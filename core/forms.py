@@ -12,6 +12,18 @@ LABEL_EMAIL = "Email"
 LABEL_EMAIL_OPCIONAL = "Email (opcional)"
 
 
+def _validar_email_unico(email, excluir_user_id=None):
+    """Un mismo email no puede quedar en dos cuentas -- se usa para mandar el
+    correo de bienvenida, comprobantes de pago y (a futuro) recuperar la
+    contraseña, así que tiene que apuntar a una sola persona."""
+    qs = User.objects.filter(email__iexact=email)
+    if excluir_user_id:
+        qs = qs.exclude(pk=excluir_user_id)
+    if qs.exists():
+        raise ValidationError("Ya existe una cuenta registrada con este email.")
+    return email
+
+
 class ConfirmacionContrasenaMixin(forms.Form):
     password1 = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={"class": "form-control"}))
     password2 = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput(attrs={"class": "form-control"}))
@@ -109,6 +121,9 @@ class CrearMiembroForm(forms.Form):
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
 
+    def clean_email(self):
+        return _validar_email_unico(self.cleaned_data["email"])
+
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("rol") == "residente" and not cleaned.get("unidad"):
@@ -145,6 +160,9 @@ class RegistroResidenteForm(ConfirmacionContrasenaMixin):
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
+
+    def clean_email(self):
+        return _validar_email_unico(self.cleaned_data["email"])
 
 
 class CondominioForm(forms.ModelForm):
@@ -218,6 +236,12 @@ class MiPerfilForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": "form-control"}),
         }
         labels = {"first_name": "Nombre", "last_name": "Apellido", "email": "Email"}
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+        if not email:
+            return email
+        return _validar_email_unico(email, excluir_user_id=self.instance.pk)
 
 
 class MiCambiarContrasenaForm(PasswordChangeForm):

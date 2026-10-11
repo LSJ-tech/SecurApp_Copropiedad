@@ -275,6 +275,68 @@ class CorreoBienvenidaTests(TestCase):
         self.assertNotRegex(mail.outbox[0].body, r"contraseña")
 
 
+class EmailUnicoTests(TestCase):
+    """Un mismo email no puede quedar en dos cuentas -- se usa para el correo
+    de bienvenida, comprobantes de pago y a futuro recuperar la contraseña."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Email Unico", plan="premium")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, numero="1")
+        cls.unidad2 = Unidad.objects.create(condominio=cls.condominio, numero="2")
+
+    def setUp(self):
+        self.existente = User.objects.create_user(username="email_unico_existente", email="repetido@example.com")
+
+    def test_residente_no_puede_autoregistrarse_con_email_repetido(self):
+        r = self.client.post(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}), {
+            "nombre": "Rosa", "apellido": "Mena", "email": "repetido@example.com", "unidad": self.unidad.pk,
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ya existe una cuenta registrada con este email")
+        self.assertFalse(User.objects.filter(first_name="Rosa").exists())
+
+    def test_email_repetido_no_distingue_mayusculas(self):
+        r = self.client.post(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}), {
+            "nombre": "Rosa", "apellido": "Mena", "email": "REPETIDO@example.com", "unidad": self.unidad.pk,
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ya existe una cuenta registrada con este email")
+
+    def test_directiva_no_puede_crear_miembro_con_email_repetido(self):
+        directiva = crear_membresia(self.condominio, "directiva", username="email_unico_directiva")
+        self.client.force_login(directiva.user)
+        r = self.client.post(reverse("crear-miembro"), {
+            "nombre": "Juan", "apellido": "Perez", "email": "repetido@example.com", "rol": "conserje",
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ya existe una cuenta registrada con este email")
+        self.assertFalse(User.objects.filter(first_name="Juan").exists())
+
+    def test_mi_perfil_no_puede_cambiar_a_un_email_de_otra_cuenta(self):
+        membresia = crear_membresia(self.condominio, "residente", unidad=self.unidad2, username="email_unico_yo", email="yo@example.com")
+        self.client.force_login(membresia.user)
+        r = self.client.post(reverse("mi-perfil"), {
+            "first_name": "Yo", "last_name": "Mismo", "email": "repetido@example.com",
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ya existe una cuenta registrada con este email")
+        membresia.user.refresh_from_db()
+        self.assertEqual(membresia.user.email, "yo@example.com")
+
+    def test_mi_perfil_puede_guardar_sin_cambiar_su_propio_email(self):
+        membresia = crear_membresia(self.condominio, "residente", unidad=self.unidad2, username="email_unico_mismo", email="mismo@example.com")
+        self.client.force_login(membresia.user)
+        r = self.client.post(reverse("mi-perfil"), {
+            "first_name": "Nombre Nuevo", "last_name": "Mismo", "email": "mismo@example.com",
+        })
+        self.assertRedirects(r, reverse("mi-perfil"))
+        membresia.user.refresh_from_db()
+        self.assertEqual(membresia.user.first_name, "Nombre Nuevo")
+
+
 class PruebaGratisTests(TestCase):
     """20 días de prueba gratis del sistema de gestión (gastos comunes y
     personal) para cualquier condominio nuevo, sin importar cómo se crea --
