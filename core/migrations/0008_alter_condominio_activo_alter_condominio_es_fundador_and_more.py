@@ -23,11 +23,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='condominio',
             name='pagado_hasta',
-            field=models.DateField(blank=True, help_text='Histórico de cuando Condofy todavía cobraba suscripción. Ya no restringe el acceso.', null=True),
+            field=models.DateField(blank=True, help_text='Histórico de cuando la plataforma todavía cobraba suscripción. Ya no restringe el acceso.', null=True),
         ),
         migrations.AlterField(
             model_name='condominio',
             name='plan',
-            field=models.CharField(choices=[('free', 'Gratis'), ('premium', 'Pro')], default='premium', help_text='Condofy es gratis para todos -- este campo es solo registro interno de DevQuad, no limita nada.', max_length=10),
+            field=models.CharField(choices=[('free', 'Gratis'), ('premium', 'Pro')], default='premium', help_text='La plataforma es gratis para todos -- este campo es solo registro interno de DevQuad, no limita nada.', max_length=10),
         ),
     ]
