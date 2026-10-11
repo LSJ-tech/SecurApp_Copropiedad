@@ -418,3 +418,132 @@ class ApiAuthTests(TestCase):
     def test_logout_requiere_autenticacion(self):
         r = self.client.post(reverse("api-logout"), {}, content_type="application/json")
         self.assertEqual(r.status_code, 401)
+
+
+class InicioViewTests(TestCase):
+    """Ramas de InicioView no cubiertas por el resto de los tests: staff sin
+    membresía va al admin en vez del mensaje genérico, y el resumen de
+    administración cuando SÍ hay un gasto común del periodo actual."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Inicio Extra", plan="premium")
+
+    def test_staff_sin_membresia_va_al_admin(self):
+        staff = User.objects.create_user(username="inicio_staff", is_staff=True)
+        self.client.force_login(staff)
+        r = self.client.get(reverse("inicio"))
+        self.assertRedirects(r, reverse("admin:index"))
+
+    def test_no_staff_sin_membresia_va_al_login_con_mensaje(self):
+        user = User.objects.create_user(username="inicio_sin_membresia")
+        self.client.force_login(user)
+        r = self.client.get(reverse("inicio"), follow=True)
+        self.assertContains(r, "no está vinculada a ningún condominio")
+
+    def test_resumen_administracion_con_gasto_comun_del_periodo(self):
+        from gastoscomunes.models import CuotaUnidad, GastoComun
+
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+        gasto = GastoComun.objects.create(condominio=self.condominio, periodo="2026-09", monto_total=10000, fecha_vencimiento=timezone.localdate())
+        CuotaUnidad.objects.create(gasto_comun=gasto, unidad=unidad, monto=10000, estado="pagado")
+        administracion = crear_membresia(self.condominio, "administracion", username="inicio_admon_gasto")
+        self.client.force_login(administracion.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["gasto_actual"], gasto)
+        self.assertEqual(r.context["gasto_actual_cuotas_pagadas"], 1)
+        self.assertEqual(r.context["gasto_actual_recaudado"], 10000)
+
+
+class ServiceWorkerViewTests(TestCase):
+    def test_sirve_el_sw_js_con_scope_global(self):
+        r = self.client.get(reverse("service-worker"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/javascript")
+        self.assertEqual(r["Service-Worker-Allowed"], "/")
+
+
+class SolicitarEliminacionViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Eliminacion", plan="premium")
+
+    def setUp(self):
+        self.membresia = crear_membresia(self.condominio, "residente", username="elim_residente")
+        self.client.force_login(self.membresia.user)
+
+    def test_get_muestra_el_formulario(self):
+        r = self.client.get(reverse("solicitar-eliminacion"))
+        self.assertEqual(r.status_code, 200)
+
+    def test_post_crea_la_solicitud_y_avisa_por_correo(self):
+        from .models import SolicitudEliminacion
+
+        r = self.client.post(reverse("solicitar-eliminacion"), {"motivo": "Ya no vivo aquí"})
+        self.assertRedirects(r, reverse("mi-perfil"))
+        solicitud = SolicitudEliminacion.objects.get(username="elim_residente")
+        self.assertEqual(solicitud.motivo, "Ya no vivo aquí")
+        self.assertEqual(len(mail.outbox), 1)
+
+
+class QRYRegenerarTokenResidentesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test QR Token", plan="premium")
+
+    def setUp(self):
+        self.directiva = crear_membresia(self.condominio, "directiva", username="qr_directiva")
+        self.client.force_login(self.directiva.user)
+
+    def test_qr_devuelve_una_imagen_png(self):
+        r = self.client.get(reverse("qr-registro-residentes"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "image/png")
+
+    def test_regenerar_token_cambia_el_token(self):
+        token_original = self.condominio.token_registro_residentes
+        r = self.client.post(reverse("regenerar-token-residentes"))
+        self.assertRedirects(r, reverse("mi-condominio"))
+        self.condominio.refresh_from_db()
+        self.assertNotEqual(self.condominio.token_registro_residentes, token_original)
+
+
+class AplicarAlicuotaMasivaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Alicuota Masiva", plan="premium")
+
+    def setUp(self):
+        self.administracion = crear_membresia(self.condominio, "administracion", username="alicuota_admon")
+        self.client.force_login(self.administracion.user)
+        self.unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+
+    def test_valor_valido_se_aplica_a_todas_las_unidades(self):
+        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "0,0033"})
+        self.assertRedirects(r, reverse("unidades"))
+        self.unidad.refresh_from_db()
+        self.assertEqual(str(self.unidad.alicuota), "0.0033")
+
+    def test_valor_invalido_no_cambia_nada(self):
+        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "no-es-un-numero"}, follow=True)
+        self.assertContains(r, "número válido")
+        self.unidad.refresh_from_db()
+        self.assertEqual(self.unidad.alicuota, 0)
+
+    def test_valor_fuera_de_rango_no_cambia_nada(self):
+        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "100"}, follow=True)
+        self.assertContains(r, "demasiado grande")
+        self.unidad.refresh_from_db()
+        self.assertEqual(self.unidad.alicuota, 0)
+
+
+class MiembroListFiltroRolTests(TestCase):
+    def test_filtra_por_rol(self):
+        condominio = Condominio.objects.create(nombre="Test Filtro Rol", plan="premium")
+        directiva = crear_membresia(condominio, "directiva", username="filtro_rol_directiva")
+        crear_membresia(condominio, "residente", username="filtro_rol_residente")
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("miembros") + "?rol=residente")
+        self.assertEqual(len(r.context["membresias"]), 1)
+        self.assertEqual(r.context["membresias"][0].rol, "residente")
