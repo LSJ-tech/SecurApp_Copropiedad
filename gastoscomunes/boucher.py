@@ -131,4 +131,9 @@ def enviar_boucher_por_correo(cuota, destinatario):
         correo.attach(nombre_archivo_boucher(cuota), generar_boucher_pdf_bytes(cuota), "application/pdf")
         correo.send()
     except Exception:
-        logger.exception("No se pudo enviar el comprobante de pago a %s (cuota #%s).", destinatario, cuota.pk)
+        # destinatario llega validado como email real (validate_email en
+        # MarcarCuotaPagadaView), pero igual se limpia de saltos de línea acá
+        # -- un valor con \r/\n en el log podría falsificar líneas de log
+        # ajenas (ver python:S6252/log injection en SonarCloud).
+        destinatario_log = destinatario.replace("\r", "").replace("\n", "")
+        logger.exception("No se pudo enviar el comprobante de pago a %s (cuota #%s).", destinatario_log, cuota.pk)

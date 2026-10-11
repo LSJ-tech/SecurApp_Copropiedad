@@ -208,6 +208,20 @@ class MarcarCuotaPagadaEnviaBoucherTests(TestCase):
         self.assertEqual(self.cuota.estado, "pagado")
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_marcar_pagada_con_correo_invalido_no_manda_nada_pero_igual_marca_pagada(self):
+        """correo_destino es un input de texto libre -- validate_email lo
+        descarta en vez de reventar si alguien manda algo que no es un email
+        real (incluido un intento de inyectar saltos de línea)."""
+        from django.core import mail
+
+        self.client.force_login(self.administracion.user)
+        r = self.client.post(reverse("cuota-marcar-pagada", args=[self.cuota.pk]), {"correo_destino": "no-es-un-correo\nInyectado: true"})
+
+        self.assertEqual(r.status_code, 302)
+        self.cuota.refresh_from_db()
+        self.assertEqual(self.cuota.estado, "pagado")
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_lista_de_cuotas_sugiere_el_correo_cuando_hay_un_solo_residente(self):
         self.client.force_login(self.administracion.user)
         r = self.client.get(reverse("gastos-comunes-cuotas", args=[self.gasto.pk]))

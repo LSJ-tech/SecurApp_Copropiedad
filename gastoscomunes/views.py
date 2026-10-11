@@ -2,6 +2,8 @@ import calendar
 from datetime import date
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Prefetch
 from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404, redirect
@@ -98,7 +100,12 @@ class MarcarCuotaPagadaView(EsDirectivaOAdministracionMixin, CondominioRequiredM
         cuota.save()
         correo_destino = request.POST.get("correo_destino", "").strip()
         if correo_destino:
-            enviar_boucher_por_correo(cuota, correo_destino)
+            try:
+                validate_email(correo_destino)
+            except ValidationError:
+                pass
+            else:
+                enviar_boucher_por_correo(cuota, correo_destino)
         return redirect("gastos-comunes-cuotas", gasto_pk=cuota.gasto_comun_id)
 
 
