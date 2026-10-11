@@ -25,6 +25,7 @@ urlpatterns = [
     path("admin-utils/probar-correo/", views.probar_correo, name="probar-correo"),
     path("admin-utils/listar-condominios/", views.listar_condominios, name="listar-condominios"),
     path("admin-utils/cargar-torres-empart/", views.cargar_torres_empart, name="cargar-torres-empart"),
+    path("admin-utils/agregar-departamentos-1-2-empart/", views.agregar_departamentos_1_2_empart, name="agregar-departamentos-1-2-empart"),
     path("miembros/", views.MiembroListView.as_view(), name="miembros"),
     path("miembros/nuevo/", views.CrearMiembroView.as_view(), name="crear-miembro"),
     path("torres/", views.TorreListView.as_view(), name="torres"),

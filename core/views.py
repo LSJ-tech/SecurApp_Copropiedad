@@ -144,6 +144,37 @@ def cargar_torres_empart(request):
     )
 
 
+@staff_member_required
+@require_GET
+def agregar_departamentos_1_2_empart(request):
+    """
+    Uso único: agrega los departamentos "1" y "2" (plantas bajas, fuera del
+    esquema piso+posición de los otros 320) a cada uno de los 16 blocks del
+    condominio real "Empart" en producción. Idempotente (get_or_create) --
+    correrla más de una vez no duplica nada.
+    """
+    try:
+        condominio = Condominio.objects.get(nombre="Empart")
+    except Condominio.DoesNotExist:
+        return HttpResponse("No existe un condominio con nombre exacto 'Empart'.", status=404)
+
+    torres = list(condominio.torres.all())
+    if not torres:
+        return HttpResponse("Empart no tiene blocks cargados todavía -- corre primero cargar_torres_empart.", status=400)
+
+    unidades_creadas = 0
+    with transaction.atomic():
+        for torre in torres:
+            for numero in ("1", "2"):
+                _, creada = Unidad.objects.get_or_create(condominio=condominio, torre=torre, numero=numero)
+                if creada:
+                    unidades_creadas += 1
+
+    return HttpResponse(
+        f"Listo. Departamentos nuevos: {unidades_creadas} (de {len(torres) * 2} esperados, 2 por cada uno de los {len(torres)} blocks)."
+    )
+
+
 class SolicitarAccesoView(FormView):
     """Formulario público embebido en la landing -- captura el interés de quien todavía no tiene código."""
 
