@@ -209,7 +209,11 @@ class SolicitarAccesoView(FormView):
                 recipient_list=[EMAIL_CONTACTO_DEVQUAD],
             )
         except Exception:
-            pass  # el lead ya quedó guardado -- el correo es solo un aviso, no bloquea la solicitud
+            # el lead ya quedó guardado -- el correo es solo un aviso, no bloquea
+            # la solicitud -- pero si falla queda registrado en los logs de
+            # Render, no desaparece en silencio (ver incidente real del correo
+            # de bienvenida, mismo patrón).
+            logger.exception("No se pudo avisar por correo de la nueva solicitud de acceso de %s (%s).", solicitud.nombre, solicitud.condominio)
         messages.success(self.request, "¡Gracias! Recibimos tu solicitud y te vamos a contactar pronto.")
         return redirect("inicio")
 
