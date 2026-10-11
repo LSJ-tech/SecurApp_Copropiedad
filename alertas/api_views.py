@@ -14,17 +14,23 @@ from .services import notificar_alerta
 
 
 class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
+    """No hereda el filtro estricto de CondominioQuerysetMixin (ver
+    get_queryset) -- las alertas, a diferencia del resto de la API, también
+    incluyen las de los condominios_vecinos del propio condominio (ver
+    Condominio.ids_red_alertas): es la única excepción deliberada al
+    aislamiento multi-tenant, y solo para esto."""
+
     queryset = Alerta.objects.select_related("autor__user", "autor__unidad", "resuelta_por__user", "resuelta_por__unidad")
     serializer_class = AlertaSerializer
     permission_classes = [IsAuthenticated, TieneMembresia]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
-        condominio_id = self.request.user.membresia.condominio_id
+        ids_red = self.request.user.membresia.condominio.ids_red_alertas
         limite = timezone.now() - timedelta(minutes=MINUTOS_AUTO_CIERRE)
-        Alerta.objects.filter(condominio_id=condominio_id, estado="activa", fecha_creacion__lt=limite).update(estado="auto_cerrada")
+        Alerta.objects.filter(condominio_id__in=ids_red, estado="activa", fecha_creacion__lt=limite).update(estado="auto_cerrada")
 
-        qs = super().get_queryset()
+        qs = self.queryset.filter(condominio_id__in=ids_red)
         estado = self.request.query_params.get("estado")
         if estado == "recientes":
             hace_24h = timezone.now() - timedelta(hours=24)

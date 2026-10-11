@@ -78,6 +78,7 @@ class CondominioAdmin(ModelAdmin):
     search_fields = ["nombre"]
     actions = [extender_30_dias, cambiar_a_free, cambiar_a_premium]
     inlines = [UnidadInline, MembresiaInline]
+    filter_horizontal = ["condominios_vecinos"]
 
     @admin.display(description="Suscripción")
     def estado_suscripcion(self, obj):

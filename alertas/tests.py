@@ -132,6 +132,88 @@ class AlertaHistorialViewTests(TestCase):
         self.assertEqual(r.context["estado_seleccionado"], "resuelta")
 
 
+class CondominiosVecinosCompartenAlertasTests(TestCase):
+    """Dos condominios que comparten vecindario (M2M condominios_vecinos,
+    simétrico) ven y reciben notificación de las alertas del otro -- pero
+    nada más (miembros, gastos comunes, etc. siguen aislados por separado,
+    eso no se tocó en este cambio)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio_a = Condominio.objects.create(nombre="Barrio A", plan="premium")
+        cls.condominio_b = Condominio.objects.create(nombre="Barrio B", plan="premium")
+        cls.condominio_suelto = Condominio.objects.create(nombre="Barrio Suelto", plan="premium")
+        cls.condominio_a.condominios_vecinos.add(cls.condominio_b)
+
+    def test_el_vinculo_es_simetrico(self):
+        self.assertIn(self.condominio_b, self.condominio_a.condominios_vecinos.all())
+        self.assertIn(self.condominio_a, self.condominio_b.condominios_vecinos.all())
+        self.assertNotIn(self.condominio_suelto, self.condominio_a.condominios_vecinos.all())
+
+    def test_ids_red_alertas_incluye_al_propio_y_a_los_vecinos(self):
+        ids = self.condominio_a.ids_red_alertas
+        self.assertCountEqual(ids, [self.condominio_a.pk, self.condominio_b.pk])
+        self.assertEqual(self.condominio_suelto.ids_red_alertas, [self.condominio_suelto.pk])
+
+    def test_un_residente_ve_la_alerta_activa_del_condominio_vecino(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor")
+        alerta_b = Alerta.objects.create(condominio=self.condominio_b, autor=autor_b, tipo="robo", estado="activa")
+
+        residente_a = crear_membresia(self.condominio_a, "residente", username="vecino_a_residente")
+        self.client.force_login(residente_a.user)
+        r = self.client.get(reverse("alerta-list") + "?estado=activa")
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([a["id"] for a in resultados], [alerta_b.id])
+        self.assertEqual(resultados[0]["condominio_nombre"], "Barrio B")
+
+    def test_un_condominio_sin_vinculo_no_ve_la_alerta_ajena(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor2")
+        Alerta.objects.create(condominio=self.condominio_b, autor=autor_b, tipo="robo", estado="activa")
+
+        residente_suelto = crear_membresia(self.condominio_suelto, "residente", username="suelto_residente")
+        self.client.force_login(residente_suelto.user)
+        r = self.client.get(reverse("alerta-list") + "?estado=activa")
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual(resultados, [])
+
+    def test_un_residente_vecino_puede_resolver_la_alerta_del_otro_condominio(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor3")
+        alerta_b = Alerta.objects.create(condominio=self.condominio_b, autor=autor_b, tipo="robo", estado="activa")
+
+        residente_a = crear_membresia(self.condominio_a, "residente", username="vecino_a_resuelve")
+        self.client.force_login(residente_a.user)
+        r = self.client.patch(
+            reverse("alerta-resolver", kwargs={"pk": alerta_b.pk}),
+            data={"estado": "falsa_alarma"}, content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        alerta_b.refresh_from_db()
+        self.assertEqual(alerta_b.estado, "falsa_alarma")
+        self.assertEqual(alerta_b.resuelta_por_id, residente_a.pk)
+
+    def test_el_historial_del_condominio_a_incluye_las_del_vecino_b(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor4")
+        Alerta.objects.create(condominio=self.condominio_b, autor=autor_b, tipo="robo", estado="activa")
+
+        residente_a = crear_membresia(self.condominio_a, "residente", username="vecino_a_historial")
+        self.client.force_login(residente_a.user)
+        r = self.client.get(reverse("alertas-historial"))
+        self.assertEqual(len(r.context["alertas"]), 1)
+        self.assertContains(r, "Barrio B")
+
+    def test_notificar_alerta_avisa_tambien_al_condominio_vecino(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor5")
+        self.client.force_login(autor_b.user)
+        with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
+             patch("alertas.services.enviar_web_push_a_condominio") as mock_web:
+            r = self.client.post(reverse("alerta-list"), {"tipo": "robo"}, content_type="application/json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(mock_expo.call_count, 2)
+        self.assertEqual(mock_web.call_count, 2)
+        condominios_avisados = {llamada.args[0] for llamada in mock_expo.call_args_list}
+        self.assertEqual(condominios_avisados, {self.condominio_a, self.condominio_b})
+
+
 class AlertaHistorialMuestraBlockTests(TestCase):
     """El historial mostraba el depto del autor/resolutor pero no el block --
     ahora muestra ambos cuando la unidad tiene torre asignada."""

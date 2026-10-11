@@ -102,6 +102,13 @@ class Condominio(models.Model):
         help_text="Solo para que el texto concuerde en género con etiqueta_unidad (ej. 'nueva unidad' vs "
         "'nuevo departamento'). No afecta nada más.",
     )
+    condominios_vecinos = models.ManyToManyField(
+        "self", blank=True,
+        help_text="Otros condominios/juntas de vecinos con los que se comparten las alertas de pánico "
+        "porque son del mismo vecindario (se ven y se avisan entre sí). Al agregar uno, queda vinculado "
+        "en ambos sentidos automáticamente. Todo lo demás -- miembros, gastos comunes, torres/unidades, "
+        "avisos, accesos -- sigue completamente separado por condominio.",
+    )
 
     class Meta:
         ordering = ["nombre"]
@@ -127,6 +134,13 @@ class Condominio(models.Model):
     @property
     def total_torres(self):
         return self.torres.count()
+
+    @property
+    def ids_red_alertas(self):
+        """IDs del propio condominio + sus condominios_vecinos -- para que
+        las alertas de pánico (y solo ellas) se compartan dentro del
+        vecindario sin tocar el aislamiento del resto de los datos."""
+        return [self.pk] + list(self.condominios_vecinos.values_list("pk", flat=True))
 
     @property
     def etiqueta_unidad_nueva(self):

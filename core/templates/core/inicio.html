@@ -279,7 +279,7 @@ const ETIQUETA_TORRE = "{{ condominio.etiqueta_torre|default:"Torre"|escapejs }}
 const ETIQUETA_UNIDAD = "{{ condominio.etiqueta_unidad|default:"Unidad"|escapejs }}";
 
 function mensajeAlertaWhatsApp(alerta) {
-    const lineas = [`🚨 *Alerta de ${alerta.tipo_display || alerta.tipo}* en ${CONDOMINIO_NOMBRE_WHATSAPP}`, ""];
+    const lineas = [`🚨 *Alerta de ${alerta.tipo_display || alerta.tipo}* en ${alerta.condominio_nombre || CONDOMINIO_NOMBRE_WHATSAPP}`, ""];
     if (alerta.autor_nombre) lineas.push(`Reportado por: ${alerta.autor_nombre}`);
     if (alerta.autor_unidad) {
         const unidad = alerta.autor_torre ? `${ETIQUETA_TORRE} ${alerta.autor_torre}, ${ETIQUETA_UNIDAD.toLowerCase()} ${alerta.autor_unidad}` : `${ETIQUETA_UNIDAD} ${alerta.autor_unidad}`;
@@ -417,9 +417,11 @@ function cargarAlertas() {
                         ? `(${ETIQUETA_TORRE} ${a.autor_torre}, ${ETIQUETA_UNIDAD.toLowerCase()} ${a.autor_unidad})`
                         : `(${ETIQUETA_UNIDAD} ${a.autor_unidad})`)
                     : "";
+                const esDeOtroCondominio = a.condominio_nombre && a.condominio_nombre !== CONDOMINIO_NOMBRE_WHATSAPP;
+                const badgeCondominio = esDeOtroCondominio ? ` <span class="badge bg-info text-dark">${a.condominio_nombre}</span>` : "";
                 return `
                 <div class="border rounded p-2 mb-2">
-                    <strong>${a.tipo_display}</strong> — ${a.autor_nombre || ""} ${unidadTexto}
+                    <strong>${a.tipo_display}</strong>${badgeCondominio} — ${a.autor_nombre || ""} ${unidadTexto}
                     <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()}</div>
                     ${a.mensaje ? `<div>${a.mensaje}</div>` : ""}
                     ${a.latitud && a.longitud ? `<div id="mapa-alerta-${a.id}" style="height: 180px;" class="rounded mt-2 mb-2"></div>` : ""}

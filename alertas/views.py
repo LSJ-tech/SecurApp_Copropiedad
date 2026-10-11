@@ -15,7 +15,10 @@ class AlertaHistorialView(CondominioRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = Alerta.objects.filter(condominio=self.condominio).select_related("autor__user", "autor__unidad", "resuelta_por__user", "resuelta_por__unidad")
+        qs = Alerta.objects.filter(condominio_id__in=self.condominio.ids_red_alertas).select_related(
+            "condominio", "autor__user", "autor__unidad__torre", "autor__condominio",
+            "resuelta_por__user", "resuelta_por__unidad__torre", "resuelta_por__condominio",
+        )
         estado = self.request.GET.get("estado")
         if estado:
             qs = qs.filter(estado=estado)
