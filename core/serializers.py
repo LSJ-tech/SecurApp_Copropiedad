@@ -65,7 +65,7 @@ class CambiarContrasenaSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs["password_nueva1"] != attrs["password_nueva2"]:
-            raise serializers.ValidationError({"password_nueva2": "Las contraseñas nuevas no coinciden."})
+            raise serializers.ValidationError("Las contraseñas nuevas no coinciden.")
         try:
             validate_password(attrs["password_nueva1"], user=self.context["request"].user)
         except DjangoValidationError as error:
