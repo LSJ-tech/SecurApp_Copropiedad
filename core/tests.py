@@ -655,12 +655,27 @@ class QRYRegenerarTokenResidentesTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "image/png")
 
+    def test_un_residente_tambien_puede_ver_el_qr(self):
+        residente = crear_membresia(self.condominio, "residente", username="qr_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("qr-registro-residentes"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "image/png")
+
     def test_regenerar_token_cambia_el_token(self):
         token_original = self.condominio.token_registro_residentes
         r = self.client.post(reverse("regenerar-token-residentes"))
         self.assertRedirects(r, reverse("mi-condominio"))
         self.condominio.refresh_from_db()
         self.assertNotEqual(self.condominio.token_registro_residentes, token_original)
+
+    def test_un_residente_no_puede_regenerar_el_token(self):
+        residente = crear_membresia(self.condominio, "residente", username="qr_residente_regen")
+        self.client.force_login(residente.user)
+        token_original = self.condominio.token_registro_residentes
+        self.client.post(reverse("regenerar-token-residentes"))
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.token_registro_residentes, token_original)
 
 
 class AplicarAlicuotaMasivaTests(TestCase):
@@ -715,6 +730,31 @@ class DashboardResidenteTests(TestCase):
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, reverse("mis-cuotas"))
         self.assertContains(r, reverse("directorio"))
+        self.assertContains(r, reverse("compartir-invitacion"))
+
+
+class CompartirInvitacionTests(TestCase):
+    """Cualquier vecino puede entrar a ver/compartir el link y QR de
+    autoregistro -- regenerar el link sigue siendo exclusivo de directiva
+    (ver QRYRegenerarTokenResidentesTests)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Compartir Invitacion", plan="premium")
+
+    def test_requiere_login(self):
+        r = self.client.get(reverse("compartir-invitacion"))
+        self.assertEqual(r.status_code, 302)
+
+    def test_cualquier_rol_puede_entrar_y_ve_el_link_y_el_boton_de_whatsapp(self):
+        for rol in ("residente", "conserje", "administracion", "directiva"):
+            membresia = crear_membresia(self.condominio, rol, username=f"invitar_{rol}")
+            self.client.force_login(membresia.user)
+            r = self.client.get(reverse("compartir-invitacion"))
+            self.assertEqual(r.status_code, 200, rol)
+            self.assertContains(r, reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+            self.assertContains(r, "wa.me")
+            self.assertNotContains(r, reverse("regenerar-token-residentes"))
 
 
 class DirectorioVecinosTests(TestCase):

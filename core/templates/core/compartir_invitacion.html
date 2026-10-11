@@ -1,0 +1,7 @@
+{% extends "core/base.html" %}
+{% block titulo %}Invitar vecinos{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-3">Invitar vecinos</h1>
+<p class="text-muted">Comparte este link o QR con otros vecinos de {{ condominio.nombre }} -- eligen {% if condominio.genero_unidad == "m" %}su propio{% else %}su propia{% endif %} {{ condominio.etiqueta_unidad|lower }} y crean su cuenta solos.</p>
+{% include "core/includes/_invitacion_card.html" %}
+{% endblock %}

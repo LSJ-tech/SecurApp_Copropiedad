@@ -1,0 +1,21 @@
+<div class="card col-md-7">
+    <div class="card-body d-flex gap-4 align-items-center flex-wrap">
+        <img src="{% url 'qr-registro-residentes' %}" alt="QR de autoregistro" width="160" height="160">
+        <div class="flex-grow-1">
+            <label class="form-label small" for="link-autoregistro">Link para compartir</label>
+            <input type="text" id="link-autoregistro" class="form-control" readonly value="{{ link_autoregistro }}" onclick="this.select();">
+            <div class="d-flex gap-2 mt-2 flex-wrap align-items-start">
+                <a class="btn btn-sm btn-success" target="_blank" rel="noopener" href="https://wa.me/?text={{ mensaje_whatsapp_invitacion|urlencode }}">
+                    <i class="bi bi-whatsapp"></i> Compartir por WhatsApp
+                </a>
+                {% if mostrar_regenerar %}
+                <form method="post" action="{% url 'regenerar-token-residentes' %}"
+                      onsubmit="return confirm('El link/QR actual dejará de funcionar. ¿Generar uno nuevo?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Generar link nuevo</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

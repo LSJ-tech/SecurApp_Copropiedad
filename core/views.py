@@ -318,7 +318,21 @@ class RegistroResidenteView(FormView):
         return redirect("inicio")
 
 
-class QRRegistroResidentesView(SoloDirectivaMixin, CondominioRequiredMixin, View):
+def _contexto_invitacion(request, condominio):
+    link = request.build_absolute_uri(
+        reverse("registro-residente", kwargs={"token": condominio.token_registro_residentes})
+    )
+    mensaje = (
+        f"¡Hola! Te invito a registrarte en SecurApp de {condominio.nombre} -- puedes crear tu cuenta "
+        f"y elegir tu {condominio.etiqueta_unidad.lower()} acá: {link}"
+    )
+    return {"link_autoregistro": link, "mensaje_whatsapp_invitacion": mensaje}
+
+
+class QRRegistroResidentesView(CondominioRequiredMixin, View):
+    """Abierto a cualquier rol -- es solo lectura y el link que codifica es el
+    mismo que ya puede ver/copiar cualquier miembro en CompartirInvitacionView."""
+
     def get(self, request):
         url = request.build_absolute_uri(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes})
@@ -327,6 +341,20 @@ class QRRegistroResidentesView(SoloDirectivaMixin, CondominioRequiredMixin, View
         buffer = BytesIO()
         imagen.save(buffer, format="PNG")
         return HttpResponse(buffer.getvalue(), content_type="image/png")
+
+
+class CompartirInvitacionView(CondominioRequiredMixin, TemplateView):
+    """Abierta a cualquier rol: cualquier vecino puede compartir el link/QR de
+    autoregistro con otros vecinos. Regenerar el link sigue siendo exclusivo
+    de la directiva (ver RegenerarTokenResidentesView), porque invalida el
+    link/QR de todos los demás."""
+
+    template_name = "core/compartir_invitacion.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(_contexto_invitacion(self.request, self.condominio))
+        return context
 
 
 class RegenerarTokenResidentesView(SoloDirectivaMixin, CondominioRequiredMixin, View):
@@ -602,6 +630,11 @@ class CondominioUpdateView(SoloDirectivaMixin, CondominioRequiredMixin, Template
     residentes (QR/link)."""
 
     template_name = "core/condominio_form.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(_contexto_invitacion(self.request, self.condominio))
+        return context
 
 
 class TorreListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
