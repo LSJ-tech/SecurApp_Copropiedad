@@ -125,6 +125,10 @@ class Condominio(models.Model):
         return self.unidades.count()
 
     @property
+    def total_torres(self):
+        return self.torres.count()
+
+    @property
     def etiqueta_unidad_nueva(self):
         """'Nueva unidad' / 'Nuevo departamento' -- concuerda en género con etiqueta_unidad."""
         return "Nuevo" if self.genero_unidad == "m" else "Nueva"

@@ -404,6 +404,10 @@ class InicioView(TemplateView):
                 pendientes = CuotaUnidad.objects.filter(unidad=self.membresia.unidad).exclude(estado="pagado")
                 context["deuda_pendiente"] = sum((c.monto for c in pendientes), Decimal("0"))
                 context["cuotas_pendientes_count"] = pendientes.count()
+            if self.membresia.rol == "residente":
+                context["total_torres"] = self.condominio.total_torres
+                context["total_unidades"] = self.condominio.total_unidades
+                context["total_miembros"] = Membresia.objects.filter(condominio=self.condominio).count()
             if self.membresia.rol in ("directiva", "administracion"):
                 context.update(self._resumen_administracion())
         return context

@@ -732,6 +732,18 @@ class DashboardResidenteTests(TestCase):
         self.assertContains(r, reverse("directorio"))
         self.assertContains(r, reverse("compartir-invitacion"))
 
+    def test_residente_ve_cantidad_de_torres_unidades_y_miembros(self):
+        condominio = Condominio.objects.create(nombre="Test Dashboard Residente Conteos", plan="premium")
+        torre = Torre.objects.create(condominio=condominio, nombre="1")
+        Unidad.objects.create(condominio=condominio, torre=torre, numero="101")
+        Unidad.objects.create(condominio=condominio, torre=torre, numero="102")
+        membresia = crear_membresia(condominio, "residente", username="dashboard_residente_conteos")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.context["total_torres"], 1)
+        self.assertEqual(r.context["total_unidades"], 2)
+        self.assertEqual(r.context["total_miembros"], 1)
+
 
 class CompartirInvitacionTests(TestCase):
     """Cualquier vecino puede entrar a ver/compartir el link y QR de
