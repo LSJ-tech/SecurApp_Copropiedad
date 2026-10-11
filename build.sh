@@ -16,14 +16,6 @@ python manage.py migrate
 # deploy -- así queda cargado en producción sin pasar por Render Shell.
 python manage.py cargar_parametros_previsionales
 
-# Condominio EMPART (primer cliente real) -- idempotente (get_or_create +
-# chequeos de existencia), seguro de correr en cada deploy. En un servicio
-# nuevo (ej. tras el rename a SecurApp Copropiedad) esto recrea solo las 15
-# torres/300 unidades y las cuentas de ejemplo (residente + directiva), con
-# contraseñas temporales nuevas que solo se imprimen UNA VEZ en este log de
-# build -- revisar el log del primer deploy en el dashboard de Render.
-python manage.py crear_condominio_empart
-
 # Crea el superusuario (dueño de la plataforma) si no existe. No hace nada si
 # DJANGO_SUPERUSER_USERNAME/PASSWORD no están definidas (por ejemplo, en local).
 python manage.py shell -c "
