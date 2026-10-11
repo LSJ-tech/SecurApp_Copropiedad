@@ -353,3 +353,81 @@ class PagoAdminTests(TestCase):
         membresia = crear_membresia(self.condominio, "residente", username="sin_nombre_admin")
         pago = Pago.objects.create(condominio=self.condominio, tipo="donacion", monto=Decimal("1000"), membresia=membresia)
         self.assertEqual(self.admin.donante(pago), "sin_nombre_admin")
+
+
+class DonarViewRamasFaltantesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Donar Ramas", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="donar_ramas_residente")
+        self.client.force_login(self.residente.user)
+
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
+    @patch("pagos.views.crear_preferencia_pago", return_value=None)
+    def test_mercadopago_no_devuelve_url_no_crea_preferencia_utilizable(self, mock_pref):
+        r = self.client.post(reverse("donar"), {"monto": "3000"}, follow=True)
+        self.assertContains(r, "No pudimos iniciar la donación")
+        self.assertEqual(Pago.objects.filter(condominio=self.condominio).count(), 1)
+
+
+class SuscripcionPagarViewRamasFaltantesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Suscripcion Ramas", plan="premium", pagado_hasta=None)
+
+    def test_sin_membresia_redirige_a_login(self):
+        user = User.objects.create_user(username="susc_sin_membresia")
+        self.client.force_login(user)
+        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
+        self.assertContains(r, "no está vinculada a ningún condominio")
+
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
+    def test_sin_token_configurado_no_crea_pago(self):
+        administracion = crear_membresia(self.condominio, "administracion", username="susc_sin_token")
+        self.client.force_login(administracion.user)
+        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
+        self.assertContains(r, "todavía no está disponible")
+        self.assertFalse(Pago.objects.filter(condominio=self.condominio).exists())
+
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
+    @patch("pagos.views.crear_preferencia_pago", return_value=None)
+    def test_mercadopago_no_devuelve_url_no_bloquea_reintentar(self, mock_pref):
+        administracion = crear_membresia(self.condominio, "administracion", username="susc_sin_url")
+        self.client.force_login(administracion.user)
+        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
+        self.assertContains(r, "No pudimos iniciar el pago")
+
+
+class PagoResultadoViewTests(TestCase):
+    def test_muestra_el_estado_que_viene_en_la_url(self):
+        condominio = Condominio.objects.create(nombre="Test Pago Resultado", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="resultado_residente")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("pago-resultado") + "?status=approved")
+        self.assertEqual(r.context["estado"], "approved")
+
+
+class WebhookMercadoPagoRamasFaltantesTests(TestCase):
+    """Las ramas de salida temprana del webhook -- nunca se confía en el
+    cuerpo del POST, así que cualquiera de estos casos debe responder 200/400
+    sin tocar ningún Pago."""
+
+    def test_body_invalido_devuelve_400(self):
+        r = self.client.post(reverse("pago-webhook"), data="esto no es json", content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_sin_payment_id_devuelve_200_sin_hacer_nada(self):
+        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {}}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+
+    @patch("pagos.views.obtener_pago_mercadopago", return_value=None)
+    def test_mercadopago_no_devuelve_el_pago_devuelve_200(self, mock_obtener):
+        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+
+    @patch("pagos.views.obtener_pago_mercadopago", return_value={"status": "approved", "external_reference": "99999"})
+    def test_pago_inexistente_devuelve_200(self, mock_obtener):
+        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)

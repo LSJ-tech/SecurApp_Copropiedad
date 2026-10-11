@@ -1,6 +1,5 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import ProtectedError
 from django.shortcuts import redirect
 from django.utils import timezone
 
@@ -152,17 +151,3 @@ class SoloStaffMixin:
             return redirect("inicio")
         return super().dispatch(request, *args, **kwargs)
 
-
-class BorradoSeguroMixin:
-    """Evita el error 500 al borrar un registro que otros protegen (on_delete=PROTECT)."""
-
-    mensaje_proteccion = "No se puede eliminar: tiene registros relacionados."
-
-    def form_valid(self, form):
-        try:
-            response = super().form_valid(form)
-        except ProtectedError:
-            messages.error(self.request, self.mensaje_proteccion)
-            return redirect(self.success_url)
-        messages.success(self.request, f"{self.object} eliminado correctamente.")
-        return response

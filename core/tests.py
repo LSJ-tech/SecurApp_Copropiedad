@@ -547,3 +547,32 @@ class MiembroListFiltroRolTests(TestCase):
         r = self.client.get(reverse("miembros") + "?rol=residente")
         self.assertEqual(len(r.context["membresias"]), 1)
         self.assertEqual(r.context["membresias"][0].rol, "residente")
+
+
+class CondominioRequiredMixinRamasTests(TestCase):
+    """Ramas de CondominioRequiredMixin.dispatch() no cubiertas vía InicioView
+    (que tiene su propia lógica inline, no usa este mixin): staff sin
+    membresía va al admin, y un condominio desactivado bloquea el acceso."""
+
+    def test_staff_sin_membresia_va_al_admin(self):
+        staff = User.objects.create_user(username="mixin_staff", is_staff=True)
+        self.client.force_login(staff)
+        r = self.client.get(reverse("miembros"))
+        self.assertRedirects(r, reverse("admin:index"))
+
+    def test_condominio_desactivado_redirige_a_cuenta_desactivada(self):
+        condominio = Condominio.objects.create(nombre="Test Desactivado", plan="premium", activo=False)
+        membresia = crear_membresia(condominio, "directiva", username="mixin_desactivado")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("miembros"))
+        self.assertRedirects(r, reverse("cuenta-desactivada"))
+
+
+class SoloStaffMixinPermiteStaffTests(TestCase):
+    def test_staff_si_puede_crear_torre(self):
+        condominio = Condominio.objects.create(nombre="Test Staff Torre", plan="premium")
+        membresia = crear_membresia(condominio, "directiva", username="staff_torre", is_staff=True)
+        self.client.force_login(membresia.user)
+        r = self.client.post(reverse("crear-torre"), {"nombre": "Nueva"})
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(Torre.objects.filter(condominio=condominio, nombre="Nueva").exists())
