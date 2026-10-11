@@ -5,7 +5,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import CustomTokenObtainPairSerializer, MembresiaSerializer
+from .serializers import CambiarContrasenaSerializer, CustomTokenObtainPairSerializer, MembresiaSerializer, MiPerfilSerializer
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -33,3 +33,24 @@ class MeView(APIView):
         if membresia is None:
             return Response({"detail": "Este usuario no tiene una membresía a ningún condominio."}, status=409)
         return Response(MembresiaSerializer(membresia).data)
+
+    def patch(self, request):
+        """Editar nombre/apellido/email -- mismos campos y misma validación
+        de email único que MiPerfilView en el panel web."""
+        serializer = MiPerfilSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class CambiarContrasenaView(APIView):
+    """Mismas reglas que MiCambiarContrasenaView en el panel web -- exige la
+    contraseña actual, valida la nueva con las reglas estándar de Django."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CambiarContrasenaSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=204)

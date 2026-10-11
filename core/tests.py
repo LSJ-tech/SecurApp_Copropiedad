@@ -482,6 +482,98 @@ class ApiAuthTests(TestCase):
         self.assertEqual(r.status_code, 401)
 
 
+class ApiMiPerfilYCambiarContrasenaTests(TestCase):
+    """PATCH /auth/me/ (editar perfil) y POST /auth/cambiar-contrasena/ --
+    mismas reglas que el panel web (MiPerfilForm/MiCambiarContrasenaForm),
+    para que la futura app Expo se comporte igual."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Api Perfil", plan="premium")
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="api_perfil_user", password="clave-segura-123", email="yo@example.com")
+        Membresia.objects.create(user=self.user, condominio=self.condominio, rol="residente", terminos_aceptados_en=timezone.now())
+        login = self.client.post(reverse("api-login"), {"username": "api_perfil_user", "password": "clave-segura-123"})
+        self.access = login.json()["access"]
+
+    def _auth(self):
+        return {"HTTP_AUTHORIZATION": f"Bearer {self.access}"}
+
+    def test_actualizar_perfil_requiere_autenticacion(self):
+        r = self.client.patch(reverse("api-me"), {"first_name": "Nuevo"}, content_type="application/json")
+        self.assertEqual(r.status_code, 401)
+
+    def test_actualizar_nombre_y_email(self):
+        r = self.client.patch(
+            reverse("api-me"), {"first_name": "Logan", "last_name": "Silva", "email": "nuevo@example.com"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Logan")
+        self.assertEqual(self.user.email, "nuevo@example.com")
+
+    def test_actualizar_perfil_con_email_de_otra_cuenta_falla(self):
+        User.objects.create_user(username="api_perfil_otro", email="ocupado@example.com")
+        r = self.client.patch(
+            reverse("api-me"), {"email": "ocupado@example.com"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "yo@example.com")
+
+    def test_actualizar_perfil_puede_guardar_sin_cambiar_su_propio_email(self):
+        r = self.client.patch(
+            reverse("api-me"), {"email": "yo@example.com", "first_name": "Mismo"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 200)
+
+    def test_cambiar_contrasena_requiere_autenticacion(self):
+        r = self.client.post(reverse("api-cambiar-contrasena"), {}, content_type="application/json")
+        self.assertEqual(r.status_code, 401)
+
+    def test_cambiar_contrasena_exitoso(self):
+        r = self.client.post(
+            reverse("api-cambiar-contrasena"),
+            {"password_actual": "clave-segura-123", "password_nueva1": "otraClaveSegura456", "password_nueva2": "otraClaveSegura456"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 204)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("otraClaveSegura456"))
+
+    def test_cambiar_contrasena_actual_incorrecta(self):
+        r = self.client.post(
+            reverse("api-cambiar-contrasena"),
+            {"password_actual": "clave-mala", "password_nueva1": "otraClaveSegura456", "password_nueva2": "otraClaveSegura456"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("clave-segura-123"))
+
+    def test_cambiar_contrasena_nuevas_no_coinciden(self):
+        r = self.client.post(
+            reverse("api-cambiar-contrasena"),
+            {"password_actual": "clave-segura-123", "password_nueva1": "otraClaveSegura456", "password_nueva2": "distinta789"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_cambiar_contrasena_nueva_demasiado_debil(self):
+        r = self.client.post(
+            reverse("api-cambiar-contrasena"),
+            {"password_actual": "clave-segura-123", "password_nueva1": "12345678", "password_nueva2": "12345678"},
+            content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("clave-segura-123"))
+
+
 class InicioViewTests(TestCase):
     """Ramas de InicioView no cubiertas por el resto de los tests: staff sin
     membresía va al admin en vez del mensaje genérico, y el resumen de

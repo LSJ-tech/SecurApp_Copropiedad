@@ -8,4 +8,5 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view(), name="api-refresh"),
     path("auth/logout/", api_views.LogoutView.as_view(), name="api-logout"),
     path("auth/me/", api_views.MeView.as_view(), name="api-me"),
+    path("auth/cambiar-contrasena/", api_views.CambiarContrasenaView.as_view(), name="api-cambiar-contrasena"),
 ]
