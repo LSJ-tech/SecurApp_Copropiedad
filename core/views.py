@@ -323,8 +323,14 @@ def _contexto_invitacion(request, condominio):
         reverse("registro-residente", kwargs={"token": condominio.token_registro_residentes})
     )
     mensaje = (
-        f"¡Hola! Te invito a registrarte en SecurApp de {condominio.nombre} -- puedes crear tu cuenta "
-        f"y elegir tu {condominio.etiqueta_unidad.lower()} acá: {link}"
+        f"🏠 ¡Hola, vecino/a!\n\n"
+        f"Te invito a unirte a *SecurApp* 🔐, la app de nuestro condominio *{condominio.nombre}*.\n\n"
+        f"Desde ahí puedes:\n"
+        f"✅ Activar el botón de pánico\n"
+        f"✅ Ver avisos y alertas del condominio\n"
+        f"✅ Revisar tus gastos comunes\n\n"
+        f"Crea tu cuenta eligiendo tu {condominio.etiqueta_unidad.lower()} acá 👇\n"
+        f"{link}"
     )
     return {"link_autoregistro": link, "mensaje_whatsapp_invitacion": mensaje}
 
