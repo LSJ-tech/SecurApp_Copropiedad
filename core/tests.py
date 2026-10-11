@@ -703,6 +703,20 @@ class MiembroListFiltroRolTests(TestCase):
         self.assertEqual(r.context["membresias"][0].rol, "residente")
 
 
+class DashboardResidenteTests(TestCase):
+    """El dashboard de residente tiene los mismos botones de acceso rápido
+    que ya tenían directiva/administración/conserjería (commit del
+    directorio de vecinos) -- antes solo tenía la tarjeta de gastos comunes."""
+
+    def test_residente_ve_los_botones_de_gastos_comunes_y_directorio(self):
+        condominio = Condominio.objects.create(nombre="Test Dashboard Residente", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="dashboard_residente")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, reverse("mis-cuotas"))
+        self.assertContains(r, reverse("directorio"))
+
+
 class DirectorioVecinosTests(TestCase):
     """Directorio abierto a cualquier rol -- nombre y block/depto, sin
     usuario, email ni rol (eso sigue siendo exclusivo de MiembroListView)."""
