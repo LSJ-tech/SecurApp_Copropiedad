@@ -82,27 +82,33 @@
     <aside class="app-sidebar bg-primary d-flex flex-column">
         {% include "core/includes/_sidebar_nav.html" %}
     </aside>
-
-    <div class="offcanvas offcanvas-start bg-primary text-white" tabindex="-1" id="sidebarOffcanvas">
-        <div class="offcanvas-header">
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
-        </div>
-        <div class="offcanvas-body d-flex flex-column">
-            {% include "core/includes/_sidebar_nav.html" %}
-        </div>
-    </div>
     {% endif %}
 
     <div class="{% if user.is_authenticated %}app-main{% else %}d-flex flex-column{% endif %}" style="min-height: 100vh;">
         {% if user.is_authenticated %}
         <div class="mobile-topbar navbar navbar-dark bg-primary px-3">
-            <button class="btn text-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas">
-                <i class="bi bi-list fs-4"></i>
-            </button>
             <a class="navbar-brand d-flex align-items-center gap-2 mb-0" href="{% url 'inicio' %}">
                 <img src="{% static 'core/logo.svg' %}" width="24" height="24" alt="">
                 {% if user.membresia %}{{ user.membresia.condominio.nombre }}{% else %}{{ PLATFORM_NAME }}{% endif %}
             </a>
+            <div class="dropdown ms-auto">
+                <button class="btn text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-person-circle fs-4"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    <li><a class="dropdown-item" href="{% url 'mi-perfil' %}"><i class="bi bi-person"></i> Mi perfil</a></li>
+                    {% if user.is_staff %}
+                    <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-shield-lock"></i> Panel admin</a></li>
+                    {% endif %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" action="{% url 'logout' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
         </div>
         {% else %}
         <nav class="navbar navbar-dark bg-primary mb-4">

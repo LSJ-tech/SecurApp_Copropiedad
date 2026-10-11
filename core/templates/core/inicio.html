@@ -30,6 +30,14 @@
 </div>
 {% endif %}
 
+{% if membresia.rol == "conserje" %}
+<div class="card mb-4">
+    <div class="card-body text-center">
+        <a href="{% url 'registro-ingreso-list' %}" class="btn btn-outline-primary w-100 py-3"><i class="bi bi-door-open d-block fs-4 mb-1"></i> Accesos</a>
+    </div>
+</div>
+{% endif %}
+
 {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
@@ -100,6 +108,7 @@
     <div class="col"><a href="{% url 'unidades' %}" class="btn btn-outline-primary w-100 h-100"><i class="bi bi-building d-block fs-4 mb-1"></i> {{ condominio.etiqueta_unidad }}s</a></div>
     <div class="col"><a href="{% url 'gastos-comunes-list' %}" class="btn btn-outline-primary w-100 h-100"><i class="bi bi-cash-coin d-block fs-4 mb-1"></i> Gastos comunes</a></div>
     <div class="col"><a href="{% url 'registro-ingreso-list' %}" class="btn btn-outline-primary w-100 h-100"><i class="bi bi-door-open d-block fs-4 mb-1"></i> Accesos</a></div>
+    <div class="col"><a href="{% url 'empleados' %}" class="btn btn-outline-primary w-100 h-100"><i class="bi bi-person-badge d-block fs-4 mb-1"></i> Personal</a></div>
     {% if membresia.rol == "directiva" %}
     <div class="col"><a href="{% url 'mi-condominio' %}" class="btn btn-outline-primary w-100 h-100"><i class="bi bi-gear d-block fs-4 mb-1"></i> Mi condominio</a></div>
     {% endif %}
