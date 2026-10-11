@@ -515,6 +515,23 @@ class SolicitarEliminacionView(LoginRequiredMixin, View):
         return redirect("mi-perfil")
 
 
+class DirectorioVecinosView(CondominioRequiredMixin, ListView):
+    """Directorio simple abierto a cualquier miembro (incluido residente) --
+    solo nombre y block/depto. A propósito NO muestra usuario, email ni rol:
+    eso sigue siendo exclusivo de directiva/administración en
+    MiembroListView."""
+
+    template_name = "core/directorio_vecinos.html"
+    context_object_name = "membresias"
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = Membresia.objects.filter(condominio=self.condominio).select_related("user", "unidad", "unidad__torre")
+        return qs.annotate(
+            _torre_len=Length("unidad__torre__nombre"), _num_len=Length("unidad__numero"),
+        ).order_by("_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "user__last_name")
+
+
 class MiembroListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, ListView):
     template_name = "core/miembro_list.html"
     context_object_name = "membresias"

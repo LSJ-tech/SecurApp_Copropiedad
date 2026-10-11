@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}
+{% block titulo %}Directorio{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-3">Directorio de vecinos</h1>
+<p class="text-muted small mb-3">Nombre y {{ condominio.etiqueta_unidad|lower }} de cada miembro del condominio.</p>
+
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead><tr><th>Nombre</th><th>{{ condominio.etiqueta_torre }}</th><th>{{ condominio.etiqueta_unidad }}</th></tr></thead>
+    <tbody>
+        {% for m in membresias %}
+        <tr>
+            <td>{{ m.user.get_full_name|default:m.user.username }}</td>
+            <td>{{ m.unidad.torre|default:"—" }}</td>
+            <td>{{ m.unidad.numero|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-muted">Todavía no hay vecinos registrados.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% include "core/includes/_paginacion_torre.html" %}
+{% endblock %}

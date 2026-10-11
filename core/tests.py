@@ -703,6 +703,44 @@ class MiembroListFiltroRolTests(TestCase):
         self.assertEqual(r.context["membresias"][0].rol, "residente")
 
 
+class DirectorioVecinosTests(TestCase):
+    """Directorio abierto a cualquier rol -- nombre y block/depto, sin
+    usuario, email ni rol (eso sigue siendo exclusivo de MiembroListView)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Directorio", plan="premium")
+        cls.torre = Torre.objects.create(condominio=cls.condominio, nombre="5")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre, numero="501")
+
+    def test_requiere_login(self):
+        r = self.client.get(reverse("directorio"))
+        self.assertEqual(r.status_code, 302)
+
+    def test_cualquier_rol_puede_entrar(self):
+        for rol in ("residente", "conserje", "administracion", "directiva"):
+            membresia = crear_membresia(self.condominio, rol, unidad=self.unidad, username=f"directorio_{rol}")
+            self.client.force_login(membresia.user)
+            r = self.client.get(reverse("directorio"))
+            self.assertEqual(r.status_code, 200, rol)
+            self.client.logout()
+
+    def test_muestra_nombre_y_depto_pero_no_usuario_ni_email_ni_rol(self):
+        vecino = crear_membresia(
+            self.condominio, "residente", unidad=self.unidad, username="directorio_vecino_secreto",
+            email="vecino_secreto@example.com", first_name="Rosa", last_name="Mena",
+        )
+        yo = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="directorio_yo")
+        self.client.force_login(yo.user)
+        r = self.client.get(reverse("directorio"))
+        contenido = r.content.decode()
+        self.assertIn("Rosa Mena", contenido)
+        self.assertIn("501", contenido)
+        self.assertNotIn("directorio_vecino_secreto", contenido)
+        self.assertNotIn("vecino_secreto@example.com", contenido)
+        self.assertNotIn("Residente", contenido)
+
+
 class CondominioRequiredMixinRamasTests(TestCase):
     """Ramas de CondominioRequiredMixin.dispatch() no cubiertas vía InicioView
     (que tiene su propia lógica inline, no usa este mixin): staff sin
