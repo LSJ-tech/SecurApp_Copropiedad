@@ -7,6 +7,7 @@ TIPO_CHOICES = [
     ("incendio", "Incendio"),
     ("accidente", "Accidente"),
     ("otro", "Otro"),
+    ("prueba", "Prueba"),
 ]
 
 ESTADO_CHOICES = [
