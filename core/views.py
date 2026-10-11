@@ -111,15 +111,21 @@ def listar_condominios(request):
 @require_GET
 def cargar_torres_empart(request):
     """
-    Uso único: completa el condominio real "Empart" en producción con sus
+    Uso único: completa el condominio real de Empart en producción con sus
     16 torres confirmadas x 5 pisos x 4 deptos (320 unidades). Idempotente
     (get_or_create) -- correrla más de una vez no duplica nada. No toca
     miembros ni unidades que ya existan.
+
+    Busca por "Empart" dentro del nombre (no exacto) -- el nombre real del
+    condominio cambió a "Población Empart" después de que esto se escribió.
     """
-    try:
-        condominio = Condominio.objects.get(nombre="Empart")
-    except Condominio.DoesNotExist:
-        return HttpResponse("No existe un condominio con nombre exacto 'Empart'.", status=404)
+    condominios = Condominio.objects.filter(nombre__icontains="Empart")
+    if not condominios.exists():
+        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
+    if condominios.count() > 1:
+        nombres = ", ".join(repr(c.nombre) for c in condominios)
+        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
+    condominio = condominios.get()
 
     numeros_por_piso = ["1", "2", "3", "4"]
     pisos = ["1", "2", "3", "4", "5"]
