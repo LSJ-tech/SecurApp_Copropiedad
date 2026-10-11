@@ -27,13 +27,13 @@
         <tr>
             <td>{{ a.get_tipo_display }}</td>
             <td><span class="badge bg-secondary">{{ a.get_estado_display }}</span></td>
-            <td>{{ a.autor.user.get_full_name|default:a.autor.user.username }}{% if a.autor.unidad %} ({{ condominio.etiqueta_unidad }} {{ a.autor.unidad.numero }}){% endif %}</td>
+            <td>{{ a.autor.user.get_full_name|default:a.autor.user.username }}{% if a.autor.unidad %} ({% if a.autor.unidad.torre %}{{ condominio.etiqueta_torre }} {{ a.autor.unidad.torre.nombre }}, {% endif %}{{ condominio.etiqueta_unidad|lower }} {{ a.autor.unidad.numero }}){% endif %}</td>
             <td>{{ a.fecha_creacion|date:"d-m-Y H:i" }}</td>
             <td>
                 {% if a.estado == "auto_cerrada" %}
                     Se cerró sola (nadie respondió en 30 min)
                 {% elif a.resuelta_por %}
-                    {{ a.resuelta_por.user.get_full_name|default:a.resuelta_por.user.username }}{% if a.resuelta_por.unidad %} ({{ condominio.etiqueta_unidad }} {{ a.resuelta_por.unidad.numero }}){% endif %}
+                    {{ a.resuelta_por.user.get_full_name|default:a.resuelta_por.user.username }}{% if a.resuelta_por.unidad %} ({% if a.resuelta_por.unidad.torre %}{{ condominio.etiqueta_torre }} {{ a.resuelta_por.unidad.torre.nombre }}, {% endif %}{{ condominio.etiqueta_unidad|lower }} {{ a.resuelta_por.unidad.numero }}){% endif %}
                 {% else %}
                     —
                 {% endif %}

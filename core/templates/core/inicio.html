@@ -411,9 +411,15 @@ function cargarAlertas() {
                 cont.innerHTML = '<p class="text-success mb-0"><i class="bi bi-check-circle"></i> Sin alertas activas.</p>';
                 return;
             }
-            cont.innerHTML = alertas.map(a => `
+            cont.innerHTML = alertas.map(a => {
+                const unidadTexto = a.autor_unidad
+                    ? (a.autor_torre
+                        ? `(${ETIQUETA_TORRE} ${a.autor_torre}, ${ETIQUETA_UNIDAD.toLowerCase()} ${a.autor_unidad})`
+                        : `(${ETIQUETA_UNIDAD} ${a.autor_unidad})`)
+                    : "";
+                return `
                 <div class="border rounded p-2 mb-2">
-                    <strong>${a.tipo_display}</strong> — ${a.autor_nombre || ""} ${a.autor_unidad ? "(" + ETIQUETA_UNIDAD + " " + a.autor_unidad + ")" : ""}
+                    <strong>${a.tipo_display}</strong> — ${a.autor_nombre || ""} ${unidadTexto}
                     <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()}</div>
                     ${a.mensaje ? `<div>${a.mensaje}</div>` : ""}
                     ${a.latitud && a.longitud ? `<div id="mapa-alerta-${a.id}" style="height: 180px;" class="rounded mt-2 mb-2"></div>` : ""}
@@ -421,7 +427,8 @@ function cargarAlertas() {
                     <button class="btn btn-sm btn-outline-secondary mt-1" onclick="resolverAlerta(${a.id}, 'falsa_alarma')">Falsa alarma</button>
                     <a href="${linkWhatsAppAlerta(a)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success mt-1"><i class="bi bi-whatsapp"></i> Compartir</a>
                 </div>
-            `).join("");
+            `;
+            }).join("");
 
             alertas.forEach(function (a) {
                 if (!a.latitud || !a.longitud) return;

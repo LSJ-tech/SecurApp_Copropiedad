@@ -130,3 +130,23 @@ class AlertaHistorialViewTests(TestCase):
         self.assertEqual(len(r.context["alertas"]), 1)
         self.assertEqual(r.context["alertas"][0].tipo, "incendio")
         self.assertEqual(r.context["estado_seleccionado"], "resuelta")
+
+
+class AlertaHistorialMuestraBlockTests(TestCase):
+    """El historial mostraba el depto del autor/resolutor pero no el block --
+    ahora muestra ambos cuando la unidad tiene torre asignada."""
+
+    def test_muestra_el_block_ademas_del_depto(self):
+        from core.models import Torre, Unidad
+
+        condominio = Condominio.objects.create(nombre="Test Historial Block", plan="premium")
+        torre = Torre.objects.create(condominio=condominio, nombre="9")
+        unidad = Unidad.objects.create(condominio=condominio, torre=torre, numero="302")
+        autor = crear_membresia(condominio, "residente", username="historial_block_autor")
+        autor.unidad = unidad
+        autor.save(update_fields=["unidad"])
+        self.client.force_login(autor.user)
+        Alerta.objects.create(condominio=condominio, autor=autor, tipo="robo", estado="activa")
+
+        r = self.client.get(reverse("alertas-historial"))
+        self.assertContains(r, f"{condominio.etiqueta_torre} 9, {condominio.etiqueta_unidad.lower()} 302")
