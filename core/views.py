@@ -150,13 +150,20 @@ def agregar_departamentos_1_2_empart(request):
     """
     Uso único: agrega los departamentos "1" y "2" (plantas bajas, fuera del
     esquema piso+posición de los otros 320) a cada uno de los 16 blocks del
-    condominio real "Empart" en producción. Idempotente (get_or_create) --
+    condominio real de Empart en producción. Idempotente (get_or_create) --
     correrla más de una vez no duplica nada.
+
+    Busca por "Empart" dentro del nombre (no exacto) -- el usuario le cambió
+    el nombre real a "Población Empart" después de cargar las torres, así
+    que un match exacto a "Empart" ya no encuentra el condominio.
     """
-    try:
-        condominio = Condominio.objects.get(nombre="Empart")
-    except Condominio.DoesNotExist:
-        return HttpResponse("No existe un condominio con nombre exacto 'Empart'.", status=404)
+    condominios = Condominio.objects.filter(nombre__icontains="Empart")
+    if not condominios.exists():
+        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
+    if condominios.count() > 1:
+        nombres = ", ".join(repr(c.nombre) for c in condominios)
+        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
+    condominio = condominios.get()
 
     torres = list(condominio.torres.all())
     if not torres:
