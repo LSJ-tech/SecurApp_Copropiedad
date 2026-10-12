@@ -287,3 +287,22 @@ class AdminOrdenNumericoTests(TestCase):
         Membresia.objects.create(user=user_2, condominio=condominio, rol="residente", unidad=unidad_2, terminos_aceptados_en=timezone.now())
         usernames = list(MembresiaAdmin(Membresia, admin.site).get_queryset(self.request).values_list("user__username", flat=True))
         self.assertEqual(usernames, ["orden_block2", "orden_block10"])
+
+
+class AdminIndexYSidebarTests(TestCase):
+    """El índice del admin arma TODO el sidebar personalizado (UNFOLD.SIDEBAR.navigation,
+    config/settings.py) -- cada link usa reverse_lazy con el nombre de URL de un
+    modelo registrado, así que un nombre mal escrito ahí no se nota hasta que
+    alguien realmente visita /admin/ (reverse_lazy es perezoso). Este test
+    fuerza esa resolución, y de paso confirma que SITE_LOGO también resuelve
+    bien (depende del storage de staticfiles, no de un path fijo)."""
+
+    def test_admin_index_renderiza_con_todo_el_sidebar_y_el_logo(self):
+        staff = User.objects.create_superuser(username="sidebar_staff", password="x", email="sidebar_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/")
+        self.assertEqual(r.status_code, 200)
+        contenido = r.content.decode()
+        self.assertIn("core/logo", contenido)
+        for texto in ("Condominios", "Blocks", "Departamentos", "Membresías", "Alertas", "Avisos", "Gastos comunes", "Empleados", "Usuarios"):
+            self.assertIn(texto, contenido)

@@ -10,6 +10,7 @@ from pathlib import Path
 import dj_database_url
 from django.contrib import messages
 from django.core.management.utils import get_random_secret_key
+from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -243,10 +244,22 @@ LOGGING = {
 
 
 # Tema del admin (django-unfold).
+
+def _logo_admin(request):
+    """SITE_LOGO necesita la URL YA resuelta por el storage de static files
+    (en producción con hash de cache-busting, ver STORAGES) -- no se puede
+    llamar static() al cargar settings.py (la app de staticfiles todavía no
+    está lista en ese momento), así que se resuelve acá, perezoso, recién
+    cuando Unfold arma el contexto de cada página del admin."""
+    from django.templatetags.static import static
+    return static("core/logo.svg")
+
+
 UNFOLD = {
     "SITE_TITLE": "SecurApp Copropiedad · Admin",
     "SITE_HEADER": "SecurApp Copropiedad",
     "SITE_SYMBOL": "shield",
+    "SITE_LOGO": _logo_admin,
     "SHOW_HISTORY": True,
     "COLORS": {
         "primary": {
@@ -262,5 +275,60 @@ UNFOLD = {
             "900": "10 20 28",
             "950": "5 10 14",
         },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "items": [
+                    {"title": "Dashboard", "icon": "dashboard", "link": reverse_lazy("admin:index")},
+                ],
+            },
+            {
+                "title": "Condominios",
+                "separator": True,
+                "items": [
+                    {"title": "Condominios", "icon": "apartment", "link": reverse_lazy("admin:core_condominio_changelist")},
+                    {"title": "Blocks", "icon": "domain", "link": reverse_lazy("admin:core_torre_changelist")},
+                    {"title": "Departamentos", "icon": "door_front", "link": reverse_lazy("admin:core_unidad_changelist")},
+                    {"title": "Membresías", "icon": "groups", "link": reverse_lazy("admin:core_membresia_changelist")},
+                    {"title": "Códigos de invitación", "icon": "vpn_key", "link": reverse_lazy("admin:core_codigoinvitacion_changelist")},
+                    {"title": "Solicitudes de acceso", "icon": "mail", "link": reverse_lazy("admin:core_solicitudacceso_changelist")},
+                    {"title": "Solicitudes de eliminación", "icon": "person_remove", "link": reverse_lazy("admin:core_solicitudeliminacion_changelist")},
+                ],
+            },
+            {
+                "title": "Operación",
+                "separator": True,
+                "items": [
+                    {"title": "Alertas", "icon": "emergency", "link": reverse_lazy("admin:alertas_alerta_changelist")},
+                    {"title": "Avisos", "icon": "campaign", "link": reverse_lazy("admin:comunicacion_aviso_changelist")},
+                    {"title": "Accesos", "icon": "meeting_room", "link": reverse_lazy("admin:accesos_registroingreso_changelist")},
+                    {"title": "Gastos comunes", "icon": "payments", "link": reverse_lazy("admin:gastoscomunes_gastocomun_changelist")},
+                    {"title": "Dispositivos push", "icon": "notifications", "link": reverse_lazy("admin:notificaciones_dispositivopush_changelist")},
+                    {"title": "Pagos", "icon": "credit_card", "link": reverse_lazy("admin:pagos_pago_changelist")},
+                ],
+            },
+            {
+                "title": "Personal",
+                "separator": True,
+                "items": [
+                    {"title": "Empleados", "icon": "badge", "link": reverse_lazy("admin:personal_empleado_changelist")},
+                    {"title": "Liquidaciones", "icon": "receipt_long", "link": reverse_lazy("admin:personal_liquidacion_changelist")},
+                    {"title": "AFPs", "icon": "account_balance", "link": reverse_lazy("admin:personal_afp_changelist")},
+                    {"title": "Tramos impuesto único", "icon": "calculate", "link": reverse_lazy("admin:personal_tramoimpuestounico_changelist")},
+                    {"title": "Parámetros del periodo", "icon": "tune", "link": reverse_lazy("admin:personal_parametrosperiodo_changelist")},
+                ],
+            },
+            {
+                "title": "Cuentas",
+                "separator": True,
+                "items": [
+                    {"title": "Usuarios", "icon": "person", "link": reverse_lazy("admin:auth_user_changelist")},
+                    {"title": "Grupos", "icon": "shield_person", "link": reverse_lazy("admin:auth_group_changelist")},
+                ],
+            },
+        ],
     },
 }
