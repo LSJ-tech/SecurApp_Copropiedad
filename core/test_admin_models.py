@@ -124,3 +124,34 @@ class MarcarAtendidoTests(TestCase):
         solicitud.refresh_from_db()
         self.assertTrue(solicitud.atendida)
         self.assertIsNotNone(solicitud.fecha_atencion)
+
+
+class MembresiaAdminChangelistTests(TestCase):
+    """El filtro por condominio en /admin/core/membresia/ pasó de la lista
+    larga de links por defecto a un desplegable con buscador
+    (AutocompleteSelectFilter) -- esto confirma que la página sigue
+    renderizando bien (requiere 'unfold.contrib.filters' en INSTALLED_APPS
+    para que cargue su template) y que el filtro realmente filtra."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio_a = Condominio.objects.create(nombre="Test Admin Filtro A", plan="premium")
+        cls.condominio_b = Condominio.objects.create(nombre="Test Admin Filtro B", plan="premium")
+        user_a = User.objects.create_user(username="admfiltro_a")
+        user_b = User.objects.create_user(username="admfiltro_b")
+        Membresia.objects.create(user=user_a, condominio=cls.condominio_a, rol="residente", terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=user_b, condominio=cls.condominio_b, rol="residente", terminos_aceptados_en=timezone.now())
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(username="admfiltro_staff", password="x")
+        self.client.force_login(self.superuser)
+
+    def test_changelist_renderiza_ok(self):
+        r = self.client.get("/admin/core/membresia/")
+        self.assertEqual(r.status_code, 200)
+
+    def test_filtro_por_condominio_acota_los_resultados(self):
+        r = self.client.get("/admin/core/membresia/", {"condominio__id__exact": self.condominio_a.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "admfiltro_a")
+        self.assertNotContains(r, "admfiltro_b")

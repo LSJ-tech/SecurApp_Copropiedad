@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     # lo exige el propio paquete.
     'core',
     'unfold',
+    'unfold.contrib.filters',
     'anymail',
     'django.contrib.admin',
     'django.contrib.auth',

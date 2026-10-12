@@ -3,6 +3,7 @@ import datetime
 from django.contrib import admin
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
+from unfold.contrib.filters.admin import AutocompleteSelectFilter
 
 from .models import PLAN_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
@@ -102,8 +103,12 @@ class UnidadAdmin(ModelAdmin):
 
 @admin.register(Membresia)
 class MembresiaAdmin(ModelAdmin):
+    """Filtro de condominio como desplegable con buscador (AutocompleteSelectFilter)
+    en vez de la lista larga de links que da el filtro por defecto -- con 27+
+    condominios registrados y subiendo, esa lista ya no es manejable."""
+
     list_display = ["user", "condominio", "rol", "unidad"]
-    list_filter = ["rol", "condominio"]
+    list_filter = ["rol", ("condominio", AutocompleteSelectFilter)]
     autocomplete_fields = ["user", "unidad"]
 
 
