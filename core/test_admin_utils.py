@@ -16,13 +16,13 @@ class AdminUtilsPermisosTests(TestCase):
         self.normal = User.objects.create_user(username="util_normal")
 
     def test_anonimo_no_puede_entrar(self):
-        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "corregir-etiqueta-unidad-empart", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
     def test_usuario_normal_no_puede_entrar(self):
         self.client.force_login(self.normal)
-        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "corregir-etiqueta-unidad-empart", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
@@ -123,6 +123,36 @@ class BuscarBorradosTests(TestCase):
         )
         r = self.client.get(reverse("buscar-borrados"))
         self.assertNotIn("No debería aparecer", r.content.decode())
+
+
+class CorregirEtiquetaUnidadEmpartTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(username="ceue_staff", is_staff=True)
+        self.client.force_login(self.staff)
+
+    def test_sin_condominio_empart_devuelve_404(self):
+        r = self.client.get(reverse("corregir-etiqueta-unidad-empart"))
+        self.assertEqual(r.status_code, 404)
+
+    def test_mas_de_un_condominio_empart_devuelve_409(self):
+        Condominio.objects.create(nombre="Condominio EMPART", plan="premium")
+        Condominio.objects.create(nombre="Población EMPART", plan="premium")
+        r = self.client.get(reverse("corregir-etiqueta-unidad-empart"))
+        self.assertEqual(r.status_code, 409)
+
+    def test_corrige_el_plural_a_singular(self):
+        condominio = Condominio.objects.create(nombre="Población Empart", plan="premium", etiqueta_unidad="Departamentos")
+        r = self.client.get(reverse("corregir-etiqueta-unidad-empart"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("'Departamentos' -> 'Departamento'", r.content.decode())
+        condominio.refresh_from_db()
+        self.assertEqual(condominio.etiqueta_unidad, "Departamento")
+
+    def test_es_idempotente(self):
+        Condominio.objects.create(nombre="Población Empart", plan="premium", etiqueta_unidad="Departamentos")
+        self.client.get(reverse("corregir-etiqueta-unidad-empart"))
+        r2 = self.client.get(reverse("corregir-etiqueta-unidad-empart"))
+        self.assertIn("ya es 'Departamento', no se tocó nada", r2.content.decode())
 
 
 class CargarTorresEmpartTests(TestCase):

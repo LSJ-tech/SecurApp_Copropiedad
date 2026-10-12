@@ -164,6 +164,33 @@ def listar_condominios(request):
 
 @staff_member_required
 @require_GET
+def corregir_etiqueta_unidad_empart(request):
+    """Uso único: la etiqueta_unidad de Población Empart quedó guardada como
+    "Departamentos" (plural) en vez de "Departamento" (singular) -- el resto
+    del sistema agrega la "s" solo cuando corresponde, así que en plural
+    quedaba duplicada ("Departamentoss", "Nuevo departamentos"). Idempotente."""
+    condominios = Condominio.objects.filter(nombre__icontains="Empart")
+    if not condominios.exists():
+        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
+    if condominios.count() > 1:
+        nombres = ", ".join(repr(c.nombre) for c in condominios)
+        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
+    condominio = condominios.get()
+
+    valor_anterior = condominio.etiqueta_unidad
+    if valor_anterior == "Departamento":
+        return HttpResponse(f"etiqueta_unidad de {condominio.nombre!r} ya es 'Departamento', no se tocó nada.", content_type=CONTENT_TYPE_TEXTO_PLANO)
+
+    condominio.etiqueta_unidad = "Departamento"
+    condominio.save(update_fields=["etiqueta_unidad"])
+    return HttpResponse(
+        f"etiqueta_unidad de {condominio.nombre!r} corregida: {valor_anterior!r} -> 'Departamento'.",
+        content_type=CONTENT_TYPE_TEXTO_PLANO,
+    )
+
+
+@staff_member_required
+@require_GET
 def cargar_torres_empart(request):
     """
     Uso único: completa el condominio real de Empart en producción con sus
