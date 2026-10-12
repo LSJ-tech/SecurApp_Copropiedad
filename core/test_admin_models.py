@@ -318,3 +318,41 @@ class AdminIndexYSidebarTests(TestCase):
         self.assertIn("core/logo", contenido)
         for texto in ("Condominios", "Blocks", "Departamentos", "Membresías", "Alertas", "Avisos", "Gastos comunes", "Empleados", "Usuarios"):
             self.assertIn(texto, contenido)
+
+
+class UserAdminReenganchadoConUnfoldTests(TestCase):
+    """auth.User/auth.Group traían el admin de Django sin tocar -- el
+    formulario de "Añadir usuario" usaba los widgets planos de Django para
+    password1/password2 dentro del tema de Unfold, incompatibles con el JS
+    que Unfold espera ahí, y el botón "Guardar" no hacía nada (bug real
+    reportado por el usuario: "el admin no puede crear usuario"). Se
+    reenganchó con unfold.forms.UserCreationForm/UserChangeForm, que traen
+    los widgets correctos -- esto confirma que el formulario de alta
+    efectivamente los usa, y que crear un usuario sigue funcionando."""
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(username="useradmin_staff", password="x", email="useradmin_staff@example.com")
+        self.client.force_login(self.superuser)
+
+    def test_el_formulario_de_alta_usa_los_widgets_de_unfold(self):
+        r = self.client.get("/admin/auth/user/add/")
+        self.assertEqual(r.status_code, 200)
+        contenido = r.content.decode()
+        self.assertIn('name="password1"', contenido)
+        # max-w-2xl es una clase propia de unfold.widgets.INPUT_CLASSES -- el
+        # PasswordInput plano de Django nunca la trae, así que esto confirma
+        # que el formulario quedó enganchado con unfold.forms.UserCreationForm.
+        self.assertIn("max-w-2xl", contenido)
+
+    def test_crear_un_usuario_sigue_funcionando(self):
+        r = self.client.post("/admin/auth/user/add/", {
+            "username": "nuevo_desde_admin",
+            "password1": "unaClaveBienSegura123!",
+            "password2": "unaClaveBienSegura123!",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(User.objects.filter(username="nuevo_desde_admin").exists())
+
+    def test_grupos_sigue_registrado_y_accesible(self):
+        r = self.client.get("/admin/auth/group/")
+        self.assertEqual(r.status_code, 200)

@@ -1,10 +1,14 @@
 import datetime
 
 from django.contrib import admin
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import Group, User
 from django.db.models.functions import Length
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from unfold.views import ChangeList
 
 from .models import PLAN_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
@@ -209,3 +213,27 @@ class SolicitudEliminacionAdmin(ModelAdmin):
     search_fields = ["nombre", "username", "condominio_nombre"]
     readonly_fields = ["membresia", "nombre", "username", "condominio_nombre", "motivo", "fecha_creacion"]
     actions = [marcar_atendida]
+
+
+# auth.User/auth.Group traían el admin de Django sin tocar (nunca se
+# reemplazaron) -- Unfold reemplaza las plantillas globales del admin, pero
+# el formulario de "Añadir usuario" seguía usando los widgets planos de
+# Django para password1/password2, incompatibles con el JS que Unfold
+# espera en esos campos dentro de su propio tema: el botón "Guardar" no
+# hacía nada (bug real reportado por el usuario). unfold.forms ya trae
+# UserCreationForm/UserChangeForm/AdminPasswordChangeForm armados con los
+# widgets correctos -- solo había que reenganchar el ModelAdmin con ellos.
+admin.site.unregister(User)
+admin.site.unregister(Group)
+
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    pass
