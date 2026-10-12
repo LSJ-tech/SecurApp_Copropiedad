@@ -169,7 +169,7 @@ class TorreYUnidadAdminFiltroCondominioTests(TestCase):
         cls.condominio_b = Condominio.objects.create(nombre="Test Torre Filtro B", plan="premium")
         cls.torre_a = Torre.objects.create(condominio=cls.condominio_a, nombre="Torre filtro A")
         Torre.objects.create(condominio=cls.condominio_b, nombre="Torre filtro B")
-        cls.unidad_a = Unidad.objects.create(condominio=cls.condominio_a, numero="Unidad filtro A")
+        cls.unidad_a = Unidad.objects.create(condominio=cls.condominio_a, torre=cls.torre_a, numero="Unidad filtro A")
         Unidad.objects.create(condominio=cls.condominio_b, numero="Unidad filtro B")
 
     def setUp(self):
@@ -187,3 +187,45 @@ class TorreYUnidadAdminFiltroCondominioTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Unidad filtro A")
         self.assertNotContains(r, "Unidad filtro B")
+
+    def test_unidad_changelist_filtra_por_torre(self):
+        unidad_otra_torre = Unidad.objects.create(condominio=self.condominio_a, numero="Unidad filtro C")
+        r = self.client.get("/admin/core/unidad/", {"torre__id__exact": self.torre_a.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Unidad filtro A")
+        self.assertNotContains(r, unidad_otra_torre.numero)
+
+
+class MembresiaAdminFiltroBlockYDeptoTests(TestCase):
+    """Filtros nuevos por block (unidad__torre) y depto (unidad) en el
+    admin de Membresías, mismo patrón AutocompleteSelectFilter."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .models import Torre
+
+        cls.condominio = Condominio.objects.create(nombre="Test Membresia Block Depto", plan="premium")
+        cls.torre_9 = Torre.objects.create(condominio=cls.condominio, nombre="9")
+        cls.torre_10 = Torre.objects.create(condominio=cls.condominio, nombre="10")
+        cls.unidad_9_54 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_9, numero="54")
+        cls.unidad_10_12 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_10, numero="12")
+        cls.residente_9 = User.objects.create_user(username="block9_residente")
+        cls.residente_10 = User.objects.create_user(username="block10_residente")
+        Membresia.objects.create(user=cls.residente_9, condominio=cls.condominio, rol="residente", unidad=cls.unidad_9_54, terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=cls.residente_10, condominio=cls.condominio, rol="residente", unidad=cls.unidad_10_12, terminos_aceptados_en=timezone.now())
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(username="block_depto_staff", password="x")
+        self.client.force_login(self.superuser)
+
+    def test_filtro_por_block_acota_los_resultados(self):
+        r = self.client.get("/admin/core/membresia/", {"unidad__torre__id__exact": self.torre_9.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "block9_residente")
+        self.assertNotContains(r, "block10_residente")
+
+    def test_filtro_por_depto_acota_los_resultados(self):
+        r = self.client.get("/admin/core/membresia/", {"unidad__id__exact": self.unidad_9_54.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "block9_residente")
+        self.assertNotContains(r, "block10_residente")

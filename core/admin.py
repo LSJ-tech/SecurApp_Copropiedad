@@ -92,23 +92,24 @@ class CondominioAdmin(ModelAdmin):
 class TorreAdmin(ModelAdmin):
     list_display = ["nombre", "condominio"]
     list_filter = [("condominio", AutocompleteSelectFilter)]
+    search_fields = ["nombre"]  # exigido por AutocompleteSelectFilter en otros admin que filtran por torre (ej. MembresiaAdmin)
 
 
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
     list_display = ["numero", "condominio", "torre", "alicuota"]
-    list_filter = [("condominio", AutocompleteSelectFilter)]
+    list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
 
 
 @admin.register(Membresia)
 class MembresiaAdmin(ModelAdmin):
-    """Filtro de condominio como desplegable con buscador (AutocompleteSelectFilter)
-    en vez de la lista larga de links que da el filtro por defecto -- con 27+
-    condominios registrados y subiendo, esa lista ya no es manejable."""
+    """Filtros como desplegable con buscador (AutocompleteSelectFilter) en vez
+    de la lista larga de links que da el filtro por defecto -- con 27+
+    condominios/cientos de unidades y subiendo, esa lista ya no es manejable."""
 
     list_display = ["user", "condominio", "rol", "unidad"]
-    list_filter = ["rol", ("condominio", AutocompleteSelectFilter)]
+    list_filter = ["rol", ("condominio", AutocompleteSelectFilter), ("unidad__torre", AutocompleteSelectFilter), ("unidad", AutocompleteSelectFilter)]
     autocomplete_fields = ["user", "unidad"]
 
 
