@@ -106,6 +106,12 @@ class BuscarBorradosTests(TestCase):
         self.assertIn("jlroman", contenido)
         self.assertNotIn("Otra Persona", contenido)
 
+    def test_q_sin_coincidencias_se_devuelve_escapado_no_crudo(self):
+        r = self.client.get(reverse("buscar-borrados"), {"q": "<script>alert(1)</script>"})
+        contenido = r.content.decode()
+        self.assertNotIn("<script>", contenido)
+        self.assertIn("&lt;script&gt;", contenido)
+
     def test_no_muestra_borrados_de_otro_tipo_de_accion(self):
         from django.contrib.admin.models import LogEntry
         from django.contrib.contenttypes.models import ContentType

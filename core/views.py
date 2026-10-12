@@ -111,7 +111,8 @@ def buscar_borrados(request):
     entradas = entradas[:50]
 
     if not entradas:
-        return HttpResponse(f"Sin borrados registrados{f' que coincidan con {q!r}' if q else ''}.", content_type=CONTENT_TYPE_TEXTO_PLANO)
+        q_seguro = escape(q)
+        return HttpResponse(f"Sin borrados registrados{f' que coincidan con {q_seguro!r}' if q_seguro else ''}.", content_type=CONTENT_TYPE_TEXTO_PLANO)
 
     lineas = [
         f"{e.action_time:%Y-%m-%d %H:%M} | modelo={e.content_type.model if e.content_type else '?'} | "
