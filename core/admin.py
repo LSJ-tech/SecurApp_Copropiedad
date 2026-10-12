@@ -150,6 +150,28 @@ class UnidadAdmin(ModelAdmin):
         return ChangeListOrdenAnotado
 
 
+class SinUnidadFilter(admin.SimpleListFilter):
+    """Mismo filtro que SinCondominioFilter (ver más abajo, Usuarios) pero
+    para el otro lado de la relación opcional: Membresia.unidad es nula
+    para directiva/administración/conserjería (no les aplica) y también,
+    por error, para algún residente al que se le haya olvidado asignar
+    depto -- esto deja encontrar esos casos sin tener que revisar fila por
+    fila."""
+
+    title = "unidad asignada"
+    parameter_name = "con_unidad"
+
+    def lookups(self, request, model_admin):
+        return [("no", "Sin unidad asignada"), ("si", "Con unidad asignada")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "no":
+            return queryset.filter(unidad__isnull=True)
+        if self.value() == "si":
+            return queryset.filter(unidad__isnull=False)
+        return queryset
+
+
 @admin.register(Membresia)
 class MembresiaAdmin(ModelAdmin):
     """Filtros como desplegable con buscador (AutocompleteSelectFilter) en vez
@@ -164,6 +186,7 @@ class MembresiaAdmin(ModelAdmin):
         ("condominio", AutocompleteSelectFilter),
         ("unidad__torre", AutocompleteSelectFilter),
         ("unidad", AutocompleteSelectFilter),
+        SinUnidadFilter,
         "rol",
     ]
     list_filter_submit = True

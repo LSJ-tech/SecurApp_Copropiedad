@@ -185,6 +185,44 @@ class MembresiaAdminChangelistTests(TestCase):
         self.assertNotContains(r, "admfiltro_b")
 
 
+class SinUnidadFilterTests(TestCase):
+    """Filtro "unidad asignada" en /admin/core/membresia/ -- mismo patrón
+    que SinCondominioFilter (Usuarios), pero del otro lado de la relación
+    opcional: encuentra membresías sin depto asignado."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Nombres a propósito sin la palabra "unidad" adentro -- el
+        # parameter_name del filtro es "con_unidad" y aparece en los links
+        # del propio widget de filtros (ver la misma trampa con
+        # SinCondominioFilterTests).
+        condominio = Condominio.objects.create(nombre="Test Sin Unidad", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        user_con_depto = User.objects.create_user(username="miembro_con_depto_xyz")
+        cls.membresia_con_depto = Membresia.objects.create(user=user_con_depto, condominio=condominio, rol="residente", unidad=unidad, terminos_aceptados_en=timezone.now())
+        user_sin_depto = User.objects.create_user(username="miembro_sin_depto_xyz")
+        cls.membresia_sin_depto = Membresia.objects.create(user=user_sin_depto, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="sinunidad_staff", password="x", email="sinunidad_staff@example.com")
+        self.client.force_login(self.staff)
+
+    def test_filtro_no_muestra_solo_los_sin_unidad(self):
+        r = self.client.get("/admin/core/membresia/", {"con_unidad": "no"})
+        self.assertContains(r, "miembro_sin_depto_xyz")
+        self.assertNotContains(r, "miembro_con_depto_xyz")
+
+    def test_filtro_si_muestra_solo_los_con_unidad(self):
+        r = self.client.get("/admin/core/membresia/", {"con_unidad": "si"})
+        self.assertContains(r, "miembro_con_depto_xyz")
+        self.assertNotContains(r, "miembro_sin_depto_xyz")
+
+    def test_sin_filtro_muestra_a_todos(self):
+        r = self.client.get("/admin/core/membresia/")
+        self.assertContains(r, "miembro_con_depto_xyz")
+        self.assertContains(r, "miembro_sin_depto_xyz")
+
+
 class TorreYUnidadAdminFiltroCondominioTests(TestCase):
     """Mismo filtro-desplegable-con-buscador que Membresía, aplicado también
     a Torre y Unidad."""
