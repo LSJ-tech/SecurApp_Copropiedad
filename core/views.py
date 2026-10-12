@@ -34,6 +34,7 @@ from .models import CodigoInvitacion, Condominio, Membresia, SolicitudEliminacio
 from .usuarios import generar_password_temporal, generar_username
 
 EMAIL_CONTACTO_DEVQUAD = "contacto@devquad.cl"
+CONTENT_TYPE_TEXTO_PLANO = "text/plain; charset=utf-8"
 logger = logging.getLogger(__name__)
 
 
@@ -110,14 +111,14 @@ def buscar_borrados(request):
     entradas = entradas[:50]
 
     if not entradas:
-        return HttpResponse(f"Sin borrados registrados{f' que coincidan con {q!r}' if q else ''}.", content_type="text/plain; charset=utf-8")
+        return HttpResponse(f"Sin borrados registrados{f' que coincidan con {q!r}' if q else ''}.", content_type=CONTENT_TYPE_TEXTO_PLANO)
 
     lineas = [
         f"{e.action_time:%Y-%m-%d %H:%M} | modelo={e.content_type.model if e.content_type else '?'} | "
         f"borrado_por={e.user.username if e.user else '?'} | object_repr={e.object_repr!r}"
         for e in entradas
     ]
-    return HttpResponse("\n".join(lineas), content_type="text/plain; charset=utf-8")
+    return HttpResponse("\n".join(lineas), content_type=CONTENT_TYPE_TEXTO_PLANO)
 
 
 @staff_member_required
@@ -133,7 +134,7 @@ def listar_condominios(request):
             f"id={condominio.pk} | nombre={condominio.nombre!r} | torres={condominio._torres} | "
             f"unidades={condominio._unidades} | miembros={condominio._miembros}"
         )
-    return HttpResponse("\n".join(lineas) or "No hay condominios.", content_type="text/plain; charset=utf-8")
+    return HttpResponse("\n".join(lineas) or "No hay condominios.", content_type=CONTENT_TYPE_TEXTO_PLANO)
 
 
 @staff_member_required
