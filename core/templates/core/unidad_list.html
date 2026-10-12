@@ -20,7 +20,7 @@
     </div>
     <div class="col-md-7">
         <form method="post" action="{% url 'aplicar-alicuota-masiva' %}" class="d-flex gap-2 justify-content-md-end"
-              onsubmit="return confirm('Esto va a cambiar la alícuota de {{ condominio.etiqueta_unidad_todos }} {{ condominio.etiqueta_unidad|lower }}s del condominio. ¿Continuar?');">
+              onsubmit="return confirm('Esto va a cambiar la alícuota de {{ condominio.etiqueta_unidad_todos }} {{ condominio.etiqueta_unidad|lower }}s. ¿Continuar?');">
             {% csrf_token %}
             <label class="col-form-label small text-muted" for="id_alicuota_masiva">Aplicar alícuota a todas:</label>
             <input type="text" id="id_alicuota_masiva" name="alicuota" class="form-control" style="max-width: 140px;" placeholder="Ej. 0.0031" required>
