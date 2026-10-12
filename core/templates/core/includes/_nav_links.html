@@ -2,6 +2,8 @@
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'inicio' %}active{% endif %}" href="{% url 'inicio' %}"><i class="bi bi-house"></i> Inicio</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'directorio' %}active{% endif %}" href="{% url 'directorio' %}"><i class="bi bi-person-lines-fill"></i> Directorio</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'compartir-invitacion' %}active{% endif %}" href="{% url 'compartir-invitacion' %}"><i class="bi bi-share"></i> Invitar vecinos</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'torres' %}active{% endif %}" href="{% url 'torres' %}"><i class="bi bi-buildings"></i> {{ user.membresia.condominio.etiqueta_torre|default:"Torre" }}s</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'unidades' %}active{% endif %}" href="{% url 'unidades' %}"><i class="bi bi-building"></i> {{ user.membresia.condominio.etiqueta_unidad|default:"Unidad" }}s</a></li>
     {% if user.membresia.rol == "directiva" or user.membresia.rol == "administracion" or user.membresia.rol == "conserje" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'registro-ingreso-list' %}active{% endif %}" href="{% url 'registro-ingreso-list' %}"><i class="bi bi-door-open"></i> Accesos</a></li>
     {% endif %}
@@ -10,8 +12,6 @@
     {% endif %}
     {% if user.membresia.rol == "directiva" or user.membresia.rol == "administracion" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'miembros' %}active{% endif %}" href="{% url 'miembros' %}"><i class="bi bi-people"></i> Miembros</a></li>
-    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'torres' %}active{% endif %}" href="{% url 'torres' %}"><i class="bi bi-buildings"></i> {{ user.membresia.condominio.etiqueta_torre|default:"Torre" }}s</a></li>
-    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'unidades' %}active{% endif %}" href="{% url 'unidades' %}"><i class="bi bi-building"></i> {{ user.membresia.condominio.etiqueta_unidad|default:"Unidad" }}s</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'gastos-comunes-list' %}active{% endif %}" href="{% url 'gastos-comunes-list' %}"><i class="bi bi-cash-coin"></i> Gastos comunes</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'empleados' %}active{% endif %}" href="{% url 'empleados' %}"><i class="bi bi-person-badge"></i> Personal</a></li>
     {% endif %}

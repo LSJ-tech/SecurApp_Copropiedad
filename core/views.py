@@ -729,7 +729,10 @@ class CondominioUpdateView(SoloDirectivaMixin, CondominioRequiredMixin, Template
         return context
 
 
-class TorreListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
+class TorreListView(CondominioFormMixin, ListView):
+    """Abierta a cualquier rol -- solo lectura (crear torre sigue siendo
+    SoloStaffMixin, ver TorreCreateView)."""
+
     model = Torre
     template_name = "core/torre_list.html"
     context_object_name = "torres"
@@ -749,7 +752,12 @@ class TorreCreateView(SoloStaffMixin, CondominioFormMixin, CreateView):
     success_url = reverse_lazy("torres")
 
 
-class UnidadListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
+class UnidadListView(CondominioFormMixin, ListView):
+    """Abierta a cualquier rol -- solo lectura (crear unidad y aplicar
+    alícuota masiva siguen exclusivos de directiva/administración, ver
+    UnidadCreateView/AplicarAlicuotaMasivaView; el template tampoco les
+    muestra la columna de Alícuota a residentes/conserjería)."""
+
     model = Unidad
     template_name = "core/unidad_list.html"
     context_object_name = "unidades"
