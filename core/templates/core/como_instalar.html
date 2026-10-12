@@ -1,0 +1,52 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block titulo %}Cómo instalar la app{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="text-center mb-4">
+            <img src="{% static 'core/logo.svg' %}" width="48" height="48" alt="" class="mb-2">
+            <h1 class="h4 mb-1">Cómo instalar {{ PLATFORM_NAME }}</h1>
+            <p class="text-muted">Queda como un ícono más en tu celular, se abre directo sin pasar por el navegador -- y en iPhone es obligatorio para que te lleguen las notificaciones del botón de pánico.</p>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h6"><i class="bi bi-android2 text-success"></i> Android (Chrome)</h2>
+                <ol class="mb-0">
+                    <li>Abre {{ PLATFORM_NAME }} desde Chrome.</li>
+                    <li>Toca el menú (los tres puntos ⋮, arriba a la derecha).</li>
+                    <li>Toca <strong>"Instalar app"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                    <li>Confirma. Queda el ícono en tu pantalla de inicio, como cualquier otra app.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h6"><i class="bi bi-apple text-secondary"></i> iPhone (Safari)</h2>
+                <p class="text-muted small mb-2">Tiene que ser desde <strong>Safari</strong> -- no funciona desde Chrome en iPhone.</p>
+                <ol class="mb-0">
+                    <li>Abre {{ PLATFORM_NAME }} desde Safari.</li>
+                    <li>Toca el botón <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba, abajo en el centro).</li>
+                    <li>Baja y toca <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                    <li>Toca <strong>"Agregar"</strong>. Queda el ícono en tu pantalla de inicio.</li>
+                    <li>Desde ahí en adelante, entra siempre tocando ese ícono (no desde Safari) para poder activar las notificaciones.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h6"><i class="bi bi-display text-secondary"></i> Computador (Chrome o Edge)</h2>
+                <ol class="mb-0">
+                    <li>Abre {{ PLATFORM_NAME }} desde el navegador.</li>
+                    <li>Busca el ícono de instalar en la barra de direcciones (una pantallita con una flecha), o el menú ⋮ → <strong>"Instalar {{ PLATFORM_NAME }}"</strong>.</li>
+                </ol>
+            </div>
+        </div>
+
+        <p class="text-muted small text-center">¿Quedaste con dudas? Escríbenos a <a href="mailto:contacto@devquad.cl">contacto@devquad.cl</a>.</p>
+    </div>
+</div>
+{% endblock %}

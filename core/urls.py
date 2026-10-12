@@ -48,6 +48,7 @@ urlpatterns = [
     path("cuenta-desactivada/", views.CuentaDesactivadaView.as_view(), name="cuenta-desactivada"),
     path("privacidad/", views.PrivacidadView.as_view(), name="privacidad"),
     path("terminos/", views.TerminosView.as_view(), name="terminos"),
+    path("como-instalar/", views.ComoInstalarView.as_view(), name="como-instalar"),
     path("aceptar-terminos/", views.AceptarTerminosView.as_view(), name="aceptar-terminos"),
     path("offline/", views.OfflineView.as_view(), name="offline"),
     path("sw.js", views.ServiceWorkerView.as_view(), name="service-worker"),

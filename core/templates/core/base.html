@@ -80,6 +80,7 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <li><a class="dropdown-item" href="{% url 'mi-perfil' %}"><i class="bi bi-person"></i> Mi perfil</a></li>
+                                <li><a class="dropdown-item" href="{% url 'como-instalar' %}"><i class="bi bi-phone"></i> Cómo instalar la app</a></li>
                                 {% if user.is_staff %}
                                 <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-shield-lock"></i> Panel admin</a></li>
                                 {% endif %}
@@ -117,6 +118,8 @@
         </main>
 
         <footer class="text-center text-muted small py-4 border-top">
+            <a href="{% url 'como-instalar' %}">Cómo instalar la app</a>
+            &middot;
             <a href="{% url 'privacidad' %}">Política de Privacidad</a>
             &middot;
             <a href="{% url 'terminos' %}">Términos de Uso</a>

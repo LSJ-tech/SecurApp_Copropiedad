@@ -584,6 +584,15 @@ class TerminosView(TemplateView):
     template_name = "core/terminos.html"
 
 
+class ComoInstalarView(TemplateView):
+    """Instrucciones de instalación de la PWA (agregar a pantalla de inicio)
+    -- para que la directiva deje de tener que explicarlo uno por uno. Abierta
+    sin login, igual que Privacidad/Términos, para poder mandar el link
+    directo por WhatsApp a alguien que todavía ni se ha registrado."""
+
+    template_name = "core/como_instalar.html"
+
+
 class AceptarTerminosView(LoginRequiredMixin, View):
     """Interstitial que se muestra una sola vez por cuenta -- a propósito NO
     usa CondominioRequiredMixin (ese mixin exige haber aceptado los términos,

@@ -1223,3 +1223,21 @@ class ConteosTorreYUnidadTests(TestCase):
         self.assertEqual(r.status_code, 200)
         unidad = next(u for u in r.context["unidades"] if u.pk == self.unidad_1_1.pk)
         self.assertEqual(unidad.miembros_count, 2)
+
+
+class ComoInstalarTests(TestCase):
+    """Página de instrucciones de instalación -- abierta sin login (como
+    Privacidad/Términos) para poder mandar el link directo por WhatsApp."""
+
+    def test_accesible_sin_login(self):
+        r = self.client.get(reverse("como-instalar"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Agregar a pantalla de inicio")
+        self.assertContains(r, "iPhone")
+
+    def test_link_visible_para_un_usuario_logueado(self):
+        condominio = Condominio.objects.create(nombre="Test Como Instalar", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="como_instalar_residente")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, reverse("como-instalar"))
