@@ -155,3 +155,35 @@ class MembresiaAdminChangelistTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "admfiltro_a")
         self.assertNotContains(r, "admfiltro_b")
+
+
+class TorreYUnidadAdminFiltroCondominioTests(TestCase):
+    """Mismo filtro-desplegable-con-buscador que Membresía, aplicado también
+    a Torre y Unidad."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .models import Torre
+
+        cls.condominio_a = Condominio.objects.create(nombre="Test Torre Filtro A", plan="premium")
+        cls.condominio_b = Condominio.objects.create(nombre="Test Torre Filtro B", plan="premium")
+        cls.torre_a = Torre.objects.create(condominio=cls.condominio_a, nombre="Torre filtro A")
+        Torre.objects.create(condominio=cls.condominio_b, nombre="Torre filtro B")
+        cls.unidad_a = Unidad.objects.create(condominio=cls.condominio_a, numero="Unidad filtro A")
+        Unidad.objects.create(condominio=cls.condominio_b, numero="Unidad filtro B")
+
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(username="admfiltro_tu_staff", password="x")
+        self.client.force_login(self.superuser)
+
+    def test_torre_changelist_renderiza_y_filtra(self):
+        r = self.client.get("/admin/core/torre/", {"condominio__id__exact": self.condominio_a.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Torre filtro A")
+        self.assertNotContains(r, "Torre filtro B")
+
+    def test_unidad_changelist_renderiza_y_filtra(self):
+        r = self.client.get("/admin/core/unidad/", {"condominio__id__exact": self.condominio_a.pk})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Unidad filtro A")
+        self.assertNotContains(r, "Unidad filtro B")

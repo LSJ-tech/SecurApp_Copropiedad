@@ -91,13 +91,13 @@ class CondominioAdmin(ModelAdmin):
 @admin.register(Torre)
 class TorreAdmin(ModelAdmin):
     list_display = ["nombre", "condominio"]
-    list_filter = ["condominio"]
+    list_filter = [("condominio", AutocompleteSelectFilter)]
 
 
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
     list_display = ["numero", "condominio", "torre", "alicuota"]
-    list_filter = ["condominio"]
+    list_filter = [("condominio", AutocompleteSelectFilter)]
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
 
 
