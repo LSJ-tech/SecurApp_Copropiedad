@@ -56,39 +56,12 @@ class RolesPermisosTests(TestCase):
             self.client.logout()
 
     def test_dia_a_dia_bloqueado_para_conserje_y_residente(self):
-        """miembros/gastos-comunes-list siguen exclusivos de directiva/
-        administración -- torres/unidades son de solo lectura y están
-        abiertas a cualquier rol (ver test_torres_y_unidades_abiertas_a_todo_rol)."""
         for membresia in (self.conserje, self.residente):
             self._login(membresia)
-            for url_name in ("miembros", "gastos-comunes-list"):
+            for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
                 r = self.client.get(reverse(url_name))
                 self.assertEqual(r.status_code, 302, f"{membresia.rol} NO debería poder ver {url_name}")
             self.client.logout()
-
-    def test_torres_y_unidades_abiertas_a_todo_rol(self):
-        for membresia in (self.directiva, self.administracion, self.conserje, self.residente):
-            self._login(membresia)
-            for url_name in ("torres", "unidades"):
-                r = self.client.get(reverse(url_name))
-                self.assertEqual(r.status_code, 200, f"{membresia.rol} debería poder ver {url_name}")
-            self.client.logout()
-
-    def test_alicuota_solo_visible_para_directiva_y_administracion(self):
-        self._login(self.directiva)
-        self.assertContains(self.client.get(reverse("unidades")), "Alícuota")
-        self.client.logout()
-        self._login(self.residente)
-        self.assertNotContains(self.client.get(reverse("unidades")), "Alícuota")
-        self.client.logout()
-        self._login(self.conserje)
-        self.assertNotContains(self.client.get(reverse("unidades")), "Alícuota")
-
-    def test_residente_no_ve_botones_de_crear_ni_aplicar_alicuota(self):
-        self._login(self.residente)
-        r = self.client.get(reverse("unidades"))
-        self.assertNotContains(r, reverse("crear-unidad"))
-        self.assertNotContains(r, reverse("aplicar-alicuota-masiva"))
 
     def test_accesos_permitido_para_directiva_administracion_conserje(self):
         for membresia in (self.directiva, self.administracion, self.conserje):

@@ -3,9 +3,7 @@
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h4 mb-0">{{ condominio.etiqueta_unidad }}s</h1>
-    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
     <a href="{% url 'crear-unidad' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> {{ condominio.etiqueta_unidad_nueva }} {{ condominio.etiqueta_unidad|lower }}</a>
-    {% endif %}
 </div>
 <div class="row g-3 mb-3">
     <div class="col-md-5">
@@ -20,7 +18,6 @@
             {% if torre_seleccionada %}<a href="{% url 'unidades' %}" class="btn btn-outline-secondary">Quitar filtro</a>{% endif %}
         </form>
     </div>
-    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
     <div class="col-md-7">
         <form method="post" action="{% url 'aplicar-alicuota-masiva' %}" class="d-flex gap-2 justify-content-md-end"
               onsubmit="return confirm('Esto va a cambiar la alícuota de {{ condominio.etiqueta_unidad_todos }} {{ condominio.etiqueta_unidad|lower }}s del condominio. ¿Continuar?');">
@@ -30,20 +27,14 @@
             <button type="submit" class="btn btn-outline-primary">Aplicar a todas</button>
         </form>
     </div>
-    {% endif %}
 </div>
 
 <div class="table-responsive">
 <table class="table table-striped">
-    <thead><tr><th>Número</th><th>{{ condominio.etiqueta_torre }}</th>{% if membresia.rol == "directiva" or membresia.rol == "administracion" %}<th>Alícuota</th>{% endif %}<th>Personas registradas</th></tr></thead>
+    <thead><tr><th>Número</th><th>{{ condominio.etiqueta_torre }}</th><th>Alícuota</th><th>Personas registradas</th></tr></thead>
     <tbody>
         {% for u in unidades %}
-        <tr>
-            <td>{{ u.numero }}</td>
-            <td>{{ u.torre|default:"—" }}</td>
-            {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}<td>{{ u.alicuota }}</td>{% endif %}
-            <td>{{ u.miembros_count }}</td>
-        </tr>
+        <tr><td>{{ u.numero }}</td><td>{{ u.torre|default:"—" }}</td><td>{{ u.alicuota }}</td><td>{{ u.miembros_count }}</td></tr>
         {% empty %}
         <tr><td colspan="4" class="text-muted">Sin {{ condominio.etiqueta_unidad|lower }}s todavía.</td></tr>
         {% endfor %}
