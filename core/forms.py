@@ -32,6 +32,19 @@ def _validar_email_unico(email, excluir_user_id=None):
     return email
 
 
+class NormalizarNombreApellidoMixin:
+    """Mezclar en cualquier form con campos "nombre"/"apellido" de texto
+    libre -- normaliza los dos igual (ver _normalizar_nombre). MiPerfilForm
+    no lo usa porque sus campos se llaman first_name/last_name (ModelForm
+    sobre User)."""
+
+    def clean_nombre(self):
+        return _normalizar_nombre(self.cleaned_data["nombre"])
+
+    def clean_apellido(self):
+        return _normalizar_nombre(self.cleaned_data["apellido"])
+
+
 class ConfirmacionContrasenaMixin(forms.Form):
     password1 = forms.CharField(label="Contraseña", widget=forms.PasswordInput(attrs={"class": "form-control"}))
     password2 = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput(attrs={"class": "form-control"}))
@@ -48,7 +61,7 @@ class ConfirmacionContrasenaMixin(forms.Form):
         return cleaned
 
 
-class RegistroCondominioForm(ConfirmacionContrasenaMixin):
+class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
     """Alta de un condominio nuevo y de su primer usuario (directiva), sin intervención manual."""
 
     field_order = [
@@ -99,14 +112,8 @@ class RegistroCondominioForm(ConfirmacionContrasenaMixin):
             raise ValidationError("Código inválido o ya usado.")
         return codigo
 
-    def clean_nombre(self):
-        return _normalizar_nombre(self.cleaned_data["nombre"])
 
-    def clean_apellido(self):
-        return _normalizar_nombre(self.cleaned_data["apellido"])
-
-
-class CrearMiembroForm(forms.Form):
+class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
     """Directiva/administración crea la cuenta de otro miembro del condominio.
 
     Solo directiva puede nombrar directiva/administración (cuentas de
@@ -135,12 +142,6 @@ class CrearMiembroForm(forms.Form):
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
 
-    def clean_nombre(self):
-        return _normalizar_nombre(self.cleaned_data["nombre"])
-
-    def clean_apellido(self):
-        return _normalizar_nombre(self.cleaned_data["apellido"])
-
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])
 
@@ -151,7 +152,7 @@ class CrearMiembroForm(forms.Form):
         return cleaned
 
 
-class RegistroResidenteForm(ConfirmacionContrasenaMixin):
+class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
     """Autoregistro público de un residente -- elige su propio depto de una lista, vía el link/QR del condominio."""
 
     field_order = ["nombre", "apellido", "email", "unidad", "password1", "password2", "acepto_terminos"]
@@ -180,12 +181,6 @@ class RegistroResidenteForm(ConfirmacionContrasenaMixin):
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
-
-    def clean_nombre(self):
-        return _normalizar_nombre(self.cleaned_data["nombre"])
-
-    def clean_apellido(self):
-        return _normalizar_nombre(self.cleaned_data["apellido"])
 
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])

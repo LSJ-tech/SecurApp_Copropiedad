@@ -162,6 +162,21 @@ def listar_condominios(request):
     return HttpResponse("\n".join(lineas) or "No hay condominios.", content_type=CONTENT_TYPE_TEXTO_PLANO)
 
 
+def _condominio_empart_o_error():
+    """Busca el único condominio real cuyo nombre contiene "Empart" (no
+    exacto -- el usuario le cambió el nombre a "Población Empart" después de
+    que estas vistas se escribieron) -- usado por las 3 vistas de uso único
+    que operan sobre ese condominio en producción. Devuelve (condominio,
+    None) si lo encuentra, o (None, HttpResponse de error 404/409) si no."""
+    condominios = Condominio.objects.filter(nombre__icontains="Empart")
+    if not condominios.exists():
+        return None, HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
+    if condominios.count() > 1:
+        nombres = ", ".join(repr(c.nombre) for c in condominios)
+        return None, HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
+    return condominios.get(), None
+
+
 @staff_member_required
 @require_GET
 def corregir_etiqueta_unidad_empart(request):
@@ -169,13 +184,9 @@ def corregir_etiqueta_unidad_empart(request):
     "Departamentos" (plural) en vez de "Departamento" (singular) -- el resto
     del sistema agrega la "s" solo cuando corresponde, así que en plural
     quedaba duplicada ("Departamentoss", "Nuevo departamentos"). Idempotente."""
-    condominios = Condominio.objects.filter(nombre__icontains="Empart")
-    if not condominios.exists():
-        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
-    if condominios.count() > 1:
-        nombres = ", ".join(repr(c.nombre) for c in condominios)
-        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
-    condominio = condominios.get()
+    condominio, error = _condominio_empart_o_error()
+    if error:
+        return error
 
     valor_anterior = condominio.etiqueta_unidad
     if valor_anterior == "Departamento":
@@ -201,13 +212,9 @@ def cargar_torres_empart(request):
     Busca por "Empart" dentro del nombre (no exacto) -- el nombre real del
     condominio cambió a "Población Empart" después de que esto se escribió.
     """
-    condominios = Condominio.objects.filter(nombre__icontains="Empart")
-    if not condominios.exists():
-        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
-    if condominios.count() > 1:
-        nombres = ", ".join(repr(c.nombre) for c in condominios)
-        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
-    condominio = condominios.get()
+    condominio, error = _condominio_empart_o_error()
+    if error:
+        return error
 
     numeros_por_piso = ["1", "2", "3", "4"]
     pisos = ["1", "2", "3", "4", "5"]
@@ -245,13 +252,9 @@ def agregar_departamentos_1_2_empart(request):
     el nombre real a "Población Empart" después de cargar las torres, así
     que un match exacto a "Empart" ya no encuentra el condominio.
     """
-    condominios = Condominio.objects.filter(nombre__icontains="Empart")
-    if not condominios.exists():
-        return HttpResponse("No existe ningún condominio cuyo nombre contenga 'Empart'.", status=404)
-    if condominios.count() > 1:
-        nombres = ", ".join(repr(c.nombre) for c in condominios)
-        return HttpResponse(f"Hay más de un condominio que contiene 'Empart', no sé cuál usar: {nombres}.", status=409)
-    condominio = condominios.get()
+    condominio, error = _condominio_empart_o_error()
+    if error:
+        return error
 
     torres = list(condominio.torres.all())
     if not torres:
