@@ -31,5 +31,6 @@ class EmpleadoAdmin(ModelAdmin):
 @admin.register(Liquidacion)
 class LiquidacionAdmin(ModelAdmin):
     list_display = ["empleado", "periodo", "liquido_a_pagar", "fecha_generacion"]
-    list_filter = ["periodo"]
+    list_filter = [("empleado__condominio", AutocompleteSelectFilter), "periodo"]
+    list_filter_submit = True
     readonly_fields = [f.name for f in Liquidacion._meta.fields if f.name not in ("id",)]

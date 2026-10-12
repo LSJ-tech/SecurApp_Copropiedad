@@ -10,3 +10,4 @@ class RegistroIngresoAdmin(ModelAdmin):
     list_display = ["nombre_visitante", "unidad", "motivo", "fecha_ingreso", "fecha_salida"]
     list_filter = ["motivo", ("unidad__condominio", AutocompleteSelectFilter)]
     list_filter_submit = True
+    search_fields = ["nombre_visitante", "motivo", "unidad__numero"]

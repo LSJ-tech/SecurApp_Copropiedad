@@ -125,3 +125,14 @@ class RegistroIngresoAdminTests(TestCase):
         self.client.force_login(staff)
         r = self.client.get("/admin/accesos/registroingreso/")
         self.assertEqual(r.status_code, 200)
+
+    def test_se_puede_buscar_por_nombre_del_visitante(self):
+        condominio = Condominio.objects.create(nombre="Test Busqueda Acceso", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        RegistroIngreso.objects.create(unidad=unidad, nombre_visitante="Pedro Soto Buscable", motivo="visita")
+        RegistroIngreso.objects.create(unidad=unidad, nombre_visitante="Alguien Más", motivo="delivery")
+        staff = User.objects.create_superuser(username="busqueda_acceso_staff", password="x")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/accesos/registroingreso/?q=Soto+Buscable")
+        self.assertContains(r, "Pedro Soto Buscable")
+        self.assertNotContains(r, "Alguien Más")

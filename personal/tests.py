@@ -370,3 +370,42 @@ class EmpleadoAdminTests(TestCase):
         self.client.force_login(staff)
         r = self.client.get("/admin/personal/empleado/")
         self.assertEqual(r.status_code, 200)
+
+
+class LiquidacionAdminTests(TestCase):
+    """Filtro de condominio (vía empleado__condominio) como desplegable con
+    buscador -- antes solo filtraba por periodo, sin forma rápida de ver
+    todas las liquidaciones de un condominio en particular."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Admin Liquidacion", plan="premium")
+        afp = Afp.objects.create(nombre="Test AFP Liquidacion", tasa_total_pct=Decimal("11.44"))
+        cls.empleado = Empleado.objects.create(
+            condominio=cls.condominio, nombre="Ana Pérez", rut="11.111.111-1", cargo="Conserje",
+            tipo_contrato="indefinido", fecha_ingreso="2026-01-01", afp=afp,
+            sistema_salud="fonasa", sueldo_base=500000,
+        )
+        cls.liquidacion = Liquidacion.objects.create(
+            empleado=cls.empleado, periodo="2026-09",
+            sueldo_base=500000, total_imponible=500000, total_haberes=500000,
+            descuento_afp=57200, descuento_salud=35000, descuento_cesantia=3000,
+            impuesto_unico=0, total_descuentos=95200, liquido_a_pagar=404800,
+            utm_usada=Decimal("65000.00"), afp_nombre_usada="Test AFP Liquidacion", afp_tasa_usada=Decimal("11.44"),
+        )
+
+    def test_changelist_renderiza_ok(self):
+        staff = User.objects.create_superuser(username="admin_liquidacion_staff", password="x")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/personal/liquidacion/")
+        self.assertEqual(r.status_code, 200)
+
+    def test_filtro_por_condominio_funciona(self):
+        otro_condominio = Condominio.objects.create(nombre="Otro Condominio Liquidacion", plan="premium")
+        staff = User.objects.create_superuser(username="filtro_liquidacion_staff", password="x")
+        self.client.force_login(staff)
+        r = self.client.get(f"/admin/personal/liquidacion/?empleado__condominio__id__exact={self.condominio.pk}")
+        self.assertContains(r, "Ana Pérez")
+
+        r2 = self.client.get(f"/admin/personal/liquidacion/?empleado__condominio__id__exact={otro_condominio.pk}")
+        self.assertNotContains(r2, "Ana Pérez")

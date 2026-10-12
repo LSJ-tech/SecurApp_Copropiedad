@@ -422,3 +422,16 @@ class GastoComunAdminTests(TestCase):
         self.client.force_login(staff)
         r = self.client.get("/admin/gastoscomunes/gastocomun/")
         self.assertEqual(r.status_code, 200)
+
+    def test_el_inline_de_cuotas_muestra_el_estado_como_badge_de_solo_lectura(self):
+        condominio = Condominio.objects.create(nombre="Test Badge Cuota", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        gasto = GastoComun.objects.create(condominio=condominio, periodo="2026-09", monto_total=100000, fecha_vencimiento=datetime.date(2026, 9, 30))
+        CuotaUnidad.objects.create(gasto_comun=gasto, unidad=unidad, monto=100000, estado="pagado")
+        staff = User.objects.create_superuser(username="badge_cuota_staff", password="x")
+        self.client.force_login(staff)
+        r = self.client.get(f"/admin/gastoscomunes/gastocomun/{gasto.pk}/change/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Pagado")
+        # era un <select> editable -- ahora es de solo lectura, no un campo de formulario
+        self.assertNotContains(r, 'name="cuotaunidad_set-0-estado"')
