@@ -29,4 +29,15 @@
         </div>
     </div>
 </div>
+{{ comunas_por_region|json_script:"comunas-por-region-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
+<script>
+    initCascadaRegionComuna({
+        regionSelectId: "id_region_condominio",
+        comunaSelectId: "id_comuna_condominio",
+        comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
+    });
+</script>
 {% endblock %}

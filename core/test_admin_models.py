@@ -675,3 +675,48 @@ class CrearUnidadesEnLoteTests(TestCase):
         r = self._post(desde="1", hasta="1000")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 0)
+
+
+class CondominioAdminRegionComunaTests(TestCase):
+    """region/comuna pasaron de texto libre a desplegable (comuna en
+    cascada según la región, ver CondominioAdminForm) -- confirma que se
+    renderizan como <select>, que una combinación real se guarda bien y
+    que una combinación que no corresponde (comuna de otra región) se
+    rechaza en vez de guardarse mal."""
+
+    def _datos_base(self, nombre, region, comuna):
+        return {
+            "nombre": nombre, "plan": "premium", "region": region, "comuna": comuna,
+            "etiqueta_torre": "Torre", "etiqueta_unidad": "Unidad", "etiqueta_organizacion": "Condominio",
+            "genero_unidad": "f",
+            "unidades-TOTAL_FORMS": "0", "unidades-INITIAL_FORMS": "0", "unidades-MIN_NUM_FORMS": "0", "unidades-MAX_NUM_FORMS": "1000",
+            "membresias-TOTAL_FORMS": "0", "membresias-INITIAL_FORMS": "0", "membresias-MIN_NUM_FORMS": "0", "membresias-MAX_NUM_FORMS": "1000",
+            "condominios_vecinos": [],
+        }
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="region_comuna_staff", password="x")
+        self.client.force_login(self.staff)
+
+    def test_el_formulario_de_alta_muestra_desplegables(self):
+        r = self.client.get("/admin/core/condominio/add/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertIn('name="region"', html)
+        self.assertIn('name="comuna"', html)
+        self.assertIn("cascada_region_comuna.js", html)
+        self.assertIn("datos_comunas_chile.js", html)
+        self.assertIn("Valparaíso", html)
+
+    def test_crea_el_condominio_con_region_y_comuna_validas(self):
+        r = self.client.post("/admin/core/condominio/add/", self._datos_base("Admin Region Valida", "valparaiso", "Valparaíso"))
+        self.assertEqual(r.status_code, 302)
+        condominio = Condominio.objects.get(nombre="Admin Region Valida")
+        self.assertEqual(condominio.region, "valparaiso")
+        self.assertEqual(condominio.comuna, "Valparaíso")
+
+    def test_rechaza_comuna_que_no_es_de_esa_region(self):
+        r = self.client.post("/admin/core/condominio/add/", self._datos_base("Admin Region Invalida", "valparaiso", "Santiago"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "no pertenece a la región elegida")
+        self.assertFalse(Condominio.objects.filter(nombre="Admin Region Invalida").exists())

@@ -14,7 +14,8 @@ from unfold.decorators import action, display
 from unfold.forms import AdminPasswordChangeForm, BaseDialogForm, UserChangeForm, UserCreationForm
 from unfold.views import ChangeList
 
-from .models import PLAN_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
+from .comunas_chile import COMUNAS_POR_REGION, comuna_choices_agrupadas
+from .models import PLAN_CHOICES, REGION_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
 # Unidad/Torre/Membresia son datos operativos de cada condominio -- se
 # registran acá porque, a diferencia de PataAgenda, no hay un panel interno
@@ -124,8 +125,47 @@ class EstadoSuscripcionFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ComunaAdminWidget(forms.Select):
+    """Carga el JS de la cascada región/comuna del admin (ver
+    core/static/core/js/admin_condominio_cascada.js) -- declararlo en la
+    Media del widget basta para que Django admin lo agregue solo, sin
+    tocar ningún template."""
+
+    class Media:
+        js = [
+            "core/js/cascada_region_comuna.js",
+            "core/js/datos_comunas_chile.js",
+            "core/js/admin_condominio_cascada.js",
+        ]
+
+
+class CondominioAdminForm(forms.ModelForm):
+    """region/comuna como desplegable (antes texto libre) -- comuna en
+    cascada según la región elegida, mismo dato que usa el formulario
+    público de autoregistro (ver RegistroCondominioForm)."""
+
+    region = forms.ChoiceField(choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región")
+    comuna = forms.ChoiceField(
+        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
+        widget=ComunaAdminWidget,
+    )
+
+    class Meta:
+        model = Condominio
+        fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        region = cleaned.get("region")
+        comuna = cleaned.get("comuna")
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise forms.ValidationError("Esa comuna no pertenece a la región elegida.")
+        return cleaned
+
+
 @admin.register(Condominio)
 class CondominioAdmin(ModelAdmin):
+    form = CondominioAdminForm
     list_display = ["nombre", "plan", "es_fundador", "estado_suscripcion", "activo", "fecha_creacion"]
     list_filter = ["plan", "es_fundador", "activo", EstadoSuscripcionFilter]
     search_fields = ["nombre"]

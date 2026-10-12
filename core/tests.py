@@ -220,6 +220,47 @@ class ConsentimientoRegistroTests(TestCase):
         self.assertTrue(form_con_checkbox.is_valid(), form_con_checkbox.errors)
 
 
+class RegistroCondominioRegionComunaTests(TestCase):
+    """region/comuna pasaron de texto libre a desplegable, comuna en
+    cascada según la región (ver comunas_chile.py y
+    cascada_region_comuna.js) -- confirma que el form acepta una
+    combinación real, rechaza una que no corresponde, y que la página
+    de registro carga el JS y los datos para la cascada."""
+
+    def _datos(self, region, comuna, **extra):
+        codigo = CodigoInvitacion.objects.create()
+        datos = {
+            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Condo Region Comuna",
+            "region_condominio": region, "comuna_condominio": comuna,
+            "nombre": "Logan", "apellido": "Test", "acepto_terminos": True,
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123",
+        }
+        datos.update(extra)
+        return datos
+
+    def test_acepta_una_combinacion_real(self):
+        form = RegistroCondominioForm(data=self._datos("valparaiso", "Valparaíso"))
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rechaza_comuna_que_no_es_de_esa_region(self):
+        form = RegistroCondominioForm(data=self._datos("valparaiso", "Santiago"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("no pertenece a la región elegida", str(form.errors))
+
+    def test_permite_dejar_region_y_comuna_vacias(self):
+        form = RegistroCondominioForm(data=self._datos("", ""))
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_la_pagina_de_registro_carga_el_js_de_la_cascada(self):
+        r = self.client.get(reverse("registro-condominio"))
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertIn('name="region_condominio"', html)
+        self.assertIn('name="comuna_condominio"', html)
+        self.assertIn("cascada_region_comuna.js", html)
+        self.assertIn("Valparaíso", html)
+
+
 class NormalizarNombreTests(TestCase):
     """nombre/apellido quedan con la primera letra de cada palabra en
     mayúscula sin importar cómo los haya tipeado la persona."""

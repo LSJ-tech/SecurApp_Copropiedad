@@ -30,6 +30,7 @@ from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 from django.views.generic.base import View
 
+from .comunas_chile import COMUNAS_POR_REGION
 from .forms import CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin, SoloDirectivaMixin, SoloStaffMixin
 from .models import CodigoInvitacion, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
@@ -310,6 +311,11 @@ class SolicitarAccesoView(FormView):
 class RegistroCondominioView(FormView):
     template_name = "core/registro_condominio.html"
     form_class = RegistroCondominioForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["comunas_por_region"] = COMUNAS_POR_REGION
+        return context
 
     def form_valid(self, form):
         datos = form.cleaned_data

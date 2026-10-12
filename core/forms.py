@@ -5,6 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models.functions import Length
 
+from .comunas_chile import COMUNAS_POR_REGION, comuna_choices_agrupadas
 from .models import REGION_CHOICES, ROL_CHOICES, CodigoInvitacion, Condominio, SolicitudAcceso, Torre, Unidad
 
 LABEL_TU_NOMBRE = "Tu nombre"
@@ -65,7 +66,7 @@ class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrase
     """Alta de un condominio nuevo y de su primer usuario (directiva), sin intervención manual."""
 
     field_order = [
-        "codigo_invitacion", "nombre_condominio", "direccion_condominio", "comuna_condominio", "region_condominio",
+        "codigo_invitacion", "nombre_condominio", "direccion_condominio", "region_condominio", "comuna_condominio",
         "nombre", "apellido", "password1", "password2", "acepto_terminos",
     ]
 
@@ -83,9 +84,9 @@ class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrase
         widget=forms.TextInput(attrs={"class": "form-control"}),
         help_text="No tiene que ser una dirección exacta -- puede ser \"Sector Los Aromos\" o similar.",
     )
-    comuna_condominio = forms.CharField(
-        max_length=100, required=False, label="Comuna",
-        widget=forms.TextInput(attrs={"class": "form-control"}),
+    comuna_condominio = forms.ChoiceField(
+        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     region_condominio = forms.ChoiceField(
         choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región",
@@ -112,6 +113,17 @@ class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrase
         except CodigoInvitacion.DoesNotExist:
             raise ValidationError("Código inválido o ya usado.")
         return codigo
+
+    def clean(self):
+        cleaned = super().clean()
+        region = cleaned.get("region_condominio")
+        comuna = cleaned.get("comuna_condominio")
+        # El filtrado real pasa por JS (ver cascada_region_comuna.js) -- esto
+        # solo cubre a quien tiene JS desactivado y deja una combinación que
+        # no corresponde (ej. elige la región después de la comuna).
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise ValidationError("Esa comuna no pertenece a la región elegida.")
+        return cleaned
 
 
 class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
