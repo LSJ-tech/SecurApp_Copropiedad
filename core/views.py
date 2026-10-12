@@ -283,7 +283,7 @@ class RegistroCondominioView(FormView):
             codigo_obj.fecha_uso = timezone.now()
             codigo_obj.save()
 
-        login(self.request, user)
+        login(self.request, user, backend="django.contrib.auth.backends.ModelBackend")
         messages.success(
             self.request,
             f"¡Listo! Creamos la cuenta de {condominio.nombre}. Tu usuario es «{username}» — anótalo, lo necesitas "
@@ -341,7 +341,7 @@ class RegistroResidenteView(FormView):
         )
         if user.email:
             enviar_correo_bienvenida(user, self.condominio)
-        login(self.request, user)
+        login(self.request, user, backend="django.contrib.auth.backends.ModelBackend")
         messages.success(
             self.request,
             f"¡Bienvenido a {self.condominio.nombre}! Tu usuario es «{username}» — anótalo, lo necesitas para "

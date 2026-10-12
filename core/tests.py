@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
@@ -839,6 +841,46 @@ class SoloStaffMixinPermiteStaffTests(TestCase):
         self.assertTrue(Torre.objects.filter(condominio=condominio, nombre="Nueva").exists())
 
 
+class LoginConUsuarioOCorreoTests(TestCase):
+    """UsuarioOCorreoBackend -- muchos residentes no recuerdan su username
+    autogenerado (ej. "jlroman2") pero sí su correo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Login Backend", plan="premium")
+
+    def setUp(self):
+        self.membresia = crear_membresia(
+            self.condominio, "residente", username="login_residente",
+            email="login_residente@example.com", password="ClaveDelUsuario123",
+        )
+        self.user = self.membresia.user
+
+    def test_entra_con_el_username(self):
+        ok = self.client.login(username="login_residente", password="ClaveDelUsuario123")
+        self.assertTrue(ok)
+
+    def test_entra_con_el_correo(self):
+        ok = self.client.login(username="login_residente@example.com", password="ClaveDelUsuario123")
+        self.assertTrue(ok)
+
+    def test_entra_con_el_correo_sin_importar_mayusculas(self):
+        ok = self.client.login(username="LOGIN_RESIDENTE@EXAMPLE.COM", password="ClaveDelUsuario123")
+        self.assertTrue(ok)
+
+    def test_contrasena_incorrecta_no_entra(self):
+        ok = self.client.login(username="login_residente@example.com", password="esta-mal")
+        self.assertFalse(ok)
+
+    def test_correo_inexistente_no_entra_y_no_crashea(self):
+        ok = self.client.login(username="no-existe@example.com", password="lo-que-sea")
+        self.assertFalse(ok)
+
+    def test_formulario_de_login_real_acepta_el_correo(self):
+        r = self.client.post(reverse("login"), {"username": "login_residente@example.com", "password": "ClaveDelUsuario123"})
+        self.assertRedirects(r, reverse("inicio"))
+
+
 class RecuperarContrasenaTests(TestCase):
     """Flujo de "olvidé mi contraseña" (Django PasswordReset* + templates
     propias) -- antes no existía ninguna forma de que un vecino recuperara
@@ -868,19 +910,28 @@ class RecuperarContrasenaTests(TestCase):
         self.assertRedirects(r, reverse("password-reset-enviado"))
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_pedir_recuperacion_manda_un_correo_con_el_link_correcto(self):
+    def test_pedir_recuperacion_manda_un_correo_con_el_link_que_funciona(self):
+        """No predice el token esperado con una segunda llamada a
+        make_token() -- el generador de Django incluye la marca de tiempo
+        en el hash, así que una segunda llamada un instante después del
+        request puede dar un token distinto y el assert sería flaky sin
+        que el feature esté mal. En vez de eso, extrae el link real del
+        correo y confirma que ese, tal cual, funciona."""
         r = self.client.post(reverse("password-reset"), {"email": self.user.email})
         self.assertRedirects(r, reverse("password-reset-enviado"))
         self.assertEqual(len(mail.outbox), 1)
         correo = mail.outbox[0]
         self.assertEqual(correo.to, [self.user.email])
 
-        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
-        token = default_token_generator.make_token(self.user)
-        link = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
-        self.assertIn(link, correo.body)
+        match = re.search(r"/contrasena/recuperar/[\w-]+/[\w-]+/", correo.body)
+        self.assertIsNotNone(match)
+        link = match.group(0)
         self.assertEqual(correo.alternatives[0][1], "text/html")
         self.assertIn(link, correo.alternatives[0][0])
+
+        r2 = self.client.get(link, follow=True)
+        self.assertEqual(r2.status_code, 200)
+        self.assertNotContains(r2, "ya no es válido")
 
     def test_muestra_las_reglas_de_contrasena_sin_escapar(self):
         """ayudas_contrasena se arma en texto plano y se renderiza en un
