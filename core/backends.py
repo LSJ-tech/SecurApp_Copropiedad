@@ -18,8 +18,8 @@ class UsuarioOCorreoBackend(ModelBackend):
     def authenticate(self, request, username=None, password=None, **kwargs):
         if username is None or password is None:
             return None
-        UserModel = get_user_model()
-        candidatos = list(UserModel._default_manager.filter(Q(username__iexact=username) | Q(email__iexact=username)))
+        modelo_usuario = get_user_model()
+        candidatos = list(modelo_usuario._default_manager.filter(Q(username__iexact=username) | Q(email__iexact=username)))
         for user in candidatos:
             if user.check_password(password) and self.user_can_authenticate(user):
                 return user
@@ -27,5 +27,5 @@ class UsuarioOCorreoBackend(ModelBackend):
             # Mismo truco que ModelBackend.authenticate(): corre el hasher
             # igual aunque no haya usuario, para que el tiempo de respuesta
             # no delate si el username/correo existe o no.
-            UserModel().set_password(password)
+            modelo_usuario().set_password(password)
         return None
