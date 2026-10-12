@@ -1,6 +1,7 @@
 import datetime
 
 from django.contrib import admin
+from django.db.models.functions import Length
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
@@ -47,7 +48,9 @@ class UnidadInline(TabularInline):
     verbose_name_plural = f"Unidades (primeras {MAX_FILAS_INLINE} -- para ver/editar el resto, ir a Unidades y filtrar por este condominio)"
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).order_by("torre__nombre", "numero")
+        qs = super().get_queryset(request).annotate(
+            _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
+        ).order_by("_torre_len", "torre__nombre", "_num_len", "numero")
         ids = list(qs.values_list("pk", flat=True)[:MAX_FILAS_INLINE])
         return qs.filter(pk__in=ids)
 
@@ -90,9 +93,16 @@ class CondominioAdmin(ModelAdmin):
 
 @admin.register(Torre)
 class TorreAdmin(ModelAdmin):
+    """Orden numérico real (1, 2, 3... no "1, 10, 11...") -- mismo truco de
+    Length() ya usado en TorreListView/UnidadListView del panel web, que acá
+    nunca se había aplicado al propio admin."""
+
     list_display = ["nombre", "condominio"]
     list_filter = [("condominio", AutocompleteSelectFilter)]
     search_fields = ["nombre"]  # exigido por AutocompleteSelectFilter en otros admin que filtran por torre (ej. MembresiaAdmin)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_len=Length("nombre")).order_by("condominio__nombre", "_len", "nombre")
 
 
 @admin.register(Unidad)
@@ -101,16 +111,34 @@ class UnidadAdmin(ModelAdmin):
     list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
+        ).order_by("condominio__nombre", "_torre_len", "torre__nombre", "_num_len", "numero")
+
 
 @admin.register(Membresia)
 class MembresiaAdmin(ModelAdmin):
     """Filtros como desplegable con buscador (AutocompleteSelectFilter) en vez
     de la lista larga de links que da el filtro por defecto -- con 27+
-    condominios/cientos de unidades y subiendo, esa lista ya no es manejable."""
+    condominios/cientos de unidades y subiendo, esa lista ya no es manejable.
+    Orden de los filtros: de lo más amplio (condominio) a lo más puntual
+    (block, depto), con el rol aparte al final por ser un atributo
+    transversal, no parte de esa jerarquía."""
 
     list_display = ["user", "condominio", "rol", "unidad"]
-    list_filter = ["rol", ("condominio", AutocompleteSelectFilter), ("unidad__torre", AutocompleteSelectFilter), ("unidad", AutocompleteSelectFilter)]
+    list_filter = [
+        ("condominio", AutocompleteSelectFilter),
+        ("unidad__torre", AutocompleteSelectFilter),
+        ("unidad", AutocompleteSelectFilter),
+        "rol",
+    ]
     autocomplete_fields = ["user", "unidad"]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _torre_len=Length("unidad__torre__nombre"), _num_len=Length("unidad__numero"),
+        ).order_by("condominio__nombre", "_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "rol", "user__username")
 
 
 @admin.register(CodigoInvitacion)

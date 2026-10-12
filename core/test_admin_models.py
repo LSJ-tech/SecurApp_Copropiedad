@@ -9,7 +9,10 @@ from .admin import (
     MAX_FILAS_INLINE,
     CodigoInvitacionAdmin,
     CondominioAdmin,
+    MembresiaAdmin,
     MembresiaInline,
+    TorreAdmin,
+    UnidadAdmin,
     UnidadInline,
     cambiar_a_free,
     cambiar_a_premium,
@@ -17,7 +20,7 @@ from .admin import (
     marcar_atendida,
     marcar_atendido,
 )
-from .models import CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Unidad
+from .models import CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
 
 class ExtenderTreintaDiasTests(TestCase):
@@ -229,3 +232,41 @@ class MembresiaAdminFiltroBlockYDeptoTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "block9_residente")
         self.assertNotContains(r, "block10_residente")
+
+
+class AdminOrdenNumericoTests(TestCase):
+    """Torre/Unidad/Membresia se ordenaban alfabéticamente en el admin
+    (torre/depto "10" antes que "2") -- mismo truco Length() que ya se usa
+    en TorreListView/UnidadListView del panel web, ahora también acá."""
+
+    def setUp(self):
+        self.request = RequestFactory().get("/admin/")
+
+    def test_torre_admin_ordena_numerico_no_alfabetico(self):
+        condominio = Condominio.objects.create(nombre="Test Orden Torre", plan="premium")
+        Torre.objects.create(condominio=condominio, nombre="10")
+        Torre.objects.create(condominio=condominio, nombre="2")
+        Torre.objects.create(condominio=condominio, nombre="1")
+        nombres = list(TorreAdmin(Torre, admin.site).get_queryset(self.request).values_list("nombre", flat=True))
+        self.assertEqual(nombres, ["1", "2", "10"])
+
+    def test_unidad_admin_ordena_numerico_no_alfabetico(self):
+        condominio = Condominio.objects.create(nombre="Test Orden Unidad", plan="premium")
+        Unidad.objects.create(condominio=condominio, numero="10")
+        Unidad.objects.create(condominio=condominio, numero="2")
+        Unidad.objects.create(condominio=condominio, numero="1")
+        numeros = list(UnidadAdmin(Unidad, admin.site).get_queryset(self.request).values_list("numero", flat=True))
+        self.assertEqual(numeros, ["1", "2", "10"])
+
+    def test_membresia_admin_ordena_por_block_numerico(self):
+        condominio = Condominio.objects.create(nombre="Test Orden Membresia", plan="premium")
+        torre_10 = Torre.objects.create(condominio=condominio, nombre="10")
+        torre_2 = Torre.objects.create(condominio=condominio, nombre="2")
+        unidad_10 = Unidad.objects.create(condominio=condominio, torre=torre_10, numero="1")
+        unidad_2 = Unidad.objects.create(condominio=condominio, torre=torre_2, numero="1")
+        user_10 = User.objects.create_user(username="orden_block10")
+        user_2 = User.objects.create_user(username="orden_block2")
+        Membresia.objects.create(user=user_10, condominio=condominio, rol="residente", unidad=unidad_10, terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=user_2, condominio=condominio, rol="residente", unidad=unidad_2, terminos_aceptados_en=timezone.now())
+        usernames = list(MembresiaAdmin(Membresia, admin.site).get_queryset(self.request).values_list("user__username", flat=True))
+        self.assertEqual(usernames, ["orden_block2", "orden_block10"])
