@@ -807,6 +807,36 @@ class InicioViewTests(TestCase):
         self.assertEqual(r.context["gasto_actual_recaudado"], 10000)
 
 
+class EtiquetaOrganizacionTests(TestCase):
+    """No todas las organizaciones son "condominio" (ej. juntas de vecinos) --
+    confirma que "Mi condominio" en el nav/inicio/ajustes sale de
+    etiqueta_organizacion y no está escrito fijo en los templates."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Junta Los Aromos", plan="premium", etiqueta_organizacion="Junta de vecinos")
+        cls.directiva = crear_membresia(cls.condominio, "directiva", username="directiva_junta_vecinos")
+
+    def test_inicio_usa_la_etiqueta_de_la_organizacion(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, "Mi junta de vecinos")
+        self.assertNotContains(r, "Mi condominio")
+
+    def test_mi_condominio_usa_la_etiqueta_de_la_organizacion(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("mi-condominio"))
+        self.assertContains(r, "Mi junta de vecinos")
+        self.assertNotContains(r, "Mi condominio")
+
+    def test_por_defecto_sigue_diciendo_condominio(self):
+        condominio_default = Condominio.objects.create(nombre="Condominio Default Test", plan="premium")
+        directiva = crear_membresia(condominio_default, "directiva", username="directiva_condominio_default")
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, "Mi condominio")
+
+
 class ServiceWorkerViewTests(TestCase):
     def test_sirve_el_sw_js_con_scope_global(self):
         r = self.client.get(reverse("service-worker"))

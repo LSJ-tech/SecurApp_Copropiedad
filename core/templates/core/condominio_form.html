@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
-{% block titulo %}Mi condominio{% endblock %}
+{% block titulo %}Mi {{ condominio.etiqueta_organizacion|default:"Condominio"|lower }}{% endblock %}
 {% block contenido %}
-<h1 class="h4 mb-3">Mi condominio</h1>
+<h1 class="h4 mb-3">Mi {{ condominio.etiqueta_organizacion|default:"Condominio"|lower }}</h1>
 
 <h2 class="h5 mb-2">Autoregistro de residentes</h2>
 <p class="text-muted">Comparte este link o QR con tus vecinos — eligen {% if condominio.genero_unidad == "m" %}su propio{% else %}su propia{% endif %} {{ condominio.etiqueta_unidad|lower }} y crean su cuenta solos, sin que tengas que cargarlos uno por uno. Cualquier vecino también puede compartirlo desde <a href="{% url 'compartir-invitacion' %}">Invitar vecinos</a>.</p>

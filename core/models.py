@@ -65,6 +65,11 @@ class Condominio(models.Model):
     """
 
     nombre = models.CharField(max_length=150)
+    etiqueta_organizacion = models.CharField(
+        max_length=30, default="Condominio",
+        help_text="Cómo le dicen a esta organización (Condominio, Junta de vecinos, Comunidad, Villa...) -- "
+        "se usa en el panel en frases como 'Mi Condominio'/'Mi Junta de vecinos', en vez de 'Mi condominio' a secas.",
+    )
     direccion = models.CharField(
         max_length=255, blank=True, verbose_name="dirección o sector",
         help_text="No tiene que ser una dirección exacta -- una junta de vecinos suele cubrir varias calles. "

@@ -16,6 +16,6 @@
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'empleados' %}active{% endif %}" href="{% url 'empleados' %}"><i class="bi bi-person-badge"></i> Personal</a></li>
     {% endif %}
     {% if user.membresia.rol == "directiva" %}
-    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mi-condominio' %}active{% endif %}" href="{% url 'mi-condominio' %}"><i class="bi bi-gear"></i> Mi condominio</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mi-condominio' %}active{% endif %}" href="{% url 'mi-condominio' %}"><i class="bi bi-gear"></i> Mi {{ user.membresia.condominio.etiqueta_organizacion|default:"Condominio"|lower }}</a></li>
     {% endif %}
 </ul>
