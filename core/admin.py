@@ -234,11 +234,32 @@ admin.site.unregister(User)
 admin.site.unregister(Group)
 
 
+class SinCondominioFilter(admin.SimpleListFilter):
+    """Para encontrar cuentas creadas en /admin/auth/user/add/ (ver
+    UserAdmin) a las que todavía les falta la Membresia que las liga a un
+    condominio -- sin esto no hay forma rápida de verlas, hay que revisar
+    usuario por usuario si tienen membresia."""
+
+    title = "condominio asignado"
+    parameter_name = "con_condominio"
+
+    def lookups(self, request, model_admin):
+        return [("no", "Sin condominio asignado"), ("si", "Con condominio asignado")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "no":
+            return queryset.filter(membresia__isnull=True)
+        if self.value() == "si":
+            return queryset.filter(membresia__isnull=False)
+        return queryset
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
+    list_filter = (*BaseUserAdmin.list_filter, SinCondominioFilter)
 
 
 @admin.register(Group)

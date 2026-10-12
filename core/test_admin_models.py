@@ -374,6 +374,42 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
         self.assertEqual(r.status_code, 200)
 
 
+class SinCondominioFilterTests(TestCase):
+    """Filtro "condominio asignado" en /admin/auth/user/ -- para encontrar
+    cuentas creadas a mano (ej. desde /admin/auth/user/add/) a las que
+    todavía les falta la Membresia que las liga a un condominio."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Nombres a propósito sin la palabra "condominio" adentro -- el
+        # parameter_name del filtro es "con_condominio" y aparece muchas
+        # veces en los links del propio widget de filtros, así que un
+        # username que la contenga da falsos positivos en assertContains.
+        condominio = Condominio.objects.create(nombre="Test Sin Condominio", plan="premium")
+        cls.usuario_asignado = User.objects.create_user(username="usuario_asignado_xyz")
+        Membresia.objects.create(user=cls.usuario_asignado, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+        cls.usuario_huerfano = User.objects.create_user(username="usuario_huerfano_xyz")
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="sincondo_staff", password="x", email="sincondo_staff@example.com")
+        self.client.force_login(self.staff)
+
+    def test_filtro_no_muestra_solo_los_sin_membresia(self):
+        r = self.client.get("/admin/auth/user/", {"con_condominio": "no"})
+        self.assertContains(r, "usuario_huerfano_xyz")
+        self.assertNotContains(r, "usuario_asignado_xyz")
+
+    def test_filtro_si_muestra_solo_los_con_membresia(self):
+        r = self.client.get("/admin/auth/user/", {"con_condominio": "si"})
+        self.assertContains(r, "usuario_asignado_xyz")
+        self.assertNotContains(r, "usuario_huerfano_xyz")
+
+    def test_sin_filtro_muestra_a_todos(self):
+        r = self.client.get("/admin/auth/user/")
+        self.assertContains(r, "usuario_asignado_xyz")
+        self.assertContains(r, "usuario_huerfano_xyz")
+
+
 class DashboardCallbackTests(TestCase):
     """UNFOLD["DASHBOARD_CALLBACK"] (core/dashboard.py) -- los KPIs y las
     tablas de /admin/ con datos reales, no la grilla de apps por defecto."""
