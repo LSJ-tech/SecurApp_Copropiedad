@@ -486,6 +486,31 @@
         </div>
     </section>
 
+    {% if stat_organizaciones %}
+    <section class="py-5 bg-white reveal">
+        <div class="container">
+            <p class="text-center text-muted small text-uppercase fw-semibold mb-4" style="letter-spacing: 0.06em;">Números reales, no de marketing</p>
+            <div class="row text-center g-4">
+                <div class="col-md-4">
+                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_organizaciones }}</div>
+                    <p class="text-muted mb-0">Condominios y juntas de vecinos activos</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_unidades }}</div>
+                    <p class="text-muted mb-0">Unidades administradas, entre deptos y casas</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_miembros }}</div>
+                    <p class="text-muted mb-0">Vecinos usando la plataforma</p>
+                </div>
+            </div>
+            {% if stat_alertas_resueltas %}
+            <p class="text-center text-muted small mt-4 mb-0"><i class="bi bi-check-circle text-success"></i> {{ stat_alertas_resueltas }} alertas de pánico resueltas hasta ahora.</p>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
     <section id="caracteristicas" class="py-5 reveal" style="margin-top: 2rem; scroll-margin-top: 5rem;">
         <div class="container">
             <h2 class="text-center fw-bold mb-2 section-title">Todo lo que necesita tu comunidad</h2>

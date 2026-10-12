@@ -837,6 +837,39 @@ class EtiquetaOrganizacionTests(TestCase):
         self.assertContains(r, "Mi condominio")
 
 
+class EstadisticasLandingTests(TestCase):
+    """La landing muestra prueba social con números reales calculados en
+    vivo (ver InicioView._estadisticas_landing), no testimonios inventados --
+    confirma que la sección no aparece vacía y que refleja datos reales."""
+
+    def test_no_muestra_la_seccion_si_no_hay_datos_reales(self):
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.context["stat_organizaciones"], 0)
+        self.assertNotContains(r, "Números reales, no de marketing")
+
+    def test_muestra_los_numeros_reales_cuando_hay_datos(self):
+        condominio = Condominio.objects.create(nombre="Stats Landing Test", plan="premium")
+        Unidad.objects.create(condominio=condominio, numero="1")
+        Unidad.objects.create(condominio=condominio, numero="2")
+        crear_membresia(condominio, "residente", username="stats_landing_residente")
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, "Números reales, no de marketing")
+        self.assertEqual(r.context["stat_organizaciones"], 1)
+        self.assertEqual(r.context["stat_unidades"], 2)
+        self.assertEqual(r.context["stat_miembros"], 1)
+        self.assertEqual(r.context["stat_alertas_resueltas"], 0)
+        self.assertNotContains(r, "alertas de pánico resueltas")
+
+    def test_muestra_las_alertas_resueltas_solo_si_hay_alguna(self):
+        from alertas.models import Alerta
+
+        condominio = Condominio.objects.create(nombre="Stats Alertas Test", plan="premium")
+        autor = crear_membresia(condominio, "residente", username="stats_alertas_autor")
+        Alerta.objects.create(condominio=condominio, autor=autor, estado="resuelta", resuelta_por=autor)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, "1 alertas de pánico resueltas hasta ahora")
+
+
 class ServiceWorkerViewTests(TestCase):
     def test_sirve_el_sw_js_con_scope_global(self):
         r = self.client.get(reverse("service-worker"))

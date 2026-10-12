@@ -507,7 +507,23 @@ class InicioView(TemplateView):
                 context["total_miembros"] = Membresia.objects.filter(condominio=self.condominio).count()
             if self.membresia.rol in ("directiva", "administracion"):
                 context.update(self._resumen_administracion())
+        else:
+            context.update(self._estadisticas_landing())
         return context
+
+    def _estadisticas_landing(self):
+        """Prueba social con números reales, no testimonios inventados --
+        se recalculan solos en cada visita, directo desde la base de datos."""
+        from alertas.models import Alerta
+
+        return {
+            "stat_organizaciones": Condominio.objects.filter(activo=True).count(),
+            "stat_unidades": Unidad.objects.count(),
+            "stat_miembros": Membresia.objects.count(),
+            # Solo se muestra si ya hay al menos una -- "0 alertas resueltas"
+            # no es un dato que convenza a nadie de probar la plataforma.
+            "stat_alertas_resueltas": Alerta.objects.filter(estado="resuelta").count(),
+        }
 
     def _resumen_administracion(self):
         from alertas.models import Alerta
