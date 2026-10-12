@@ -8,8 +8,8 @@
 
 <form method="get" class="row g-2 mb-3">
     <div class="col-md-5">
-        <label for="miembros-q" class="visually-hidden">Buscar por nombre o usuario</label>
-        <input type="text" id="miembros-q" name="q" class="form-control" placeholder="Buscar por nombre o usuario" value="{{ busqueda }}">
+        <label for="miembros-q" class="visually-hidden">Buscar por nombre</label>
+        <input type="text" id="miembros-q" name="q" class="form-control" placeholder="Buscar por nombre" value="{{ busqueda }}">
     </div>
     <div class="col-md-4">
         <label for="miembros-rol" class="visually-hidden">Filtrar por rol</label>
@@ -28,17 +28,16 @@
 
 <div class="table-responsive">
 <table class="table table-striped">
-    <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>{{ condominio.etiqueta_unidad }}</th></tr></thead>
+    <thead><tr><th>Nombre</th><th>Rol</th><th>{{ condominio.etiqueta_unidad }}</th></tr></thead>
     <tbody>
         {% for m in membresias %}
         <tr>
             <td>{{ m.user.get_full_name|default:m.user.username }}</td>
-            <td>{{ m.user.username }}</td>
             <td>{{ m.get_rol_display }}</td>
             <td>{{ m.unidad|default:"—" }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="text-muted">Sin miembros para este filtro.</td></tr>
+        <tr><td colspan="3" class="text-muted">Sin miembros para este filtro.</td></tr>
         {% endfor %}
     </tbody>
 </table>

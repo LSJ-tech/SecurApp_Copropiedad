@@ -817,7 +817,32 @@ class MiembroListFiltroRolTests(TestCase):
         self.client.force_login(directiva.user)
         r = self.client.get(reverse("miembros") + "?rol=residente")
         self.assertEqual(len(r.context["membresias"]), 1)
-        self.assertEqual(r.context["membresias"][0].rol, "residente")
+
+    def test_no_muestra_el_nombre_de_usuario(self):
+        condominio = Condominio.objects.create(nombre="Test Sin Usuario", plan="premium")
+        directiva = crear_membresia(condominio, "directiva", username="sinusuario_directiva", first_name="Ana", last_name="Soto")
+        crear_membresia(condominio, "residente", username="sinusuario_residente_unico", first_name="Rosa", last_name="Mena")
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("miembros"))
+        self.assertNotContains(r, "sinusuario_residente_unico")
+        self.assertContains(r, "Rosa Mena")
+
+    def test_ordena_por_block_y_depto_numerico_no_alfabetico(self):
+        from .models import Torre
+
+        condominio = Condominio.objects.create(nombre="Test Orden Miembros", plan="premium")
+        torre_10 = Torre.objects.create(condominio=condominio, nombre="10")
+        torre_2 = Torre.objects.create(condominio=condominio, nombre="2")
+        unidad_10 = Unidad.objects.create(condominio=condominio, torre=torre_10, numero="1")
+        unidad_2 = Unidad.objects.create(condominio=condominio, torre=torre_2, numero="1")
+        directiva = crear_membresia(condominio, "directiva", username="orden_miembros_directiva")
+        crear_membresia(condominio, "residente", unidad=unidad_10, username="orden_miembros_t10")
+        crear_membresia(condominio, "residente", unidad=unidad_2, username="orden_miembros_t2")
+
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("miembros"))
+        residentes = [m for m in r.context["membresias"] if m.rol == "residente"]
+        self.assertEqual([m.unidad.torre.nombre for m in residentes], ["2", "10"])
 
 
 class DashboardResidenteTests(TestCase):

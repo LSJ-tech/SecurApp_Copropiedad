@@ -672,7 +672,9 @@ class MiembroListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, 
                 | Q(user__username__icontains=busqueda)
             )
 
-        return qs.order_by("rol", "user__last_name")
+        return qs.annotate(
+            _torre_len=Length("unidad__torre__nombre"), _num_len=Length("unidad__numero"),
+        ).order_by("rol", "_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "user__last_name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
