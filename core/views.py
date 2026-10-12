@@ -415,10 +415,10 @@ def _contexto_invitacion(request, condominio):
     )
     mensaje = (
         f"🏠 ¡Hola, vecino/a!\n\n"
-        f"Te invito a unirte a *SecurApp* 🔐, la app de nuestro condominio *{condominio.nombre}*.\n\n"
+        f"Te invito a unirte a *SecurApp* 🔐, la app de *{condominio.nombre}*.\n\n"
         f"Desde ahí puedes:\n"
         f"✅ Activar el botón de pánico\n"
-        f"✅ Ver avisos y alertas del condominio\n"
+        f"✅ Ver avisos y alertas\n"
         f"✅ Revisar tus gastos comunes\n\n"
         f"Crea tu cuenta eligiendo tu {condominio.etiqueta_unidad.lower()} acá 👇\n"
         f"{link}"
