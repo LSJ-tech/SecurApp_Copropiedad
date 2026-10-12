@@ -24,12 +24,16 @@ def _ultimos_n_meses(n):
     return list(reversed(meses))
 
 
-def dashboard_callback(request, context):
+def dashboard_callback(_request, context):
     """UNFOLD["DASHBOARD_CALLBACK"] -- arma los datos que pinta
     core/templates/admin/index.html (KPIs + tablas) arriba de la grilla de
     apps de siempre. Solo lectura, nada de esto se usa para filtrar ni
     restringir nada -- es un resumen para quien administra la plataforma
-    (DevQuad), no cambia el aislamiento multi-tenant del resto del sistema."""
+    (DevQuad), no cambia el aislamiento multi-tenant del resto del sistema.
+
+    _request: Unfold siempre llama este callback como callback(request, context)
+    (posicional, ver AdminSite.index en unfold/sites.py) -- el parámetro es
+    obligatorio por ese contrato aunque nunca se use acá."""
     from alertas.models import Alerta
 
     hoy = timezone.localdate()
