@@ -153,6 +153,15 @@ class MembresiaAdminChangelistTests(TestCase):
         r = self.client.get("/admin/core/membresia/")
         self.assertEqual(r.status_code, 200)
 
+    def test_tiene_el_formulario_y_boton_de_aplicar_filtros(self):
+        """list_filter_submit=True es obligatorio para que el desplegable
+        (AutocompleteSelectFilter) sirva de algo -- sin él, Unfold renderiza
+        un <div> en vez de un <form> y elegir una opción no hace nada
+        (bug real encontrado por el usuario: "intenté hacer un filtro pero
+        no se aplica")."""
+        r = self.client.get("/admin/core/membresia/")
+        self.assertContains(r, 'id="filter-form"')
+
     def test_filtro_por_condominio_acota_los_resultados(self):
         r = self.client.get("/admin/core/membresia/", {"condominio__id__exact": self.condominio_a.pk})
         self.assertEqual(r.status_code, 200)
@@ -185,11 +194,19 @@ class TorreYUnidadAdminFiltroCondominioTests(TestCase):
         self.assertContains(r, "Torre filtro A")
         self.assertNotContains(r, "Torre filtro B")
 
+    def test_torre_tiene_boton_de_aplicar_filtros(self):
+        r = self.client.get("/admin/core/torre/")
+        self.assertContains(r, 'id="filter-form"')
+
     def test_unidad_changelist_renderiza_y_filtra(self):
         r = self.client.get("/admin/core/unidad/", {"condominio__id__exact": self.condominio_a.pk})
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Unidad filtro A")
         self.assertNotContains(r, "Unidad filtro B")
+
+    def test_unidad_tiene_boton_de_aplicar_filtros(self):
+        r = self.client.get("/admin/core/unidad/")
+        self.assertContains(r, 'id="filter-form"')
 
     def test_unidad_changelist_filtra_por_torre(self):
         unidad_otra_torre = Unidad.objects.create(condominio=self.condominio_a, numero="Unidad filtro C")

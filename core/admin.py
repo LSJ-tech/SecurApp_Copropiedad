@@ -99,6 +99,7 @@ class TorreAdmin(ModelAdmin):
 
     list_display = ["nombre", "condominio"]
     list_filter = [("condominio", AutocompleteSelectFilter)]
+    list_filter_submit = True  # sin esto el desplegable no tiene botón "Aplicar filtros" y elegir una opción no hace nada
     search_fields = ["nombre"]  # exigido por AutocompleteSelectFilter en otros admin que filtran por torre (ej. MembresiaAdmin)
 
     def get_queryset(self, request):
@@ -109,6 +110,7 @@ class TorreAdmin(ModelAdmin):
 class UnidadAdmin(ModelAdmin):
     list_display = ["numero", "condominio", "torre", "alicuota"]
     list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
+    list_filter_submit = True
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
 
     def get_queryset(self, request):
@@ -133,6 +135,7 @@ class MembresiaAdmin(ModelAdmin):
         ("unidad", AutocompleteSelectFilter),
         "rol",
     ]
+    list_filter_submit = True
     autocomplete_fields = ["user", "unidad"]
 
     def get_queryset(self, request):
