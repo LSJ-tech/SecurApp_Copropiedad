@@ -277,12 +277,29 @@ class SinCondominioFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MembresiaInlineParaUsuario(TabularInline):
+    """Deja asignar el condominio (y unidad/rol) de un usuario desde su
+    propia página, sin tener que ir aparte a Membresías. Solo aparece
+    después de guardar el usuario por primera vez -- Django necesita que
+    el usuario ya tenga un ID antes de poder ligarlo a un condominio."""
+
+    model = Membresia
+    fk_name = "user"
+    extra = 1
+    max_num = 1
+    autocomplete_fields = ["condominio", "unidad"]
+    fields = ["condominio", "unidad", "rol"]
+    verbose_name = "Membresía"
+    verbose_name_plural = "Membresía (condominio asignado)"
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
     list_filter = (*BaseUserAdmin.list_filter, SinCondominioFilter)
+    inlines = [MembresiaInlineParaUsuario]
 
 
 @admin.register(Group)

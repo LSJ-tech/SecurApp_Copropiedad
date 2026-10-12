@@ -398,14 +398,48 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
         # que el formulario quedó enganchado con unfold.forms.UserCreationForm.
         self.assertIn("max-w-2xl", contenido)
 
+    def _datos_inline_membresia_vacio(self):
+        # El formulario de alta ahora incluye el inline de Membresía (ver
+        # MembresiaInlineParaUsuario) -- aunque no se use, su management
+        # form (TOTAL_FORMS, etc.) es obligatorio para que el POST valide.
+        return {
+            "membresia-TOTAL_FORMS": "1",
+            "membresia-INITIAL_FORMS": "0",
+            "membresia-MIN_NUM_FORMS": "0",
+            "membresia-MAX_NUM_FORMS": "1",
+            "membresia-0-condominio": "",
+            "membresia-0-unidad": "",
+            "membresia-0-rol": "residente",
+        }
+
     def test_crear_un_usuario_sigue_funcionando(self):
         r = self.client.post("/admin/auth/user/add/", {
             "username": "nuevo_desde_admin",
             "password1": "unaClaveBienSegura123!",
             "password2": "unaClaveBienSegura123!",
+            **self._datos_inline_membresia_vacio(),
         })
         self.assertEqual(r.status_code, 302)
         self.assertTrue(User.objects.filter(username="nuevo_desde_admin").exists())
+
+    def test_crear_usuario_y_asignarle_condominio_en_el_mismo_formulario(self):
+        condominio = Condominio.objects.create(nombre="Condominio Para Alta Usuario", plan="premium")
+        r = self.client.post("/admin/auth/user/add/", {
+            "username": "nuevo_con_condominio",
+            "password1": "unaClaveBienSegura123!",
+            "password2": "unaClaveBienSegura123!",
+            "membresia-TOTAL_FORMS": "1",
+            "membresia-INITIAL_FORMS": "0",
+            "membresia-MIN_NUM_FORMS": "0",
+            "membresia-MAX_NUM_FORMS": "1",
+            "membresia-0-condominio": str(condominio.pk),
+            "membresia-0-unidad": "",
+            "membresia-0-rol": "directiva",
+        })
+        self.assertEqual(r.status_code, 302)
+        nuevo = User.objects.get(username="nuevo_con_condominio")
+        self.assertEqual(nuevo.membresia.condominio, condominio)
+        self.assertEqual(nuevo.membresia.rol, "directiva")
 
     def test_grupos_sigue_registrado_y_accesible(self):
         r = self.client.get("/admin/auth/group/")
