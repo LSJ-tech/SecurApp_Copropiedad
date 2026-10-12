@@ -3,11 +3,20 @@
 {% block contenido %}
 <h1 class="h4 mb-3">{{ condominio.etiqueta_torre }}s</h1>
 <p class="text-muted small">La estructura de {{ condominio.etiqueta_torre|lower }}s la configura el administrador de la plataforma al dar de alta el condominio. Si necesitas agregar o corregir una, contáctanos.</p>
-<ul class="list-group">
-    {% for t in torres %}
-    <li class="list-group-item">{{ t.nombre }}</li>
-    {% empty %}
-    <li class="list-group-item text-muted">Sin {{ condominio.etiqueta_torre|lower }}s registradas (opcional, solo para condominios grandes).</li>
-    {% endfor %}
-</ul>
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead><tr><th>{{ condominio.etiqueta_torre }}</th><th>{{ condominio.etiqueta_unidad }}s</th><th>Vecinos registrados</th></tr></thead>
+    <tbody>
+        {% for t in torres %}
+        <tr>
+            <td>{{ t.nombre }}</td>
+            <td>{{ t.unidades_count }}</td>
+            <td>{{ t.miembros_count }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-muted">Sin {{ condominio.etiqueta_torre|lower }}s registradas (opcional, solo para condominios grandes).</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
 {% endblock %}

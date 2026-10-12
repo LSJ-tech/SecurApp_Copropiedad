@@ -1065,3 +1065,41 @@ class RecuperarContrasenaTests(TestCase):
 
         r = self.client.get(url_confirmar, follow=True)
         self.assertContains(r, "ya no es válido")
+
+
+class ConteosTorreYUnidadTests(TestCase):
+    """Torres muestra cuántos deptos y vecinos registrados tiene cada block,
+    y Unidades cuántas personas están registradas en cada depto -- antes
+    ninguna de las dos pantallas mostraba esos conteos."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Conteos", plan="premium")
+        cls.torre_1 = Torre.objects.create(condominio=cls.condominio, nombre="1")
+        cls.torre_2 = Torre.objects.create(condominio=cls.condominio, nombre="2")
+        cls.unidad_1_1 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_1, numero="1")
+        Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_1, numero="2")
+        Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_2, numero="1")
+
+    def setUp(self):
+        self.directiva = crear_membresia(self.condominio, "directiva", username="conteos_directiva")
+        self.client.force_login(self.directiva.user)
+        # dos residentes distintos registrados en la misma unidad (ej. pareja)
+        crear_membresia(self.condominio, "residente", unidad=self.unidad_1_1, username="conteos_res1")
+        crear_membresia(self.condominio, "residente", unidad=self.unidad_1_1, username="conteos_res2")
+
+    def test_torres_muestra_deptos_y_vecinos_por_block(self):
+        r = self.client.get(reverse("torres"))
+        self.assertEqual(r.status_code, 200)
+        torre_1 = next(t for t in r.context["torres"] if t.nombre == "1")
+        torre_2 = next(t for t in r.context["torres"] if t.nombre == "2")
+        self.assertEqual(torre_1.unidades_count, 2)
+        self.assertEqual(torre_1.miembros_count, 2)
+        self.assertEqual(torre_2.unidades_count, 1)
+        self.assertEqual(torre_2.miembros_count, 0)
+
+    def test_unidades_muestra_personas_registradas_por_depto(self):
+        r = self.client.get(reverse("unidades"))
+        self.assertEqual(r.status_code, 200)
+        unidad = next(u for u in r.context["unidades"] if u.pk == self.unidad_1_1.pk)
+        self.assertEqual(unidad.miembros_count, 2)

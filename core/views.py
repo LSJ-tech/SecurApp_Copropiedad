@@ -708,7 +708,11 @@ class TorreListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListVi
     context_object_name = "torres"
 
     def get_queryset(self):
-        return super().get_queryset().annotate(_len=Length("nombre")).order_by("_len", "nombre")
+        return super().get_queryset().annotate(
+            _len=Length("nombre"),
+            unidades_count=Count("unidades", distinct=True),
+            miembros_count=Count("unidades__membresias", distinct=True),
+        ).order_by("_len", "nombre")
 
 
 class TorreCreateView(SoloStaffMixin, CondominioFormMixin, CreateView):
@@ -729,7 +733,10 @@ class UnidadListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListV
         torre_id = self.request.GET.get("torre")
         if torre_id:
             qs = qs.filter(torre_id=torre_id)
-        return qs.annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero")).order_by("_torre_len", "torre__nombre", "_num_len", "numero")
+        return qs.annotate(
+            _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
+            miembros_count=Count("membresias", distinct=True),
+        ).order_by("_torre_len", "torre__nombre", "_num_len", "numero")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
