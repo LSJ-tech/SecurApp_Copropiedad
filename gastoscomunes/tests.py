@@ -1,4 +1,5 @@
 import datetime
+from io import BytesIO
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -334,3 +335,77 @@ class CuotaUnidadApiTests(TestCase):
     def test_sin_autenticar_no_puede_listar(self):
         r = self.client.get(reverse("cuota-unidad-list"))
         self.assertEqual(r.status_code, 401)
+
+
+class ExportarCuotasTests(TestCase):
+    """Exportar el listado de cuotas de un periodo a Excel/PDF -- mismo
+    permiso que verlo en pantalla (EsDirectivaOAdministracionMixin), un
+    residente no debería poder descargarlo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from core.models import Torre
+
+        cls.condominio = Condominio.objects.create(nombre="Test Exportar Cuotas", plan="premium")
+        cls.torre = Torre.objects.create(condominio=cls.condominio, nombre="5")
+        cls.unidad_pagada = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre, numero="501")
+        cls.unidad_pendiente = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre, numero="502")
+        cls.gasto = GastoComun.objects.create(condominio=cls.condominio, periodo="2026-08", monto_total=24000, fecha_vencimiento=datetime.date(2026, 8, 31))
+        CuotaUnidad.objects.create(gasto_comun=cls.gasto, unidad=cls.unidad_pagada, monto=12000, estado="pagado", fecha_pago=datetime.date(2026, 8, 5))
+        CuotaUnidad.objects.create(gasto_comun=cls.gasto, unidad=cls.unidad_pendiente, monto=12000)
+
+    def setUp(self):
+        self.administracion = crear_membresia(self.condominio, "administracion", username="exportar_admon")
+        self.residente = crear_membresia(self.condominio, "residente", unidad=self.unidad_pagada, username="exportar_residente")
+
+    def test_administracion_puede_descargar_excel(self):
+        self.client.force_login(self.administracion.user)
+        r = self.client.get(reverse("gastos-comunes-cuotas-excel", args=[self.gasto.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.assertIn("gastos_comunes_2026-08.xlsx", r["Content-Disposition"])
+
+    def test_administracion_puede_descargar_pdf(self):
+        self.client.force_login(self.administracion.user)
+        r = self.client.get(reverse("gastos-comunes-cuotas-pdf", args=[self.gasto.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertIn("gastos_comunes_2026-08.pdf", r["Content-Disposition"])
+
+    def test_residente_no_puede_descargar(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("gastos-comunes-cuotas-excel", args=[self.gasto.pk]))
+        self.assertEqual(r.status_code, 302)
+        r = self.client.get(reverse("gastos-comunes-cuotas-pdf", args=[self.gasto.pk]))
+        self.assertEqual(r.status_code, 302)
+
+    def test_excel_contiene_las_cifras_correctas(self):
+        from openpyxl import load_workbook
+
+        self.client.force_login(self.administracion.user)
+        r = self.client.get(reverse("gastos-comunes-cuotas-excel", args=[self.gasto.pk]))
+        wb = load_workbook(BytesIO(r.content))
+        ws = wb.active
+        valores = [celda.value for fila in ws.iter_rows() for celda in fila if celda.value is not None]
+        self.assertIn("501", valores)
+        self.assertIn("502", valores)
+        self.assertIn(12000, valores)
+        self.assertIn("Total recaudado", valores)
+        self.assertIn("Total pendiente", valores)
+
+    def test_filtro_por_torre_tambien_aplica_al_exportar(self):
+        from core.models import Torre
+
+        otra_torre = Torre.objects.create(condominio=self.condominio, nombre="9")
+        unidad_otra_torre = Unidad.objects.create(condominio=self.condominio, torre=otra_torre, numero="901")
+        CuotaUnidad.objects.create(gasto_comun=self.gasto, unidad=unidad_otra_torre, monto=12000)
+
+        self.client.force_login(self.administracion.user)
+        r = self.client.get(reverse("gastos-comunes-cuotas-excel", args=[self.gasto.pk]), {"torre": self.torre.pk})
+        from openpyxl import load_workbook
+
+        wb = load_workbook(BytesIO(r.content))
+        ws = wb.active
+        valores = [celda.value for fila in ws.iter_rows() for celda in fila if celda.value is not None]
+        self.assertIn("501", valores)
+        self.assertNotIn("901", valores)

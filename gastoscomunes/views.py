@@ -18,6 +18,16 @@ from core.models import Condominio, Membresia, Torre
 from .boucher import enviar_boucher_por_correo, generar_boucher_pdf
 from .forms import GastoComunForm
 from .models import CuotaUnidad, GastoComun
+from .reportes import generar_cuotas_excel, generar_cuotas_pdf
+
+
+def _cuotas_del_gasto(condominio, gasto_pk, torre_id=None):
+    qs = CuotaUnidad.objects.filter(
+        gasto_comun__condominio=condominio, gasto_comun_id=gasto_pk
+    ).select_related("unidad", "unidad__torre", "gasto_comun")
+    if torre_id:
+        qs = qs.filter(unidad__torre_id=torre_id)
+    return qs.annotate(_torre_len=Length("unidad__torre__nombre")).order_by("_torre_len", "unidad__torre__nombre", "unidad__numero")
 
 
 class GastoComunListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
@@ -70,15 +80,8 @@ class CuotaListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, Li
 
     def get_queryset(self):
         residentes_con_correo = Membresia.objects.filter(rol="residente").exclude(user__email="").select_related("user")
-        qs = CuotaUnidad.objects.filter(
-            gasto_comun__condominio=self.condominio, gasto_comun_id=self.kwargs["gasto_pk"]
-        ).select_related("unidad", "unidad__torre").prefetch_related(
-            Prefetch("unidad__membresias", queryset=residentes_con_correo, to_attr="residentes_con_correo")
-        )
-        torre_id = self.request.GET.get("torre")
-        if torre_id:
-            qs = qs.filter(unidad__torre_id=torre_id)
-        return qs.annotate(_torre_len=Length("unidad__torre__nombre")).order_by("_torre_len", "unidad__torre__nombre", "unidad__numero")
+        qs = _cuotas_del_gasto(self.condominio, self.kwargs["gasto_pk"], self.request.GET.get("torre"))
+        return qs.prefetch_related(Prefetch("unidad__membresias", queryset=residentes_con_correo, to_attr="residentes_con_correo"))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -87,6 +90,20 @@ class CuotaListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, Li
         context["torres"] = Torre.objects.filter(condominio=self.condominio).annotate(_len=Length("nombre")).order_by("_len", "nombre")
         context["torre_seleccionada"] = self.request.GET.get("torre", "")
         return context
+
+
+class CuotasExportarExcelView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+    def get(self, request, gasto_pk):
+        gasto = get_object_or_404(GastoComun, pk=gasto_pk, condominio=self.condominio)
+        cuotas = _cuotas_del_gasto(self.condominio, gasto_pk, request.GET.get("torre"))
+        return generar_cuotas_excel(gasto, cuotas, self.condominio)
+
+
+class CuotasExportarPDFView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+    def get(self, request, gasto_pk):
+        gasto = get_object_or_404(GastoComun, pk=gasto_pk, condominio=self.condominio)
+        cuotas = _cuotas_del_gasto(self.condominio, gasto_pk, request.GET.get("torre"))
+        return generar_cuotas_pdf(gasto, cuotas, self.condominio)
 
 
 class MarcarCuotaPagadaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):

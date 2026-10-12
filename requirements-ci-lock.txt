@@ -56,6 +56,8 @@ djangorestframework_simplejwt==5.5.1 \
     --hash=sha256:2c30f3707053d384e9f315d11c2daccfcb548d4faa453111ca19a542b732e469
 drf-spectacular==0.30.0 \
     --hash=sha256:006cf5921ebe20a9bd24f7c846261ebbf78780be5961b0d6e87afaa82afd62ff
+et-xmlfile==2.0.0 \
+    --hash=sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa
 frozenlist==1.8.0 \
     --hash=sha256:494a5952b1c597ba44e0e78113a7266e656b9794eec897b19ead706bd7074383
 gunicorn==26.2.0 \
@@ -80,6 +82,8 @@ mercadopago==3.6.0 \
     --hash=sha256:9a405991f8520ee36b2857bf7b2c8fbd701a5f429fc8f60fcf9fd2a9e664bb0f
 multidict==6.9.1 \
     --hash=sha256:976fd7689d69ec78d67d31d38d396d8adb562f7e8368279f76aed4aa451fa06d
+openpyxl==3.1.5 \
+    --hash=sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2
 pillow==12.3.0 \
     --hash=sha256:78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91
 propcache==0.5.4 \
