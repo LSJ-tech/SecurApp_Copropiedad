@@ -1,9 +1,12 @@
 from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from .forms import CrearMiembroForm, RegistroCondominioForm, RegistroResidenteForm
 from .models import CodigoInvitacion, Condominio, Membresia, Torre, Unidad
@@ -834,3 +837,72 @@ class SoloStaffMixinPermiteStaffTests(TestCase):
         r = self.client.post(reverse("crear-torre"), {"nombre": "Nueva"})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(Torre.objects.filter(condominio=condominio, nombre="Nueva").exists())
+
+
+class RecuperarContrasenaTests(TestCase):
+    """Flujo de "olvidé mi contraseña" (Django PasswordReset* + templates
+    propias) -- antes no existía ninguna forma de que un vecino recuperara
+    el acceso solo, tenía que pedirle a alguien que se la cambiara a mano
+    desde el admin de Django."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Reset Contraseña", plan="premium")
+
+    def setUp(self):
+        self.membresia = crear_membresia(
+            self.condominio, "residente", username="reset_residente",
+            email="reset_residente@example.com", password="ClaveVieja123",
+        )
+        self.user = self.membresia.user
+
+    def test_form_get_funciona(self):
+        r = self.client.get(reverse("password-reset"))
+        self.assertEqual(r.status_code, 200)
+
+    def test_correo_inexistente_no_filtra_informacion(self):
+        """Mismo correo de "revisa tu bandeja" exista o no la cuenta -- así
+        nadie puede usar este formulario para adivinar qué correos están
+        registrados."""
+        r = self.client.post(reverse("password-reset"), {"email": "no-existe@example.com"})
+        self.assertRedirects(r, reverse("password-reset-enviado"))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_pedir_recuperacion_manda_un_correo_con_el_link_correcto(self):
+        r = self.client.post(reverse("password-reset"), {"email": self.user.email})
+        self.assertRedirects(r, reverse("password-reset-enviado"))
+        self.assertEqual(len(mail.outbox), 1)
+        correo = mail.outbox[0]
+        self.assertEqual(correo.to, [self.user.email])
+
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        link = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
+        self.assertIn(link, correo.body)
+        self.assertEqual(correo.alternatives[0][1], "text/html")
+        self.assertIn(link, correo.alternatives[0][0])
+
+    def test_el_link_permite_elegir_contrasena_nueva(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        url_confirmar = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
+
+        r = self.client.get(url_confirmar, follow=True)
+        self.assertEqual(r.status_code, 200)
+        url_formulario = r.redirect_chain[-1][0]
+
+        r = self.client.post(url_formulario, {"new_password1": "ClaveNuevaSegura123", "new_password2": "ClaveNuevaSegura123"})
+        self.assertRedirects(r, reverse("password-reset-listo"))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("ClaveNuevaSegura123"))
+
+    def test_el_link_ya_usado_no_sirve_dos_veces(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        url_confirmar = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
+
+        url_formulario = self.client.get(url_confirmar, follow=True).redirect_chain[-1][0]
+        self.client.post(url_formulario, {"new_password1": "ClaveNuevaSegura123", "new_password2": "ClaveNuevaSegura123"})
+
+        r = self.client.get(url_confirmar, follow=True)
+        self.assertContains(r, "ya no es válido")

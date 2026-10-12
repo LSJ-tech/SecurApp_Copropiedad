@@ -1,7 +1,9 @@
+from django.conf import settings
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import path, reverse_lazy
 
 from . import views
+from .views import EMAIL_CONTACTO_DEVQUAD
 
 urlpatterns = [
     path("", views.InicioView.as_view(), name="inicio"),
@@ -10,6 +12,36 @@ urlpatterns = [
     path("unirme/<uuid:token>/", views.RegistroResidenteView.as_view(), name="registro-residente"),
     path("login/", auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path(
+        "contrasena/recuperar/",
+        auth_views.PasswordResetView.as_view(
+            template_name="core/password_reset_form.html",
+            email_template_name="core/emails/password_reset.txt",
+            html_email_template_name="core/emails/password_reset.html",
+            subject_template_name="core/emails/password_reset_subject.txt",
+            extra_email_context={"platform_name": settings.PLATFORM_NAME, "email_contacto": EMAIL_CONTACTO_DEVQUAD},
+            success_url=reverse_lazy("password-reset-enviado"),
+        ),
+        name="password-reset",
+    ),
+    path(
+        "contrasena/recuperar/enviado/",
+        auth_views.PasswordResetDoneView.as_view(template_name="core/password_reset_done.html"),
+        name="password-reset-enviado",
+    ),
+    path(
+        "contrasena/recuperar/<uidb64>/<token>/",
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name="core/password_reset_confirm.html",
+            success_url=reverse_lazy("password-reset-listo"),
+        ),
+        name="password-reset-confirmar",
+    ),
+    path(
+        "contrasena/recuperar/listo/",
+        auth_views.PasswordResetCompleteView.as_view(template_name="core/password_reset_complete.html"),
+        name="password-reset-listo",
+    ),
     path("mi-perfil/", views.MiPerfilView.as_view(), name="mi-perfil"),
     path("mi-perfil/cambiar-contrasena/", views.MiCambiarContrasenaView.as_view(), name="cambiar-contrasena"),
     path("mi-perfil/eliminar-cuenta/", views.SolicitarEliminacionView.as_view(), name="solicitar-eliminacion"),
