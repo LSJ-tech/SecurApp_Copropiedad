@@ -356,3 +356,51 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
     def test_grupos_sigue_registrado_y_accesible(self):
         r = self.client.get("/admin/auth/group/")
         self.assertEqual(r.status_code, 200)
+
+
+class DashboardCallbackTests(TestCase):
+    """UNFOLD["DASHBOARD_CALLBACK"] (core/dashboard.py) -- los KPIs y las
+    tablas de /admin/ con datos reales, no la grilla de apps por defecto."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from alertas.models import Alerta
+
+        cls.condominio_activo = Condominio.objects.create(
+            nombre="Test Dashboard Activo", plan="premium", activo=True,
+            pagado_hasta=timezone.localdate() + datetime.timedelta(days=10),
+        )
+        Condominio.objects.create(nombre="Test Dashboard Inactivo", plan="premium", activo=False)
+        cls.condominio_vencido = Condominio.objects.create(
+            nombre="Test Dashboard Vencido", plan="premium",
+            pagado_hasta=timezone.localdate() - datetime.timedelta(days=5),
+        )
+        unidad_1 = Unidad.objects.create(condominio=cls.condominio_activo, numero="1")
+        Unidad.objects.create(condominio=cls.condominio_activo, numero="2")
+        user = User.objects.create_user(username="dashboard_residente")
+        membresia = Membresia.objects.create(user=user, condominio=cls.condominio_activo, rol="residente", unidad=unidad_1, terminos_aceptados_en=timezone.now())
+        Alerta.objects.create(condominio=cls.condominio_activo, autor=membresia, tipo="robo", estado="activa")
+        SolicitudAcceso.objects.create(condominio="Junta de prueba", nombre="Ana", comuna="Valparaíso", telefono="+56911111111", atendido=False)
+        SolicitudAcceso.objects.create(condominio="Ya atendida", nombre="Luis", comuna="Valparaíso", telefono="+56922222222", atendido=True)
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="dashboard_staff", password="x", email="dashboard_staff@example.com")
+        self.client.force_login(self.staff)
+
+    def test_dashboard_muestra_los_kpis_correctos(self):
+        r = self.client.get("/admin/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["kpi_condominios_activos"], 2)  # activo + vencido (vencido no tiene activo=False)
+        self.assertEqual(r.context["kpi_condominios_total"], 3)
+        self.assertEqual(r.context["kpi_unidades"], 2)
+        self.assertEqual(r.context["kpi_miembros"], 1)
+        self.assertEqual(r.context["kpi_alertas_activas"], 1)
+        self.assertEqual(r.context["kpi_solicitudes_pendientes"], 1)
+        self.assertEqual(r.context["kpi_suscripciones_vencidas"], 1)
+
+    def test_dashboard_muestra_las_tablas(self):
+        r = self.client.get("/admin/")
+        contenido = r.content.decode()
+        self.assertIn("Test Dashboard Activo", contenido)
+        self.assertIn("Ana", contenido)
+        self.assertNotIn("Luis", contenido)  # ya atendida, no debería salir

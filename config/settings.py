@@ -260,6 +260,7 @@ UNFOLD = {
     "SITE_HEADER": "SecurApp Copropiedad",
     "SITE_SYMBOL": "shield",
     "SITE_LOGO": _logo_admin,
+    "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
     "SHOW_HISTORY": True,
     "COLORS": {
         "primary": {

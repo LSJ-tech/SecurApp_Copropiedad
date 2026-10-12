@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% load i18n unfold %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {% component "unfold/components/card.html" with icon="apartment" title="Condominios" %}
+            <div class="text-3xl font-semibold text-important">{{ kpi_condominios_activos }}</div>
+            <div class="text-sm text-subtle">activos de {{ kpi_condominios_total }} en total</div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with icon="door_front" title="Departamentos" %}
+            <div class="text-3xl font-semibold text-important">{{ kpi_unidades }}</div>
+            <div class="text-sm text-subtle">en todos los condominios</div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with icon="groups" title="Vecinos registrados" %}
+            <div class="text-3xl font-semibold text-important">{{ kpi_miembros }}</div>
+            <div class="text-sm text-subtle">en todos los condominios</div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with icon="emergency" title="Alertas activas" label=kpi_alertas_activas|yesno:"URGENTE," %}
+            <div class="text-3xl font-semibold {% if kpi_alertas_activas %}text-red-600 dark:text-red-500{% else %}text-important{% endif %}">{{ kpi_alertas_activas }}</div>
+            <div class="text-sm text-subtle">ahora mismo, en cualquier condominio</div>
+        {% endcomponent %}
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {% component "unfold/components/card.html" with icon="mail" title="Solicitudes sin atender" href="/admin/core/solicitudacceso/?atendido__exact=0" %}
+            <div class="text-3xl font-semibold text-important">{{ kpi_solicitudes_pendientes }}</div>
+            <div class="text-sm text-subtle">leads de la landing</div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with icon="payments" title="Suscripciones vencidas" %}
+            <div class="text-3xl font-semibold {% if kpi_suscripciones_vencidas %}text-orange-600 dark:text-orange-500{% else %}text-important{% endif %}">{{ kpi_suscripciones_vencidas }}</div>
+            <div class="text-sm text-subtle">condominios por cobrar</div>
+        {% endcomponent %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {% component "unfold/components/table.html" with title="Condominios recientes" table=tabla_condominios_recientes %}{% endcomponent %}
+        {% component "unfold/components/table.html" with title="Solicitudes de acceso pendientes" table=tabla_solicitudes_pendientes %}{% endcomponent %}
+    </div>
+</div>
+
+{% include "unfold/helpers/dashboard_default.html" %}
+{% endblock %}
