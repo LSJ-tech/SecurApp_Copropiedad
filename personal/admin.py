@@ -26,6 +26,7 @@ class EmpleadoAdmin(ModelAdmin):
     list_filter = [("condominio", AutocompleteSelectFilter), "activo", "tipo_contrato"]
     list_filter_submit = True
     search_fields = ["nombre", "rut"]
+    list_select_related = ["condominio"]
 
 
 @admin.register(Liquidacion)
@@ -34,3 +35,4 @@ class LiquidacionAdmin(ModelAdmin):
     list_filter = [("empleado__condominio", AutocompleteSelectFilter), "periodo"]
     list_filter_submit = True
     readonly_fields = [f.name for f in Liquidacion._meta.fields if f.name not in ("id",)]
+    list_select_related = ["empleado"]

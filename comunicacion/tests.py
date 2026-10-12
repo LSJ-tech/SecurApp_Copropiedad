@@ -86,3 +86,27 @@ class AvisoAdminTests(TestCase):
         self.client.force_login(staff)
         r = self.client.get("/admin/comunicacion/aviso/")
         self.assertEqual(r.status_code, 200)
+
+    def test_el_listado_no_crece_en_queries_por_fila(self):
+        """autor es un Membresia, y Membresia.__str__ toca autor.user y
+        autor.condominio -- sin list_select_related, cada fila nueva sumaría
+        2 queries más. Confirma que el total no depende de cuántas filas hay."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        condominio = Condominio.objects.create(nombre="Test N+1 Aviso", plan="premium")
+        staff = User.objects.create_superuser(username="n1_aviso_staff", password="x")
+        self.client.force_login(staff)
+
+        autor = crear_membresia(condominio, "directiva", username="n1_aviso_autor_0")
+        Aviso.objects.create(condominio=condominio, autor=autor, titulo="Aviso 0", cuerpo="...")
+        with CaptureQueriesContext(connection) as ctx_una_fila:
+            self.client.get("/admin/comunicacion/aviso/")
+
+        for i in range(1, 4):
+            autor = crear_membresia(condominio, "directiva", username=f"n1_aviso_autor_{i}")
+            Aviso.objects.create(condominio=condominio, autor=autor, titulo=f"Aviso {i}", cuerpo="...")
+        with CaptureQueriesContext(connection) as ctx_cuatro_filas:
+            self.client.get("/admin/comunicacion/aviso/")
+
+        self.assertEqual(len(ctx_una_fila.captured_queries), len(ctx_cuatro_filas.captured_queries))

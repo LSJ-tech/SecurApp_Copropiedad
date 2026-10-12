@@ -152,6 +152,7 @@ class TorreAdmin(ModelAdmin):
     list_filter = [("condominio", AutocompleteSelectFilter)]
     list_filter_submit = True  # sin esto el desplegable no tiene botón "Aplicar filtros" y elegir una opción no hace nada
     search_fields = ["nombre"]  # exigido por AutocompleteSelectFilter en otros admin que filtran por torre (ej. MembresiaAdmin)
+    list_select_related = ["condominio"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(_len=Length("nombre")).order_by("condominio__nombre", "_len", "nombre")
@@ -203,6 +204,7 @@ class UnidadAdmin(ModelAdmin):
     list_filter_submit = True
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
     actions_list = ["crear_unidades_en_lote"]
+    list_select_related = ["condominio", "torre"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(
@@ -291,6 +293,7 @@ class MembresiaAdmin(ModelAdmin):
     ]
     list_filter_submit = True
     autocomplete_fields = ["user", "unidad"]
+    list_select_related = ["user", "condominio", "unidad", "unidad__torre", "unidad__condominio"]
 
     @display(description="Rol", ordering="rol", label={"directiva": "primary", "administracion": "info", "conserje": "warning", "residente": "success"})
     def rol_badge(self, obj):
@@ -312,6 +315,7 @@ class CodigoInvitacionAdmin(ModelAdmin):
     list_display = ["codigo", "usado_display", "condominio", "fecha_creacion", "fecha_uso"]
     list_filter = ["fecha_creacion"]
     readonly_fields = ["condominio", "fecha_uso"]
+    list_select_related = ["condominio"]
 
     @admin.display(description="Usado", boolean=True)
     def usado_display(self, obj):

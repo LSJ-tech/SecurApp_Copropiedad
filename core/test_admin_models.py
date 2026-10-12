@@ -169,6 +169,24 @@ class MembresiaAdminChangelistTests(TestCase):
         r = self.client.get("/admin/core/membresia/")
         self.assertContains(r, "Residente")
 
+    def test_el_listado_no_crece_en_queries_por_fila(self):
+        """user, condominio y unidad (con su propio torre/condominio para
+        Unidad.__str__) se muestran en cada fila -- sin list_select_related,
+        cada membresía nueva sumaría varias queries más."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx_dos_filas:
+            self.client.get("/admin/core/membresia/")
+
+        for i in range(4):
+            user = User.objects.create_user(username=f"n1_membresia_{i}")
+            Membresia.objects.create(user=user, condominio=self.condominio_a, rol="residente", terminos_aceptados_en=timezone.now())
+        with CaptureQueriesContext(connection) as ctx_seis_filas:
+            self.client.get("/admin/core/membresia/")
+
+        self.assertEqual(len(ctx_dos_filas.captured_queries), len(ctx_seis_filas.captured_queries))
+
     def test_tiene_el_formulario_y_boton_de_aplicar_filtros(self):
         """list_filter_submit=True es obligatorio para que el desplegable
         (AutocompleteSelectFilter) sirva de algo -- sin él, Unfold renderiza

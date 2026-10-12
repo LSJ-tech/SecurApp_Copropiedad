@@ -126,6 +126,28 @@ class RegistroIngresoAdminTests(TestCase):
         r = self.client.get("/admin/accesos/registroingreso/")
         self.assertEqual(r.status_code, 200)
 
+    def test_el_listado_no_crece_en_queries_por_fila(self):
+        """Unidad.__str__ toca unidad.torre o unidad.condominio -- sin
+        list_select_related, cada fila nueva sumaría una query más."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        condominio = Condominio.objects.create(nombre="Test N+1 Acceso", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        staff = User.objects.create_superuser(username="n1_acceso_staff", password="x")
+        self.client.force_login(staff)
+
+        RegistroIngreso.objects.create(unidad=unidad, nombre_visitante="Visitante 0", motivo="visita")
+        with CaptureQueriesContext(connection) as ctx_una_fila:
+            self.client.get("/admin/accesos/registroingreso/")
+
+        for i in range(1, 4):
+            RegistroIngreso.objects.create(unidad=unidad, nombre_visitante=f"Visitante {i}", motivo="visita")
+        with CaptureQueriesContext(connection) as ctx_cuatro_filas:
+            self.client.get("/admin/accesos/registroingreso/")
+
+        self.assertEqual(len(ctx_una_fila.captured_queries), len(ctx_cuatro_filas.captured_queries))
+
     def test_se_puede_buscar_por_nombre_del_visitante(self):
         condominio = Condominio.objects.create(nombre="Test Busqueda Acceso", plan="premium")
         unidad = Unidad.objects.create(condominio=condominio, numero="1")

@@ -27,3 +27,4 @@ class GastoComunAdmin(ModelAdmin):
     list_filter = [("condominio", AutocompleteSelectFilter)]
     list_filter_submit = True
     inlines = [CuotaUnidadInline]
+    list_select_related = ["condominio"]
