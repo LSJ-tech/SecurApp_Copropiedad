@@ -1,15 +1,17 @@
 import datetime
 
-from django.contrib import admin
+from django import forms
+from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
 from django.db.models.functions import Length
+from django.shortcuts import redirect
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
-from unfold.decorators import display
-from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+from unfold.decorators import action, display
+from unfold.forms import AdminPasswordChangeForm, BaseDialogForm, UserChangeForm, UserCreationForm
 from unfold.views import ChangeList
 
 from .models import PLAN_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
@@ -98,10 +100,34 @@ class MembresiaInline(TabularInline):
         return qs.filter(pk__in=ids)
 
 
+class EstadoSuscripcionFilter(admin.SimpleListFilter):
+    """El cobro de la suscripción es manual (no hay corte automático, ver
+    SuscripcionActivaMixin) -- este filtro es la lista de seguimiento de
+    cobro: encontrar rápido a quién hay que escribirle. Mismas 3 categorías
+    que ya calcula CondominioAdmin.estado_suscripcion, solo que ese método
+    no se puede usar en list_filter porque no es un campo real del modelo."""
+
+    title = "estado de suscripción"
+    parameter_name = "estado_suscripcion"
+
+    def lookups(self, request, model_admin):
+        return [("vencida", "Vencida"), ("vigente", "Vigente"), ("libre", "Sin restricción")]
+
+    def queryset(self, request, queryset):
+        hoy = timezone.localdate()
+        if self.value() == "vencida":
+            return queryset.filter(pagado_hasta__lt=hoy)
+        if self.value() == "vigente":
+            return queryset.filter(pagado_hasta__gte=hoy)
+        if self.value() == "libre":
+            return queryset.filter(pagado_hasta__isnull=True)
+        return queryset
+
+
 @admin.register(Condominio)
 class CondominioAdmin(ModelAdmin):
     list_display = ["nombre", "plan", "es_fundador", "estado_suscripcion", "activo", "fecha_creacion"]
-    list_filter = ["plan", "es_fundador", "activo"]
+    list_filter = ["plan", "es_fundador", "activo", EstadoSuscripcionFilter]
     search_fields = ["nombre"]
     actions = [extender_30_dias, cambiar_a_free, cambiar_a_premium]
     inlines = [UnidadInline, MembresiaInline]
@@ -134,12 +160,49 @@ class TorreAdmin(ModelAdmin):
         return ChangeListOrdenAnotado
 
 
+class CrearUnidadesEnLoteForm(BaseDialogForm):
+    """Onboardear un condominio grande a mano, unidad por unidad, es lento
+    y repetitivo (ej. las ~300 de Empart) -- este form genera un rango
+    numerado de una vez. MAX_UNIDADES_POR_LOTE es solo un tope de cordura
+    contra un rango tipeado mal (ej. 1 a 99999), no un límite de negocio."""
+
+    MAX_UNIDADES_POR_LOTE = 500
+
+    condominio = forms.ModelChoiceField(queryset=Condominio.objects.all(), label="Condominio")
+    torre = forms.ModelChoiceField(
+        queryset=Torre.objects.all(), required=False, label="Torre (opcional)",
+        help_text="Dejar vacío si son casas o unidades sin torre.",
+    )
+    prefijo = forms.CharField(required=False, label="Prefijo", help_text="Ej. \"A-\" para generar A-101, A-102...")
+    desde = forms.IntegerField(label="Número inicial", min_value=1)
+    hasta = forms.IntegerField(label="Número final", min_value=1)
+    alicuota = forms.DecimalField(
+        required=False, max_digits=6, decimal_places=4, label="Alícuota (opcional, igual para todas)",
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        condominio = cleaned.get("condominio")
+        torre = cleaned.get("torre")
+        desde = cleaned.get("desde")
+        hasta = cleaned.get("hasta")
+        if torre and condominio and torre.condominio_id != condominio.id:
+            raise forms.ValidationError("Esa torre no pertenece al condominio elegido.")
+        if desde is not None and hasta is not None:
+            if hasta < desde:
+                raise forms.ValidationError("El número final no puede ser menor que el inicial.")
+            if (hasta - desde + 1) > self.MAX_UNIDADES_POR_LOTE:
+                raise forms.ValidationError(f"Como máximo {self.MAX_UNIDADES_POR_LOTE} unidades por lote.")
+        return cleaned
+
+
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
     list_display = ["numero", "condominio", "torre", "alicuota"]
     list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
     list_filter_submit = True
     search_fields = ["numero", "torre__nombre", "condominio__nombre"]
+    actions_list = ["crear_unidades_en_lote"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(
@@ -148,6 +211,43 @@ class UnidadAdmin(ModelAdmin):
 
     def get_changelist(self, request, **kwargs):
         return ChangeListOrdenAnotado
+
+    @action(
+        description="Crear unidades en lote",
+        icon="add_box",
+        url_path="crear-unidades-en-lote",
+        dialog={
+            "title": "Crear unidades en lote",
+            "description": "Crea varias unidades numeradas de una vez (ej. del 101 al 115), en vez de una por una.",
+            "form_class": CrearUnidadesEnLoteForm,
+            "form_submit_text": "Crear",
+        },
+    )
+    def crear_unidades_en_lote(self, request, form):
+        condominio = form.cleaned_data["condominio"]
+        torre = form.cleaned_data["torre"]
+        prefijo = form.cleaned_data["prefijo"] or ""
+        alicuota = form.cleaned_data["alicuota"]
+
+        creadas = 0
+        ya_existian = 0
+        for n in range(form.cleaned_data["desde"], form.cleaned_data["hasta"] + 1):
+            numero = f"{prefijo}{n}"
+            defaults = {"alicuota": alicuota} if alicuota is not None else {}
+            _, creada = Unidad.objects.get_or_create(condominio=condominio, torre=torre, numero=numero, defaults=defaults)
+            if creada:
+                creadas += 1
+            else:
+                ya_existian += 1
+
+        if creadas:
+            mensaje = f"Se crearon {creadas} unidades nuevas en {condominio}."
+            if ya_existian:
+                mensaje += f" {ya_existian} ya existían y se omitieron."
+            messages.success(request, mensaje)
+        else:
+            messages.warning(request, f"No se creó ninguna unidad nueva -- las {ya_existian} del rango ya existían.")
+        return redirect("admin:core_unidad_changelist")
 
 
 class SinUnidadFilter(admin.SimpleListFilter):

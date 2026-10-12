@@ -539,3 +539,121 @@ class DashboardCallbackTests(TestCase):
         # los 3 condominios de setUpTestData se crean "ahora" -- el mes
         # actual (último de la lista) tiene que sumarlos.
         self.assertEqual(datos["datasets"][0]["data"][-1], 3)
+
+
+class EstadoSuscripcionFilterTests(TestCase):
+    """Como el cobro es manual (ver SuscripcionActivaMixin), este filtro es
+    la lista de seguimiento de pagos -- confirma que agrupa bien los 3
+    estados que ya calcula CondominioAdmin.estado_suscripcion."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.vencido = Condominio.objects.create(
+            nombre="Filtro Suscripcion Vencido", plan="premium",
+            pagado_hasta=timezone.localdate() - datetime.timedelta(days=3),
+        )
+        cls.vigente = Condominio.objects.create(
+            nombre="Filtro Suscripcion Vigente", plan="premium",
+            pagado_hasta=timezone.localdate() + datetime.timedelta(days=10),
+        )
+        cls.libre = Condominio.objects.create(
+            nombre="Filtro Suscripcion Libre", plan="premium", pagado_hasta=None,
+        )
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="filtro_susc_staff", password="x")
+        self.client.force_login(self.staff)
+
+    def test_filtro_vencida_muestra_solo_los_vencidos(self):
+        r = self.client.get("/admin/core/condominio/?estado_suscripcion=vencida")
+        self.assertContains(r, "Filtro Suscripcion Vencido")
+        self.assertNotContains(r, "Filtro Suscripcion Vigente")
+        self.assertNotContains(r, "Filtro Suscripcion Libre")
+
+    def test_filtro_vigente_muestra_solo_los_vigentes(self):
+        r = self.client.get("/admin/core/condominio/?estado_suscripcion=vigente")
+        self.assertContains(r, "Filtro Suscripcion Vigente")
+        self.assertNotContains(r, "Filtro Suscripcion Vencido")
+        self.assertNotContains(r, "Filtro Suscripcion Libre")
+
+    def test_filtro_libre_muestra_solo_los_sin_restriccion(self):
+        r = self.client.get("/admin/core/condominio/?estado_suscripcion=libre")
+        self.assertContains(r, "Filtro Suscripcion Libre")
+        self.assertNotContains(r, "Filtro Suscripcion Vencido")
+        self.assertNotContains(r, "Filtro Suscripcion Vigente")
+
+    def test_sin_filtro_muestra_a_todos(self):
+        r = self.client.get("/admin/core/condominio/")
+        self.assertContains(r, "Filtro Suscripcion Vencido")
+        self.assertContains(r, "Filtro Suscripcion Vigente")
+        self.assertContains(r, "Filtro Suscripcion Libre")
+
+
+class CrearUnidadesEnLoteTests(TestCase):
+    """Onboardear un condominio grande unidad por unidad es lento -- esta
+    acción del admin (ver UnidadAdmin.crear_unidades_en_lote) genera un
+    rango numerado de una vez."""
+
+    URL = "/admin/core/unidad/crear-unidades-en-lote/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Lote Unidades Test", plan="premium")
+        cls.torre = Torre.objects.create(condominio=cls.condominio, nombre="Torre A")
+        cls.otro_condominio = Condominio.objects.create(nombre="Otro Condominio Lote", plan="premium")
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="lote_unidades_staff", password="x")
+        self.client.force_login(self.staff)
+
+    def _post(self, **overrides):
+        datos = {
+            "_form_submitted": "true",
+            "condominio": self.condominio.pk,
+            "torre": "",
+            "prefijo": "",
+            "desde": "101",
+            "hasta": "105",
+            "alicuota": "",
+        }
+        datos.update(overrides)
+        return self.client.post(self.URL, datos)
+
+    def test_el_boton_aparece_en_el_changelist(self):
+        r = self.client.get("/admin/core/unidad/")
+        self.assertContains(r, "crear-unidades-en-lote")
+
+    def test_crea_el_rango_completo(self):
+        r = self._post()
+        self.assertEqual(r.status_code, 302)
+        numeros = set(Unidad.objects.filter(condominio=self.condominio).values_list("numero", flat=True))
+        self.assertEqual(numeros, {"101", "102", "103", "104", "105"})
+
+    def test_respeta_el_prefijo_y_la_alicuota(self):
+        self._post(prefijo="A-", alicuota="0.0033", desde="1", hasta="2")
+        creadas = Unidad.objects.filter(condominio=self.condominio, numero__in=["A-1", "A-2"])
+        self.assertEqual(creadas.count(), 2)
+        for unidad in creadas:
+            self.assertEqual(str(unidad.alicuota), "0.0033")
+
+    def test_no_duplica_unidades_que_ya_existian(self):
+        Unidad.objects.create(condominio=self.condominio, numero="101")
+        self._post()
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="101").count(), 1)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 5)
+
+    def test_rechaza_torre_que_no_es_del_condominio_elegido(self):
+        torre_ajena = Torre.objects.create(condominio=self.otro_condominio, nombre="Torre Ajena")
+        r = self._post(torre=torre_ajena.pk)
+        self.assertEqual(r.status_code, 200)  # el dialog vuelve a renderizar con el error, no redirige
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 0)
+
+    def test_rechaza_rango_invertido(self):
+        r = self._post(desde="10", hasta="5")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 0)
+
+    def test_rechaza_rango_demasiado_grande(self):
+        r = self._post(desde="1", hasta="1000")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 0)
