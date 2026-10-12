@@ -1,6 +1,27 @@
+import datetime
+import json
+
+from django.db.models import Count
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from .models import Condominio, Membresia, SolicitudAcceso, Unidad
+
+NOMBRES_MES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+
+def _ultimos_n_meses(n):
+    """[(año, mes), ...] de los últimos n meses, terminando en el actual --
+    sin dateutil, solo restando mes a mes con acarreo de año manual."""
+    hoy = timezone.localdate()
+    anio, mes = hoy.year, hoy.month
+    meses = []
+    for _ in range(n):
+        meses.append((anio, mes))
+        mes -= 1
+        if mes == 0:
+            mes, anio = 12, anio - 1
+    return list(reversed(meses))
 
 
 def dashboard_callback(request, context):
@@ -44,5 +65,24 @@ def dashboard_callback(request, context):
         "headers": ["Nombre", "Condominio", "Teléfono", "Fecha"],
         "rows": filas_solicitudes,
     }
+
+    meses = _ultimos_n_meses(6)
+    inicio = datetime.date(meses[0][0], meses[0][1], 1)
+    conteos = (
+        condominios.filter(fecha_creacion__date__gte=inicio)
+        .annotate(mes=TruncMonth("fecha_creacion"))
+        .values("mes")
+        .annotate(total=Count("id"))
+    )
+    conteo_por_mes = {(c["mes"].year, c["mes"].month): c["total"] for c in conteos}
+    context["chart_condominios_por_mes"] = json.dumps({
+        "labels": [f"{NOMBRES_MES[mes]} {anio}" for anio, mes in meses],
+        "datasets": [{
+            "label": "Condominios nuevos",
+            "data": [conteo_por_mes.get(par, 0) for par in meses],
+            "backgroundColor": "#1A2E40",
+            "borderRadius": 4,
+        }],
+    })
 
     return context

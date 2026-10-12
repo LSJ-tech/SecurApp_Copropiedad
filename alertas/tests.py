@@ -232,3 +232,20 @@ class AlertaHistorialMuestraBlockTests(TestCase):
 
         r = self.client.get(reverse("alertas-historial"))
         self.assertContains(r, f"{condominio.etiqueta_torre} 9, {condominio.etiqueta_unidad.lower()} 302")
+
+
+class AlertaAdminTests(TestCase):
+    """Insignias de color para tipo/estado (ver tipo_badge/estado_badge en
+    alertas/admin.py) -- confirma que el changelist renderiza bien con
+    ellas, no solo que el método en sí devuelve el valor esperado."""
+
+    def test_changelist_renderiza_con_las_insignias(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Alerta", plan="premium")
+        autor = crear_membresia(condominio, "residente", username="admin_alerta_autor")
+        Alerta.objects.create(condominio=condominio, autor=autor, tipo="robo", estado="activa")
+        staff = User.objects.create_superuser(username="admin_alerta_staff", password="x", email="admin_alerta_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/alertas/alerta/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Robo")
+        self.assertContains(r, "Activa")

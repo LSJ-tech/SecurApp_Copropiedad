@@ -431,3 +431,16 @@ class WebhookMercadoPagoRamasFaltantesTests(TestCase):
     def test_pago_inexistente_devuelve_200(self, mock_obtener):
         r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json")
         self.assertEqual(r.status_code, 200)
+
+
+class PagoAdminTests(TestCase):
+    """Insignia de color para estado (ver estado_badge en pagos/admin.py)."""
+
+    def test_changelist_renderiza_con_la_insignia(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Pago", plan="premium")
+        Pago.objects.create(condominio=condominio, tipo="suscripcion", plan="premium", monto=19990, estado="aprobado")
+        staff = User.objects.create_superuser(username="admin_pago_staff", password="x", email="admin_pago_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/pagos/pago/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Aprobado")

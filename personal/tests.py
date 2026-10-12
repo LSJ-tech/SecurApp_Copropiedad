@@ -352,3 +352,21 @@ class LiquidacionGenerarTests(TestCase):
         r = self.client.get(reverse("liquidacion-pdf", args=[liquidacion.pk]))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/pdf")
+
+
+class EmpleadoAdminTests(TestCase):
+    """Filtro de condominio como desplegable con buscador (ver EmpleadoAdmin)
+    -- confirma que el changelist sigue renderizando bien."""
+
+    def test_changelist_renderiza_ok(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Empleado", plan="premium")
+        afp = Afp.objects.create(nombre="Test AFP Admin", tasa_total_pct=Decimal("11.44"))
+        Empleado.objects.create(
+            condominio=condominio, nombre="Pedro Soto", rut="22.222.222-2", cargo="Aseo",
+            tipo_contrato="indefinido", fecha_ingreso="2026-01-01", afp=afp,
+            sistema_salud="fonasa", sueldo_base=450000,
+        )
+        staff = User.objects.create_superuser(username="admin_empleado_staff", password="x", email="admin_empleado_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/personal/empleado/")
+        self.assertEqual(r.status_code, 200)

@@ -82,22 +82,34 @@ class InlinesCapadosTests(TestCase):
 
 
 class CondominioAdminEstadoSuscripcionTests(TestCase):
+    """estado_suscripcion devuelve (clave_de_color, texto) -- ver el
+    decorador @display(label=...) en CondominioAdmin, que arma la insignia
+    de color en el changelist a partir de esa clave."""
+
     def setUp(self):
         self.admin = CondominioAdmin(Condominio, admin.site)
 
     def test_sin_pagado_hasta_dice_sin_restriccion(self):
         condominio = Condominio.objects.create(nombre="Test Estado A", plan="premium", pagado_hasta=None)
-        self.assertEqual(self.admin.estado_suscripcion(condominio), "Sin restricción")
+        self.assertEqual(self.admin.estado_suscripcion(condominio), ("libre", "Sin restricción"))
 
     def test_pagado_hasta_futuro_dice_vigente(self):
         fecha = timezone.localdate() + datetime.timedelta(days=5)
         condominio = Condominio.objects.create(nombre="Test Estado B", plan="premium", pagado_hasta=fecha)
-        self.assertEqual(self.admin.estado_suscripcion(condominio), f"Vigente hasta {fecha}")
+        self.assertEqual(self.admin.estado_suscripcion(condominio), ("vigente", f"Vigente hasta {fecha:%d-%m-%Y}"))
 
     def test_pagado_hasta_pasado_dice_vencida(self):
         fecha = timezone.localdate() - datetime.timedelta(days=5)
         condominio = Condominio.objects.create(nombre="Test Estado C", plan="premium", pagado_hasta=fecha)
-        self.assertEqual(self.admin.estado_suscripcion(condominio), f"Vencida hasta {fecha}")
+        self.assertEqual(self.admin.estado_suscripcion(condominio), ("vencida", "Vencida hace 5 días"))
+
+    def test_changelist_renderiza_con_la_insignia(self):
+        Condominio.objects.create(nombre="Test Estado Changelist", plan="premium", pagado_hasta=None)
+        staff = User.objects.create_superuser(username="admin_condo_estado_staff", password="x", email="admin_condo_estado_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/core/condominio/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Sin restricción")
 
 
 class CodigoInvitacionAdminTests(TestCase):
@@ -152,6 +164,10 @@ class MembresiaAdminChangelistTests(TestCase):
     def test_changelist_renderiza_ok(self):
         r = self.client.get("/admin/core/membresia/")
         self.assertEqual(r.status_code, 200)
+
+    def test_changelist_muestra_la_insignia_de_rol(self):
+        r = self.client.get("/admin/core/membresia/")
+        self.assertContains(r, "Residente")
 
     def test_tiene_el_formulario_y_boton_de_aplicar_filtros(self):
         """list_filter_submit=True es obligatorio para que el desplegable
@@ -404,3 +420,14 @@ class DashboardCallbackTests(TestCase):
         self.assertIn("Test Dashboard Activo", contenido)
         self.assertIn("Ana", contenido)
         self.assertNotIn("Luis", contenido)  # ya atendida, no debería salir
+
+    def test_grafico_de_condominios_por_mes_trae_el_mes_actual(self):
+        import json
+
+        r = self.client.get("/admin/")
+        datos = json.loads(r.context["chart_condominios_por_mes"])
+        self.assertEqual(len(datos["labels"]), 6)
+        self.assertEqual(len(datos["datasets"][0]["data"]), 6)
+        # los 3 condominios de setUpTestData se crean "ahora" -- el mes
+        # actual (último de la lista) tiene que sumarlos.
+        self.assertEqual(datos["datasets"][0]["data"][-1], 3)

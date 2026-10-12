@@ -1,5 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
+from unfold.contrib.filters.admin import AutocompleteSelectFilter
 
 from .models import Afp, Empleado, Liquidacion, ParametrosPeriodo, TramoImpuestoUnico
 
@@ -22,7 +23,8 @@ class ParametrosPeriodoAdmin(ModelAdmin):
 @admin.register(Empleado)
 class EmpleadoAdmin(ModelAdmin):
     list_display = ["nombre", "condominio", "cargo", "tipo_contrato", "sueldo_base", "activo"]
-    list_filter = ["condominio", "activo", "tipo_contrato"]
+    list_filter = [("condominio", AutocompleteSelectFilter), "activo", "tipo_contrato"]
+    list_filter_submit = True
     search_fields = ["nombre", "rut"]
 
 

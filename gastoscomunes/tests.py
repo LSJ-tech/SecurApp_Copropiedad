@@ -409,3 +409,16 @@ class ExportarCuotasTests(TestCase):
         valores = [celda.value for fila in ws.iter_rows() for celda in fila if celda.value is not None]
         self.assertIn("501", valores)
         self.assertNotIn("901", valores)
+
+
+class GastoComunAdminTests(TestCase):
+    """Filtro de condominio como desplegable con buscador (ver
+    GastoComunAdmin) -- confirma que el changelist sigue renderizando bien."""
+
+    def test_changelist_renderiza_ok(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Gasto Comun", plan="premium")
+        GastoComun.objects.create(condominio=condominio, periodo="2026-09", monto_total=100000, fecha_vencimiento=datetime.date(2026, 9, 30))
+        staff = User.objects.create_superuser(username="admin_gasto_staff", password="x", email="admin_gasto_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/gastoscomunes/gastocomun/")
+        self.assertEqual(r.status_code, 200)

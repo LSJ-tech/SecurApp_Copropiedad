@@ -43,6 +43,10 @@
         {% endcomponent %}
     </div>
 
+    {% component "unfold/components/card.html" with title="Condominios nuevos por mes" description="Últimos 6 meses" %}
+        {% component "unfold/components/chart/bar.html" with data=chart_condominios_por_mes height=220 %}{% endcomponent %}
+    {% endcomponent %}
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {% component "unfold/components/table.html" with title="Condominios recientes" table=tabla_condominios_recientes %}{% endcomponent %}
         {% component "unfold/components/table.html" with title="Solicitudes de acceso pendientes" table=tabla_solicitudes_pendientes %}{% endcomponent %}

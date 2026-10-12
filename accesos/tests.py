@@ -111,3 +111,17 @@ class RegistroIngresoFormOrdenTests(TestCase):
         from .forms import RegistroIngresoForm
         form = RegistroIngresoForm(condominio=condominio)
         self.assertEqual(list(form.fields["unidad"].queryset), [unidad_2, unidad_10])
+
+
+class RegistroIngresoAdminTests(TestCase):
+    """Filtro de condominio (vía unidad__condominio) como desplegable con
+    buscador -- confirma que el changelist sigue renderizando bien."""
+
+    def test_changelist_renderiza_ok(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Acceso", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        RegistroIngreso.objects.create(unidad=unidad, nombre_visitante="Juan Pérez", motivo="visita")
+        staff = User.objects.create_superuser(username="admin_acceso_staff", password="x", email="admin_acceso_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/accesos/registroingreso/")
+        self.assertEqual(r.status_code, 200)

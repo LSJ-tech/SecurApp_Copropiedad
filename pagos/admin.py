@@ -1,13 +1,16 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
+from unfold.contrib.filters.admin import AutocompleteSelectFilter
+from unfold.decorators import display
 
 from .models import Pago
 
 
 @admin.register(Pago)
 class PagoAdmin(ModelAdmin):
-    list_display = ["condominio", "donante", "torre", "unidad", "tipo", "plan", "monto", "estado", "fecha_creacion"]
-    list_filter = ["tipo", "plan", "estado"]
+    list_display = ["condominio", "donante", "torre", "unidad", "tipo", "plan", "monto", "estado_badge", "fecha_creacion"]
+    list_filter = [("condominio", AutocompleteSelectFilter), "tipo", "plan", "estado"]
+    list_filter_submit = True
     list_select_related = ["condominio", "membresia__user", "membresia__unidad", "membresia__unidad__torre"]
 
     @admin.display(description="Donante")
@@ -27,3 +30,7 @@ class PagoAdmin(ModelAdmin):
         if obj.membresia and obj.membresia.unidad:
             return obj.membresia.unidad.numero
         return "-"
+
+    @display(description="Estado", ordering="estado", label={"pendiente": "warning", "aprobado": "success", "rechazado": "danger"})
+    def estado_badge(self, obj):
+        return obj.estado, obj.get_estado_display()

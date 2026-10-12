@@ -72,3 +72,17 @@ class AvisoApiTests(TestCase):
     def test_sin_autenticar_no_puede_listar(self):
         r = self.client.get(reverse("aviso-list"))
         self.assertEqual(r.status_code, 401)
+
+
+class AvisoAdminTests(TestCase):
+    """Filtro de condominio como desplegable con buscador (ver AvisoAdmin)
+    -- confirma que el changelist sigue renderizando bien."""
+
+    def test_changelist_renderiza_ok(self):
+        condominio = Condominio.objects.create(nombre="Test Admin Aviso", plan="premium")
+        autor = crear_membresia(condominio, "directiva", username="admin_aviso_autor")
+        Aviso.objects.create(condominio=condominio, autor=autor, titulo="Corte de agua", cuerpo="Mañana de 9 a 12.")
+        staff = User.objects.create_superuser(username="admin_aviso_staff", password="x", email="admin_aviso_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/comunicacion/aviso/")
+        self.assertEqual(r.status_code, 200)

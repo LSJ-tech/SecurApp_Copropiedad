@@ -8,6 +8,7 @@ from django.db.models.functions import Length
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
+from unfold.decorators import display
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from unfold.views import ChangeList
 
@@ -106,11 +107,13 @@ class CondominioAdmin(ModelAdmin):
     inlines = [UnidadInline, MembresiaInline]
     filter_horizontal = ["condominios_vecinos"]
 
-    @admin.display(description="Suscripción")
+    @display(description="Suscripción", label={"vigente": "success", "vencida": "danger", "libre": "info"})
     def estado_suscripcion(self, obj):
         if obj.pagado_hasta is None:
-            return "Sin restricción"
-        return f"{'Vencida' if obj.esta_vencido else 'Vigente'} hasta {obj.pagado_hasta}"
+            return "libre", "Sin restricción"
+        if obj.esta_vencido:
+            return "vencida", f"Vencida hace {(timezone.localdate() - obj.pagado_hasta).days} días"
+        return "vigente", f"Vigente hasta {obj.pagado_hasta:%d-%m-%Y}"
 
 
 @admin.register(Torre)
@@ -156,7 +159,7 @@ class MembresiaAdmin(ModelAdmin):
     (block, depto), con el rol aparte al final por ser un atributo
     transversal, no parte de esa jerarquía."""
 
-    list_display = ["user", "condominio", "rol", "unidad"]
+    list_display = ["user", "condominio", "rol_badge", "unidad"]
     list_filter = [
         ("condominio", AutocompleteSelectFilter),
         ("unidad__torre", AutocompleteSelectFilter),
@@ -165,6 +168,10 @@ class MembresiaAdmin(ModelAdmin):
     ]
     list_filter_submit = True
     autocomplete_fields = ["user", "unidad"]
+
+    @display(description="Rol", ordering="rol", label={"directiva": "primary", "administracion": "info", "conserje": "warning", "residente": "success"})
+    def rol_badge(self, obj):
+        return obj.rol, obj.get_rol_display()
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(
