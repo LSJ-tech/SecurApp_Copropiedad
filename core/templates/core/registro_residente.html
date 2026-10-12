@@ -14,7 +14,7 @@
                 <form method="post">
                     {% csrf_token %}
                     {% for field in form %}
-                    {% if field.name == "unidad" %}
+                    {% if field.name == "unidad" and not form.modo_casas %}
                     <div class="mb-3">
                         <label class="form-label" for="id_torre_selector">{{ condominio.etiqueta_torre }}</label>
                         <select id="id_torre_selector" class="form-select">
@@ -33,10 +33,22 @@
                         <div class="form-text">Elige primero tu {{ condominio.etiqueta_torre|lower }}.</div>
                         {{ field.errors }}
                     </div>
+                    {% elif field.name == "unidad" and form.modo_casas %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if not form.fields.unidad.queryset.exists %}<div class="form-text">Todavía no hay ninguna registrada -- escribe la tuya abajo.</div>{% endif %}
+                        {{ field.errors }}
+                    </div>
                     {% elif field.name != "acepto_terminos" %}
                     <div class="mb-3">
                         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
+                        {% if field.name == "numero_unidad_libre" and numeros_unidad_existentes %}
+                        <datalist id="numeros-unidad-existentes">
+                            {% for numero in numeros_unidad_existentes %}<option value="{{ numero }}">{% endfor %}
+                        </datalist>
+                        {% endif %}
                         {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                         {{ field.errors }}
                     </div>
@@ -80,7 +92,12 @@ function actualizarUnidades() {
     selectorUnidad.disabled = false;
 }
 
-selectorTorre.addEventListener("change", actualizarUnidades);
-actualizarUnidades();
+// Sin unidades cargadas todavía (ver RegistroResidenteForm): no hay campo
+// "unidad" ni selector de torre en el formulario, se usa el número libre
+// en su lugar -- nada que inicializar acá.
+if (selectorTorre && selectorUnidad) {
+    selectorTorre.addEventListener("change", actualizarUnidades);
+    actualizarUnidades();
+}
 </script>
 {% endblock %}

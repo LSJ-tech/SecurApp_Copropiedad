@@ -164,7 +164,11 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         widget=forms.EmailInput(attrs={"class": "form-control"}),
         help_text="Te mandamos un correo de bienvenida.",
     )
-    unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), label="Tu departamento", widget=forms.Select(attrs={"class": "form-select"}))
+    unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), required=False, label="Tu departamento", widget=forms.Select(attrs={"class": "form-select"}))
+    numero_unidad_libre = forms.CharField(
+        max_length=100, required=False, label="Número de tu casa",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
     acepto_terminos = forms.BooleanField(
         required=True, label="Acepto los Términos de Uso y la Política de Privacidad",
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
@@ -173,14 +177,51 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
 
     def __init__(self, *args, condominio=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if condominio is not None:
-            self.fields["unidad"].label = f"Tu {condominio.etiqueta_unidad.lower()}"
+        self.condominio = condominio
+        # La señal de "este condominio es de casas, no de block/depto" es que
+        # nunca tuvo torres cargadas -- a propósito no se mira si ya hay
+        # Unidad creadas, porque esas se van creando solas a medida que la
+        # gente se registra (ver clean()), y el modo tiene que seguir
+        # dejando escribir un número nuevo para el segundo/tercer vecino
+        # también, no solo para el primero que inaugura la lista.
+        self.modo_casas = condominio is not None and not Torre.objects.filter(condominio=condominio).exists()
+        if condominio is None:
+            return
+        etiqueta = condominio.etiqueta_unidad.lower()
+        if self.modo_casas:
+            # Ninguno de los dos campos es obligatorio por separado -- clean()
+            # exige al menos uno. Así el primer vecino puede escribir su
+            # número (todavía no hay nada que elegir) y el segundo puede
+            # sumarse a una casa ya registrada eligiéndola, o escribir una
+            # nueva si la suya no está en la lista.
+            self.fields["unidad"].label = f"Tu {etiqueta} (si ya está en la lista)"
+            self.fields["unidad"].queryset = (
+                Unidad.objects.filter(condominio=condominio).annotate(_num_len=Length("numero")).order_by("_num_len", "numero")
+            )
+            self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
+            self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
+        else:
+            del self.fields["numero_unidad_libre"]
+            self.fields["unidad"].required = True
+            self.fields["unidad"].label = f"Tu {etiqueta}"
             self.fields["unidad"].queryset = (
                 Unidad.objects.filter(condominio=condominio)
                 .select_related("torre")
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.modo_casas and not cleaned.get("unidad"):
+            numero = (cleaned.get("numero_unidad_libre") or "").strip()
+            if numero:
+                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero)
+                cleaned["unidad"] = unidad
+            else:
+                etiqueta = self.condominio.etiqueta_unidad.lower()
+                raise ValidationError(f"Elige tu {etiqueta} de la lista, o escribe el número si todavía no aparece.")
+        return cleaned
 
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])

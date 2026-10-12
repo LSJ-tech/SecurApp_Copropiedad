@@ -317,6 +317,101 @@ class NormalizarNombresExistentesTests(TestCase):
         self.assertIn("Ningún nombre necesitaba normalizarse", r2.content.decode())
 
 
+class AutoregistroCasasLibresTests(TestCase):
+    """Cuando el condominio todavía no tiene ninguna unidad cargada (junta
+    de vecinos nueva, sin estructura de torres/pisos -- ej. casas con
+    numeración propia), el autoregistro deja escribir el número en vez de
+    mostrar un dropdown vacío e imposible de usar. La unidad se crea sola
+    (sin block) la primera vez que alguien escribe ese número."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Casas Libres", plan="premium", etiqueta_unidad="Casa")
+
+    def _datos_base(self, **extra):
+        datos = {
+            "nombre": "Rosa", "apellido": "Mena", "email": "rosa_casas@example.com",
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        }
+        datos.update(extra)
+        return datos
+
+    def test_form_en_modo_casas_no_exige_ninguno_de_los_dos_por_separado(self):
+        """unidad y numero_unidad_libre son opcionales cada uno por su
+        cuenta en modo casas -- clean() exige al menos uno de los dos
+        (ver test_sin_numero_no_se_puede_registrar), no un campo fijo
+        obligatorio, porque el primer vecino no tiene nada que elegir
+        todavía y el segundo sí."""
+        form = RegistroResidenteForm(condominio=self.condominio)
+        self.assertIn("unidad", form.fields)
+        self.assertIn("numero_unidad_libre", form.fields)
+        self.assertFalse(form.fields["unidad"].required)
+        self.assertFalse(form.fields["numero_unidad_libre"].required)
+
+    def test_pagina_de_registro_renderiza_bien_en_modo_casas(self):
+        r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "número de tu casa")
+
+    def test_elegir_una_unidad_existente_no_crea_una_nueva(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="123")
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(unidad=unidad.pk),
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio).count(), 1)
+        user = User.objects.get(email="rosa_casas@example.com")
+        self.assertEqual(user.membresia.unidad, unidad)
+
+    def test_form_con_torres_pide_elegir_de_la_lista_como_antes(self):
+        """La señal de "condominio estructurado" es tener torres cargadas
+        (como Empart) -- no solo que exista alguna unidad, porque las
+        unidades de un condominio de casas también se van creando solas
+        (ver test_dos_personas_con_el_mismo_numero_comparten_la_unidad) y
+        eso no debería "trabar" el modo libre para el segundo vecino."""
+        from .models import Torre
+
+        torre = Torre.objects.create(condominio=self.condominio, nombre="1")
+        Unidad.objects.create(condominio=self.condominio, torre=torre, numero="1")
+        form = RegistroResidenteForm(condominio=self.condominio)
+        self.assertIn("unidad", form.fields)
+        self.assertNotIn("numero_unidad_libre", form.fields)
+        self.assertTrue(form.fields["unidad"].required)
+
+    def test_registrarse_con_numero_libre_crea_la_unidad_sin_block(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="123"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="123")
+        self.assertIsNone(unidad.torre)
+        user = User.objects.get(email="rosa_casas@example.com")
+        self.assertEqual(user.membresia.unidad, unidad)
+
+    def test_dos_personas_con_el_mismo_numero_comparten_la_unidad(self):
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="123"),
+        )
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(nombre="Juan", apellido="Mena", email="juan_casas@example.com", numero_unidad_libre="123"),
+        )
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="123").count(), 1)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="123")
+        self.assertEqual(unidad.membresias.count(), 2)
+
+    def test_sin_numero_no_se_puede_registrar(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre=""),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(email="rosa_casas@example.com").exists())
+
+
 class CorreoBienvenidaTests(TestCase):
     """El email es obligatorio en ambos formularios de alta (autoregistro y
     CrearMiembroForm) justo para garantizar que siempre llegue el correo de

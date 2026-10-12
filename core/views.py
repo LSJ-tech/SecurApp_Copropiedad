@@ -378,6 +378,12 @@ class RegistroResidenteView(FormView):
             unidades_por_torre.setdefault(clave, []).append({"id": unidad.pk, "numero": unidad.numero})
         context["unidades_por_torre"] = unidades_por_torre
         context["hay_unidades_sin_torre"] = hay_sin_torre
+        if not context["torres"].exists():
+            # Modo casas (ver RegistroResidenteForm) -- lista de números ya
+            # registrados por otros vecinos, para que quien se registra vea
+            # si su casa ya existe (y no cree sin querer una casi-duplicada
+            # por una diferencia de tipeo) antes de escribir la suya.
+            context["numeros_unidad_existentes"] = list(unidades.values_list("numero", flat=True))
         return context
 
     def form_valid(self, form):
