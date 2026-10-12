@@ -12,6 +12,14 @@ LABEL_EMAIL = "Email"
 LABEL_EMAIL_OPCIONAL = "Email (opcional)"
 
 
+def _normalizar_nombre(texto):
+    """Primera letra de cada palabra en mayúscula, el resto en minúscula --
+    para que no quede "juan perez"/"JUAN PEREZ" en la base según cómo lo haya
+    tipeado cada quien. str.title() también separa bien en apóstrofes
+    (ej. "o'higgins" -> "O'Higgins"), que es lo único no trivial acá."""
+    return " ".join(texto.split()).title()
+
+
 def _validar_email_unico(email, excluir_user_id=None):
     """Un mismo email no puede quedar en dos cuentas -- se usa para mandar el
     correo de bienvenida, comprobantes de pago y (a futuro) recuperar la
@@ -91,6 +99,12 @@ class RegistroCondominioForm(ConfirmacionContrasenaMixin):
             raise ValidationError("Código inválido o ya usado.")
         return codigo
 
+    def clean_nombre(self):
+        return _normalizar_nombre(self.cleaned_data["nombre"])
+
+    def clean_apellido(self):
+        return _normalizar_nombre(self.cleaned_data["apellido"])
+
 
 class CrearMiembroForm(forms.Form):
     """Directiva/administración crea la cuenta de otro miembro del condominio.
@@ -120,6 +134,12 @@ class CrearMiembroForm(forms.Form):
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
+
+    def clean_nombre(self):
+        return _normalizar_nombre(self.cleaned_data["nombre"])
+
+    def clean_apellido(self):
+        return _normalizar_nombre(self.cleaned_data["apellido"])
 
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])
@@ -160,6 +180,12 @@ class RegistroResidenteForm(ConfirmacionContrasenaMixin):
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
+
+    def clean_nombre(self):
+        return _normalizar_nombre(self.cleaned_data["nombre"])
+
+    def clean_apellido(self):
+        return _normalizar_nombre(self.cleaned_data["apellido"])
 
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])
@@ -236,6 +262,12 @@ class MiPerfilForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": "form-control"}),
         }
         labels = {"first_name": "Nombre", "last_name": "Apellido", "email": "Email"}
+
+    def clean_first_name(self):
+        return _normalizar_nombre(self.cleaned_data["first_name"])
+
+    def clean_last_name(self):
+        return _normalizar_nombre(self.cleaned_data["last_name"])
 
     def clean_email(self):
         email = self.cleaned_data["email"]

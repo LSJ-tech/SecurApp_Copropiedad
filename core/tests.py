@@ -220,6 +220,103 @@ class ConsentimientoRegistroTests(TestCase):
         self.assertTrue(form_con_checkbox.is_valid(), form_con_checkbox.errors)
 
 
+class NormalizarNombreTests(TestCase):
+    """nombre/apellido quedan con la primera letra de cada palabra en
+    mayúscula sin importar cómo los haya tipeado la persona."""
+
+    def test_normalizar_nombre_casos_basicos(self):
+        from .forms import _normalizar_nombre
+
+        self.assertEqual(_normalizar_nombre("juan perez"), "Juan Perez")
+        self.assertEqual(_normalizar_nombre("JUAN PEREZ"), "Juan Perez")
+        self.assertEqual(_normalizar_nombre("  juan   perez  "), "Juan Perez")
+        self.assertEqual(_normalizar_nombre("o'higgins"), "O'Higgins")
+
+    def test_registro_condominio_normaliza_nombre_y_apellido(self):
+        codigo = CodigoInvitacion.objects.create()
+        datos = {
+            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Nuevo Condo Normalizar",
+            "nombre": "juan", "apellido": "PEREZ",
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        }
+        form = RegistroCondominioForm(data=datos)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["nombre"], "Juan")
+        self.assertEqual(form.cleaned_data["apellido"], "Perez")
+
+    def test_registro_residente_normaliza_nombre_y_apellido(self):
+        condominio = Condominio.objects.create(nombre="Test Normalizar Residente", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        datos = {
+            "nombre": "ROSA", "apellido": "mena soto", "email": "rosa_normaliza@example.com", "unidad": unidad.pk,
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        }
+        form = RegistroResidenteForm(data=datos, condominio=condominio)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["nombre"], "Rosa")
+        self.assertEqual(form.cleaned_data["apellido"], "Mena Soto")
+
+    def test_crear_miembro_normaliza_nombre_y_apellido(self):
+        condominio = Condominio.objects.create(nombre="Test Normalizar Miembro", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        form = CrearMiembroForm(
+            data={"nombre": "ana", "apellido": "SOTO", "email": "ana_normaliza@example.com", "rol": "residente", "unidad": unidad.pk},
+            condominio=condominio, creador_rol="directiva",
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["nombre"], "Ana")
+        self.assertEqual(form.cleaned_data["apellido"], "Soto")
+
+    def test_mi_perfil_normaliza_nombre_y_apellido(self):
+        from .forms import MiPerfilForm
+
+        condominio = Condominio.objects.create(nombre="Test Normalizar Perfil", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="perfil_normaliza", email="perfil_normaliza@example.com")
+        form = MiPerfilForm(
+            data={"first_name": "pedro", "last_name": "GOMEZ", "email": membresia.user.email},
+            instance=membresia.user,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["first_name"], "Pedro")
+        self.assertEqual(form.cleaned_data["last_name"], "Gomez")
+
+
+class NormalizarNombresExistentesTests(TestCase):
+    """Vista de uso único /admin-utils/normalizar-nombres/ -- corrige lo que
+    ya quedó mal capitalizado en producción antes de este cambio."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(username="nn_staff", is_staff=True)
+        self.client.force_login(self.staff)
+
+    def test_requiere_staff(self):
+        self.client.logout()
+        normal = User.objects.create_user(username="nn_normal")
+        self.client.force_login(normal)
+        r = self.client.get(reverse("normalizar-nombres"))
+        self.assertEqual(r.status_code, 302)
+
+    def test_corrige_nombres_mal_capitalizados(self):
+        user = User.objects.create_user(username="nn_mal", first_name="juan", last_name="PEREZ")
+        r = self.client.get(reverse("normalizar-nombres"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("nn_mal", r.content.decode())
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Juan")
+        self.assertEqual(user.last_name, "Perez")
+
+    def test_no_toca_lo_que_ya_esta_bien(self):
+        User.objects.create_user(username="nn_bien", first_name="Juan", last_name="Perez")
+        r = self.client.get(reverse("normalizar-nombres"))
+        self.assertIn("Ningún nombre necesitaba normalizarse", r.content.decode())
+
+    def test_es_idempotente(self):
+        User.objects.create_user(username="nn_doble", first_name="juan", last_name="perez")
+        self.client.get(reverse("normalizar-nombres"))
+        r2 = self.client.get(reverse("normalizar-nombres"))
+        self.assertIn("Ningún nombre necesitaba normalizarse", r2.content.decode())
+
+
 class CorreoBienvenidaTests(TestCase):
     """El email es obligatorio en ambos formularios de alta (autoregistro y
     CrearMiembroForm) justo para garantizar que siempre llegue el correo de

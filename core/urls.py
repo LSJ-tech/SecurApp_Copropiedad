@@ -57,6 +57,7 @@ urlpatterns = [
     path("admin-utils/probar-correo/", views.probar_correo, name="probar-correo"),
     path("admin-utils/listar-condominios/", views.listar_condominios, name="listar-condominios"),
     path("admin-utils/buscar-borrados/", views.buscar_borrados, name="buscar-borrados"),
+    path("admin-utils/normalizar-nombres/", views.normalizar_nombres_existentes, name="normalizar-nombres"),
     path("admin-utils/cargar-torres-empart/", views.cargar_torres_empart, name="cargar-torres-empart"),
     path("admin-utils/agregar-departamentos-1-2-empart/", views.agregar_departamentos_1_2_empart, name="agregar-departamentos-1-2-empart"),
     path("directorio/", views.DirectorioVecinosView.as_view(), name="directorio"),

@@ -30,7 +30,7 @@ from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 from django.views.generic.base import View
 
-from .forms import CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm
+from .forms import CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin, SoloDirectivaMixin, SoloStaffMixin
 from .models import CodigoInvitacion, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
 from .usuarios import generar_password_temporal, generar_username
@@ -92,6 +92,28 @@ def probar_correo(request):
         recipient_list=[destino],
     )
     return HttpResponse(f"Correo de prueba enviado a {escape(destino)}.")
+
+
+@staff_member_required
+@require_GET
+def normalizar_nombres_existentes(request):
+    """Uso único: los formularios de registro/alta ya normalizan nombre y
+    apellido desde ahora (ver _normalizar_nombre en core/forms.py), pero eso
+    no corrige lo que ya quedó guardado en producción con mayúsculas/
+    minúsculas inconsistentes (ej. "juan perez", "JUAN PEREZ"). Idempotente:
+    correrla de nuevo no cambia nada que ya esté bien."""
+    cambiados = []
+    for user in User.objects.exclude(first_name="", last_name=""):
+        nuevo_first = _normalizar_nombre(user.first_name) if user.first_name else user.first_name
+        nuevo_last = _normalizar_nombre(user.last_name) if user.last_name else user.last_name
+        if nuevo_first != user.first_name or nuevo_last != user.last_name:
+            cambiados.append(f"{user.username}: {user.first_name!r} {user.last_name!r} -> {nuevo_first!r} {nuevo_last!r}")
+            user.first_name = nuevo_first
+            user.last_name = nuevo_last
+            user.save(update_fields=["first_name", "last_name"])
+    if not cambiados:
+        return HttpResponse("Ningún nombre necesitaba normalizarse.", content_type=CONTENT_TYPE_TEXTO_PLANO)
+    return HttpResponse(f"{len(cambiados)} usuario(s) corregido(s):\n" + "\n".join(cambiados), content_type=CONTENT_TYPE_TEXTO_PLANO)
 
 
 @staff_member_required

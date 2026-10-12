@@ -16,13 +16,13 @@ class AdminUtilsPermisosTests(TestCase):
         self.normal = User.objects.create_user(username="util_normal")
 
     def test_anonimo_no_puede_entrar(self):
-        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
     def test_usuario_normal_no_puede_entrar(self):
         self.client.force_login(self.normal)
-        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "normalizar-nombres", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
