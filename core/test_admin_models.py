@@ -254,17 +254,27 @@ class MembresiaAdminFiltroBlockYDeptoTests(TestCase):
 class AdminOrdenNumericoTests(TestCase):
     """Torre/Unidad/Membresia se ordenaban alfabéticamente en el admin
     (torre/depto "10" antes que "2") -- mismo truco Length() que ya se usa
-    en TorreListView/UnidadListView del panel web, ahora también acá."""
+    en TorreListView/UnidadListView del panel web, ahora también acá.
+
+    IMPORTANTE: estos tests pegan por HTTP a la página real del admin, no
+    llaman ModelAdmin.get_queryset() directo -- el ChangeList de Django
+    vuelve a aplicar su propio order_by() DESPUÉS de get_queryset() (ver
+    ChangeList.get_ordering), así que un test que solo llama get_queryset()
+    puede pasar en verde aunque la página real siga saliendo alfabética
+    (bug real que pasó acá: get_ordering() faltaba y el fix de
+    get_queryset() nunca se notaba en el navegador)."""
 
     def setUp(self):
-        self.request = RequestFactory().get("/admin/")
+        self.staff = User.objects.create_user(username="orden_num_staff", is_staff=True, is_superuser=True)
+        self.client.force_login(self.staff)
 
     def test_torre_admin_ordena_numerico_no_alfabetico(self):
         condominio = Condominio.objects.create(nombre="Test Orden Torre", plan="premium")
         Torre.objects.create(condominio=condominio, nombre="10")
         Torre.objects.create(condominio=condominio, nombre="2")
         Torre.objects.create(condominio=condominio, nombre="1")
-        nombres = list(TorreAdmin(Torre, admin.site).get_queryset(self.request).values_list("nombre", flat=True))
+        r = self.client.get("/admin/core/torre/")
+        nombres = [t.nombre for t in r.context["cl"].result_list]
         self.assertEqual(nombres, ["1", "2", "10"])
 
     def test_unidad_admin_ordena_numerico_no_alfabetico(self):
@@ -272,7 +282,8 @@ class AdminOrdenNumericoTests(TestCase):
         Unidad.objects.create(condominio=condominio, numero="10")
         Unidad.objects.create(condominio=condominio, numero="2")
         Unidad.objects.create(condominio=condominio, numero="1")
-        numeros = list(UnidadAdmin(Unidad, admin.site).get_queryset(self.request).values_list("numero", flat=True))
+        r = self.client.get("/admin/core/unidad/")
+        numeros = [u.numero for u in r.context["cl"].result_list]
         self.assertEqual(numeros, ["1", "2", "10"])
 
     def test_membresia_admin_ordena_por_block_numerico(self):
@@ -285,7 +296,8 @@ class AdminOrdenNumericoTests(TestCase):
         user_2 = User.objects.create_user(username="orden_block2")
         Membresia.objects.create(user=user_10, condominio=condominio, rol="residente", unidad=unidad_10, terminos_aceptados_en=timezone.now())
         Membresia.objects.create(user=user_2, condominio=condominio, rol="residente", unidad=unidad_2, terminos_aceptados_en=timezone.now())
-        usernames = list(MembresiaAdmin(Membresia, admin.site).get_queryset(self.request).values_list("user__username", flat=True))
+        r = self.client.get("/admin/core/membresia/")
+        usernames = [m.user.username for m in r.context["cl"].result_list]
         self.assertEqual(usernames, ["orden_block2", "orden_block10"])
 
 

@@ -5,12 +5,30 @@ from django.db.models.functions import Length
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
+from unfold.views import ChangeList
 
 from .models import PLAN_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
 # Unidad/Torre/Membresia son datos operativos de cada condominio -- se
 # registran acá porque, a diferencia de PataAgenda, no hay un panel interno
 # rico todavía para gestionarlos (Fase 1 usa el panel simple bajo /panel/).
+
+
+class ChangeListOrdenAnotado(ChangeList):
+    """El ChangeList de Django SIEMPRE vuelve a ordenar después de
+    get_queryset() -- primero intenta ModelAdmin.get_ordering(request), y
+    si no hay nada ahí cae al Meta.ordering del modelo (alfabético). Eso
+    pisa cualquier .order_by() con campos anotados (Length(), ver
+    TorreAdmin/UnidadAdmin/MembresiaAdmin) que get_queryset() ya haya
+    dejado armado, y ni siquiera se puede resolver ModelAdmin.get_ordering()
+    con esos mismos nombres: ese método también lo llama el get_queryset()
+    base de Django ANTES de que exista la anotación, así que truena con
+    FieldError. La salida es confiar directo en el order_by que el propio
+    queryset ya trae (ChangeListOrdenAnotado.get_ordering), sin pasar por
+    ninguno de esos dos mecanismos."""
+
+    def get_ordering(self, request, queryset):
+        return list(queryset.query.order_by) or ["-pk"]
 
 
 @admin.action(description="Extender 30 días de acceso pagado")
@@ -105,6 +123,9 @@ class TorreAdmin(ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(_len=Length("nombre")).order_by("condominio__nombre", "_len", "nombre")
 
+    def get_changelist(self, request, **kwargs):
+        return ChangeListOrdenAnotado
+
 
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
@@ -117,6 +138,9 @@ class UnidadAdmin(ModelAdmin):
         return super().get_queryset(request).annotate(
             _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
         ).order_by("condominio__nombre", "_torre_len", "torre__nombre", "_num_len", "numero")
+
+    def get_changelist(self, request, **kwargs):
+        return ChangeListOrdenAnotado
 
 
 @admin.register(Membresia)
@@ -142,6 +166,9 @@ class MembresiaAdmin(ModelAdmin):
         return super().get_queryset(request).annotate(
             _torre_len=Length("unidad__torre__nombre"), _num_len=Length("unidad__numero"),
         ).order_by("condominio__nombre", "_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "rol", "user__username")
+
+    def get_changelist(self, request, **kwargs):
+        return ChangeListOrdenAnotado
 
 
 @admin.register(CodigoInvitacion)
