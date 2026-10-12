@@ -31,7 +31,7 @@ urlpatterns = [
     ),
     path(
         "contrasena/recuperar/<uidb64>/<token>/",
-        auth_views.PasswordResetConfirmView.as_view(
+        views.PasswordResetConfirmView.as_view(
             template_name="core/password_reset_confirm.html",
             success_url=reverse_lazy("password-reset-listo"),
         ),

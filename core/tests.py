@@ -882,6 +882,17 @@ class RecuperarContrasenaTests(TestCase):
         self.assertEqual(correo.alternatives[0][1], "text/html")
         self.assertIn(link, correo.alternatives[0][0])
 
+    def test_muestra_las_reglas_de_contrasena_sin_escapar(self):
+        """ayudas_contrasena se arma en texto plano y se renderiza en un
+        <li> por regla -- evita el |safe en el template (ver
+        PasswordResetConfirmView)."""
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        url_confirmar = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
+        r = self.client.get(url_confirmar, follow=True)
+        self.assertContains(r, "<li>")
+        self.assertNotContains(r, "&lt;ul&gt;")
+
     def test_el_link_permite_elegir_contrasena_nueva(self):
         uid = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)

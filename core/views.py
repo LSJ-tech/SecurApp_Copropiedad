@@ -10,7 +10,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import password_validators_help_texts
 from django.contrib.auth.views import PasswordChangeView
+from django.contrib.auth.views import PasswordResetConfirmView as _PasswordResetConfirmView
 from django.contrib.staticfiles.finders import find as find_static
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives, send_mail
@@ -765,3 +767,18 @@ class MiCambiarContrasenaView(PasswordChangeView):
     def form_valid(self, form):
         messages.success(self.request, "Tu contraseña fue cambiada correctamente.")
         return super().form_valid(form)
+
+
+class PasswordResetConfirmView(_PasswordResetConfirmView):
+    """Igual que la vista de Django, pero pasa las reglas de contraseña como
+    texto plano (ayudas_contrasena) en vez del HTML pre-armado de
+    form.new_password1.help_text -- evita usar el filtro |safe en el
+    template. El HTML de Django siempre fue seguro en los hechos (sale de
+    AUTH_PASSWORD_VALIDATORS, nunca de un usuario), pero SonarCloud no
+    puede probar eso de forma estática y lo marca como hallazgo a revisar
+    (Web:S5247) -- esto lo saca de raíz en vez de solo silenciarlo."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["ayudas_contrasena"] = password_validators_help_texts()
+        return context
