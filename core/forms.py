@@ -79,8 +79,9 @@ class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrase
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     direccion_condominio = forms.CharField(
-        max_length=255, required=False, label="Dirección",
+        max_length=255, required=False, label="Dirección o sector",
         widget=forms.TextInput(attrs={"class": "form-control"}),
+        help_text="No tiene que ser una dirección exacta -- puede ser \"Sector Los Aromos\" o similar.",
     )
     comuna_condominio = forms.CharField(
         max_length=100, required=False, label="Comuna",

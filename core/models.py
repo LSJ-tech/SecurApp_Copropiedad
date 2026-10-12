@@ -65,7 +65,11 @@ class Condominio(models.Model):
     """
 
     nombre = models.CharField(max_length=150)
-    direccion = models.CharField(max_length=255, blank=True)
+    direccion = models.CharField(
+        max_length=255, blank=True, verbose_name="dirección o sector",
+        help_text="No tiene que ser una dirección exacta -- una junta de vecinos suele cubrir varias calles. "
+        "Puede ser una descripción tipo \"Sector Los Aromos\" o \"Entre Av. Principal y Los Olivos\".",
+    )
     comuna = models.CharField(max_length=100, blank=True)
     region = models.CharField(max_length=100, blank=True)
     activo = models.BooleanField(default=True, help_text="Interruptor manual: desactivarlo bloquea todo (ej. un cliente que dejó de serlo).")
