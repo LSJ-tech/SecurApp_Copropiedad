@@ -16,13 +16,13 @@ class AdminUtilsPermisosTests(TestCase):
         self.normal = User.objects.create_user(username="util_normal")
 
     def test_anonimo_no_puede_entrar(self):
-        for nombre in ("probar-correo", "listar-condominios", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
     def test_usuario_normal_no_puede_entrar(self):
         self.client.force_login(self.normal)
-        for nombre in ("probar-correo", "listar-condominios", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
+        for nombre in ("probar-correo", "listar-condominios", "buscar-borrados", "cargar-torres-empart", "agregar-departamentos-1-2-empart"):
             r = self.client.get(reverse(nombre))
             self.assertEqual(r.status_code, 302, nombre)
 
@@ -68,6 +68,55 @@ class ListarCondominiosTests(TestCase):
         self.assertIn("Test Listar", contenido)
         self.assertIn("torres=1", contenido)
         self.assertIn("unidades=1", contenido)
+
+
+class BuscarBorradosTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(username="bb_staff", is_staff=True)
+        self.client.force_login(self.staff)
+
+    def _crear_logentry_borrado(self, object_repr, model="membresia"):
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        content_type = ContentType.objects.get(app_label="core", model=model)
+        return LogEntry.objects.create(
+            user=self.staff, content_type=content_type, object_id="1",
+            object_repr=object_repr, action_flag=3, change_message="Borrado.",
+        )
+
+    def test_sin_borrados_devuelve_mensaje_claro(self):
+        r = self.client.get(reverse("buscar-borrados"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Sin borrados registrados", r.content.decode())
+
+    def test_lista_el_borrado_con_quien_y_que_modelo(self):
+        self._crear_logentry_borrado("jlroman (Residente de Población Empart)")
+        r = self.client.get(reverse("buscar-borrados"))
+        contenido = r.content.decode()
+        self.assertIn("jlroman", contenido)
+        self.assertIn("modelo=membresia", contenido)
+        self.assertIn("borrado_por=bb_staff", contenido)
+
+    def test_filtra_por_q_y_no_mezcla_con_otros_borrados(self):
+        self._crear_logentry_borrado("jlroman (Residente de Población Empart)")
+        self._crear_logentry_borrado("Otra Persona (Residente de Población Empart)")
+        r = self.client.get(reverse("buscar-borrados"), {"q": "roman"})
+        contenido = r.content.decode()
+        self.assertIn("jlroman", contenido)
+        self.assertNotIn("Otra Persona", contenido)
+
+    def test_no_muestra_borrados_de_otro_tipo_de_accion(self):
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        content_type = ContentType.objects.get(app_label="core", model="membresia")
+        LogEntry.objects.create(
+            user=self.staff, content_type=content_type, object_id="1",
+            object_repr="No debería aparecer", action_flag=2, change_message="Editado, no borrado.",
+        )
+        r = self.client.get(reverse("buscar-borrados"))
+        self.assertNotIn("No debería aparecer", r.content.decode())
 
 
 class CargarTorresEmpartTests(TestCase):

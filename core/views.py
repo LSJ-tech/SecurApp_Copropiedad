@@ -93,6 +93,35 @@ def probar_correo(request):
 
 @staff_member_required
 @require_GET
+def buscar_borrados(request):
+    """Diagnóstico manual: busca en el registro de auditoría del admin de
+    Django (LogEntry) qué se borró y cuándo, filtrando por `?q=`.
+    `LogEntry.object_repr` guarda el __str__ del objeto en el momento del
+    borrado (ej. "jlroman (Residente de Población Empart)" para una
+    Membresia, o el username a secas para un User) -- útil para confirmar
+    qué modelo se borró exactamente, pero NO permite reconstruir los datos
+    por sí solo (no guarda una copia serializada del objeto)."""
+    from django.contrib.admin.models import LogEntry
+
+    q = request.GET.get("q", "").strip()
+    entradas = LogEntry.objects.filter(action_flag=3).select_related("user", "content_type").order_by("-action_time")
+    if q:
+        entradas = entradas.filter(object_repr__icontains=q)
+    entradas = entradas[:50]
+
+    if not entradas:
+        return HttpResponse(f"Sin borrados registrados{f' que coincidan con {q!r}' if q else ''}.", content_type="text/plain; charset=utf-8")
+
+    lineas = [
+        f"{e.action_time:%Y-%m-%d %H:%M} | modelo={e.content_type.model if e.content_type else '?'} | "
+        f"borrado_por={e.user.username if e.user else '?'} | object_repr={e.object_repr!r}"
+        for e in entradas
+    ]
+    return HttpResponse("\n".join(lineas), content_type="text/plain; charset=utf-8")
+
+
+@staff_member_required
+@require_GET
 def listar_condominios(request):
     """Diagnóstico manual: nombre exacto, torres y unidades de cada condominio real en esta base de datos."""
     lineas = []
