@@ -1094,6 +1094,15 @@ class CompartirInvitacionTests(TestCase):
             self.assertContains(r, "wa.me")
             self.assertNotContains(r, reverse("regenerar-token-residentes"))
 
+    def test_el_mensaje_de_whatsapp_usa_la_etiqueta_de_la_organizacion(self):
+        junta = Condominio.objects.create(nombre="Junta Los Aromos Wsp", plan="premium", etiqueta_organizacion="Junta de vecinos")
+        membresia = crear_membresia(junta, "directiva", username="invitar_wsp_junta")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("compartir-invitacion"))
+        # el mensaje va urlencoded dentro del href de wa.me -- los espacios
+        # quedan como %20 (el filtro |urlencode de Django no usa "+").
+        self.assertContains(r, "tu%20junta%20de%20vecinos")
+
 
 class DirectorioVecinosTests(TestCase):
     """Directorio abierto a cualquier rol -- nombre y block/depto, sin

@@ -421,7 +421,11 @@ def _contexto_invitacion(request, condominio):
     )
     mensaje = (
         f"🏠 ¡Hola, vecino/a!\n\n"
-        f"Te invito a unirte a *SecurApp* 🔐, la app de *{condominio.nombre}*.\n\n"
+        # "tu {etiqueta}" en vez de "nuestro/nuestra {etiqueta}" a propósito --
+        # "tu" no cambia con el género de la palabra (condominio, junta de
+        # vecinos, comunidad...), así que no hace falta saber el género de
+        # etiqueta_organizacion para que la frase quede bien armada.
+        f"Te invito a unirte a *SecurApp* 🔐, la app de tu {condominio.etiqueta_organizacion.lower()} *{condominio.nombre}*.\n\n"
         f"Desde ahí puedes:\n"
         f"✅ Activar el botón de pánico\n"
         f"✅ Ver avisos y alertas\n"
