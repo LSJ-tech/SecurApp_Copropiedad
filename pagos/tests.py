@@ -570,6 +570,86 @@ class SuscripcionRecurrenteAdminTests(TestCase):
         suscripcion.refresh_from_db()
         self.assertEqual(suscripcion.estado, "cancelada")
 
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_accion_sincroniza_el_estado_con_mercadopago(self, mock_obtener):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=19990,
+            mercadopago_preapproval_id="pre-admin-sync", estado="pendiente",
+        )
+        self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "sincronizar_con_mercadopago",
+            "_selected_action": [str(suscripcion.pk)],
+        })
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "autorizada")
+        mock_obtener.assert_called_once_with("pre-admin-sync")
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value=None)
+    def test_accion_sincronizar_avisa_si_mercadopago_no_responde(self, mock_obtener):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=19990,
+            mercadopago_preapproval_id="pre-admin-sync-falla", estado="pendiente",
+        )
+        r = self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "sincronizar_con_mercadopago",
+            "_selected_action": [str(suscripcion.pk)],
+        }, follow=True)
+        self.assertContains(r, "No se pudo consultar la suscripción recurrente")
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "pendiente")
+
+
+class SincronizarEstadoSuscripcionTests(TestCase):
+    """sincronizar_estado_suscripcion (pagos/views.py) -- la misma lógica
+    que usa el webhook al recibir un cambio de preapproval, pero como
+    función reutilizable que también dispara la acción del admin."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Sync Estado", plan="premium")
+
+    def _suscripcion(self, **kwargs):
+        kwargs.setdefault("condominio", self.condominio)
+        kwargs.setdefault("tipo", "suscripcion")
+        kwargs.setdefault("monto", Decimal("19990"))
+        kwargs.setdefault("mercadopago_preapproval_id", "pre-sync")
+        kwargs.setdefault("estado", "pendiente")
+        return SuscripcionRecurrente.objects.create(**kwargs)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_actualiza_el_estado_cuando_cambia(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion()
+        self.assertTrue(sincronizar_estado_suscripcion(suscripcion))
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "autorizada")
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_hace_nada_si_el_estado_ya_coincide(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(estado="autorizada")
+        with self.assertNumQueries(0):  # no hay que guardar nada si el estado no cambió
+            sincronizar_estado_suscripcion(suscripcion)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value=None)
+    def test_devuelve_false_si_mercadopago_no_responde(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion()
+        self.assertFalse(sincronizar_estado_suscripcion(suscripcion))
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "cancelled"})
+    def test_marca_fecha_de_cancelacion(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(estado="autorizada")
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+        self.assertIsNotNone(suscripcion.fecha_cancelacion)
+
 
 class PagoResultadoViewTests(TestCase):
     def test_muestra_el_estado_que_viene_en_la_url(self):

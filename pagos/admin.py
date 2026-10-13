@@ -19,13 +19,31 @@ def cancelar_en_mercadopago(modeladmin, request, queryset):
             messages.error(request, f"No se pudo cancelar la suscripción recurrente #{suscripcion.pk} en Mercado Pago.")
 
 
+@admin.action(description="Sincronizar estado con Mercado Pago")
+def sincronizar_con_mercadopago(modeladmin, request, queryset):
+    """Respaldo manual para cuando el webhook no llega (ver
+    sincronizar_estado_suscripcion en pagos/views.py) -- re-consulta cada
+    suscripción directo a la API de Mercado Pago, en vez de esperar a que
+    avisen solos."""
+    from .views import sincronizar_estado_suscripcion
+
+    sincronizadas = 0
+    for suscripcion in queryset:
+        if sincronizar_estado_suscripcion(suscripcion):
+            sincronizadas += 1
+        else:
+            messages.error(request, f"No se pudo consultar la suscripción recurrente #{suscripcion.pk} en Mercado Pago.")
+    if sincronizadas:
+        messages.success(request, f"Se consultó el estado de {sincronizadas} suscripción(es) en Mercado Pago.")
+
+
 @admin.register(SuscripcionRecurrente)
 class SuscripcionRecurrenteAdmin(ModelAdmin):
     list_display = ["condominio", "donante", "tipo", "monto", "estado_badge", "fecha_creacion"]
     list_filter = [("condominio", AutocompleteSelectFilter), "tipo", "estado"]
     list_filter_submit = True
     list_select_related = ["condominio", "membresia__user"]
-    actions = [cancelar_en_mercadopago]
+    actions = [sincronizar_con_mercadopago, cancelar_en_mercadopago]
     readonly_fields = ["mercadopago_preapproval_id", "fecha_creacion", "fecha_cancelacion"]
 
     @admin.display(description="Donante")

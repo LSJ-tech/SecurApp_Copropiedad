@@ -28,11 +28,13 @@ MONTO_SUSCRIPCION = Decimal("19990")
 MONTO_DONACION = Decimal("2000")
 
 # Mercado Pago manda el tipo de notificación como "type" (cuerpo) o "topic"
-# (query string, estilo IPN viejo). Estos valores de "subscription_*" están
-# SIN VERIFICAR contra la documentación real (bloqueada desde este entorno
-# al momento de escribir esto) -- confirmar contra el sandbox real de
-# Mercado Pago antes de confiar en este camino en producción. "payment" sí
-# está confirmado (ya se usaba para Checkout Pro).
+# (query string, estilo IPN viejo). "subscription_authorized_payment" quedó
+# CONFIRMADO en la práctica (apareció tal cual en un POST real a
+# /pago/webhook/, probado con el botón "Simular notificación" del panel de
+# Mercado Pago). "payment" ya estaba confirmado de antes (Checkout Pro).
+# "preapproval"/"subscription_preapproval" siguen sin confirmar -- no se
+# pudo generar una notificación real de cambio de estado para probarlos (ver
+# sincronizar_estado_suscripcion más abajo, el respaldo mientras tanto).
 TIPOS_NOTIFICACION_PREAPPROVAL = {"preapproval", "subscription_preapproval"}
 TIPOS_NOTIFICACION_COBRO = {"payment", "subscription_authorized_payment"}
 
@@ -49,6 +51,28 @@ def _email_del_pagador(request):
     Mercado Pago -- el autorregistro de directiva no pide email (ver
     RegistroCondominioForm), así que puede venir vacío."""
     return (request.user.email or "").strip()
+
+
+def sincronizar_estado_suscripcion(suscripcion):
+    """Re-consulta el estado real de esta SuscripcionRecurrente en Mercado
+    Pago y lo actualiza -- mismo código que usa el webhook al recibir un
+    cambio de preapproval, pero disparado a pedido (ver la acción
+    "Sincronizar con Mercado Pago" en el admin) para los casos donde el
+    webhook no llega. Devuelve True si se pudo consultar a Mercado Pago
+    (sin importar si el estado cambió), False si no respondió."""
+    detalle = obtener_preapproval_mercadopago(suscripcion.mercadopago_preapproval_id)
+    if not detalle:
+        return False
+    nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
+    if not nuevo_estado or nuevo_estado == suscripcion.estado:
+        return True
+    suscripcion.estado = nuevo_estado
+    if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
+        suscripcion.fecha_cancelacion = timezone.now()
+        suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
+    else:
+        suscripcion.save(update_fields=["estado"])
+    return True
 
 
 class DonarView(LoginRequiredMixin, View):
@@ -223,21 +247,10 @@ class WebhookMercadoPagoView(View):
         return HttpResponse(status=200)
 
     def _manejar_cambio_preapproval(self, preapproval_id):
-        detalle = obtener_preapproval_mercadopago(preapproval_id)
-        if not detalle:
-            return
         suscripcion = SuscripcionRecurrente.objects.filter(mercadopago_preapproval_id=str(preapproval_id)).first()
         if not suscripcion:
             return
-        nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
-        if not nuevo_estado or nuevo_estado == suscripcion.estado:
-            return
-        suscripcion.estado = nuevo_estado
-        if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
-            suscripcion.fecha_cancelacion = timezone.now()
-            suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
-        else:
-            suscripcion.save(update_fields=["estado"])
+        sincronizar_estado_suscripcion(suscripcion)
 
     def _manejar_cobro(self, payment_id):
         if Pago.objects.filter(mercadopago_payment_id=str(payment_id)).exists():
