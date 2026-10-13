@@ -1,3 +1,5 @@
+from typing import Optional
+
 from rest_framework import serializers
 
 from core.models import Membresia
@@ -21,12 +23,12 @@ class AvisoSerializer(serializers.ModelSerializer):
         membresia = getattr(request.user, "membresia", None) if request else None
         return bool(membresia and membresia.rol in ("directiva", "administracion"))
 
-    def get_leido_por_count(self, obj):
+    def get_leido_por_count(self, obj) -> Optional[int]:
         if not self._puede_ver_estadisticas():
             return None
         return obj.lecturas.count()
 
-    def get_total_destinatarios(self, obj):
+    def get_total_destinatarios(self, obj) -> Optional[int]:
         if not self._puede_ver_estadisticas():
             return None
         return Membresia.objects.filter(condominio_id=obj.condominio_id).count()
@@ -46,11 +48,11 @@ class PublicacionSerializer(serializers.ModelSerializer):
             "autor_nombre", "autor_unidad", "autor_torre", "puede_eliminar",
         ]
 
-    def get_puede_eliminar(self, obj):
+    def get_puede_eliminar(self, obj) -> bool:
         """El autor siempre puede borrar lo suyo; directiva/administración
         pueden moderar lo de cualquiera (es un muro abierto a todos)."""
         request = self.context.get("request")
         membresia = getattr(request.user, "membresia", None) if request else None
         if not membresia:
             return False
-        return obj.autor_id == membresia.id or membresia.rol in ("directiva", "administracion")
+        return bool(obj.autor_id == membresia.id or membresia.rol in ("directiva", "administracion"))

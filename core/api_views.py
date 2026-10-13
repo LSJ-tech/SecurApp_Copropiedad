@@ -1,3 +1,5 @@
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,6 +19,10 @@ class LogoutView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=inline_serializer("LogoutRequest", {"refresh": serializers.CharField()}),
+        responses={205: None},
+    )
     def post(self, request):
         try:
             RefreshToken(request.data["refresh"]).blacklist()
@@ -28,12 +34,14 @@ class LogoutView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses=MembresiaSerializer)
     def get(self, request):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
             return Response({"detail": "Este usuario no tiene una membresía a ningún condominio."}, status=409)
         return Response(MembresiaSerializer(membresia).data)
 
+    @extend_schema(request=MiPerfilSerializer, responses=MiPerfilSerializer)
     def patch(self, request):
         """Editar nombre/apellido/email -- mismos campos y misma validación
         de email único que MiPerfilView en el panel web."""
@@ -49,6 +57,7 @@ class CambiarContrasenaView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=CambiarContrasenaSerializer, responses={204: None})
     def post(self, request):
         serializer = CambiarContrasenaSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)

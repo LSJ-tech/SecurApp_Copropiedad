@@ -130,7 +130,7 @@ class Condominio(models.Model):
         return self.pagado_hasta is not None and self.pagado_hasta < timezone.localdate()
 
     @property
-    def puede_operar(self):
+    def puede_operar(self) -> bool:
         """El precio es fijo y la cobranza manual (ver README) -- no hay
         corte automático por falta de pago. Lo único que puede bloquear el
         acceso es el interruptor manual `activo` (ver su help_text)."""
