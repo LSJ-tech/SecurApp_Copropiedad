@@ -380,17 +380,23 @@ class SolicitudAccesoAdmin(ModelAdmin):
     actions = [marcar_atendido]
 
 
-@admin.action(description="Marcar como atendida")
+@admin.action(description="Marcar como atendida (avisa por correo)")
 def marcar_atendida(modeladmin, request, queryset):
-    queryset.update(atendida=True, fecha_atencion=timezone.now())
+    from .views import enviar_correo_eliminacion_confirmada
+
+    for solicitud in queryset.filter(atendida=False):
+        solicitud.atendida = True
+        solicitud.fecha_atencion = timezone.now()
+        solicitud.save(update_fields=["atendida", "fecha_atencion"])
+        enviar_correo_eliminacion_confirmada(solicitud)
 
 
 @admin.register(SolicitudEliminacion)
 class SolicitudEliminacionAdmin(ModelAdmin):
-    list_display = ["nombre", "username", "condominio_nombre", "atendida", "fecha_creacion"]
+    list_display = ["nombre", "username", "email", "condominio_nombre", "atendida", "fecha_creacion"]
     list_filter = ["atendida"]
-    search_fields = ["nombre", "username", "condominio_nombre"]
-    readonly_fields = ["membresia", "nombre", "username", "condominio_nombre", "motivo", "fecha_creacion"]
+    search_fields = ["nombre", "username", "email", "condominio_nombre"]
+    readonly_fields = ["membresia", "nombre", "username", "email", "condominio_nombre", "motivo", "fecha_creacion"]
     actions = [marcar_atendida]
 
 

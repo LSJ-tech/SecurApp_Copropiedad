@@ -77,6 +77,39 @@ def enviar_correo_bienvenida(user, condominio):
         logger.exception("No se pudo enviar el correo de bienvenida a %s (usuario %s, condominio %s).", user.email, user.username, condominio.nombre)
 
 
+def enviar_correo_eliminacion_confirmada(solicitud):
+    """Se manda cuando DevQuad marca la SolicitudEliminacion como atendida
+    (ver marcar_atendida en core/admin.py) -- usa solicitud.email (copia
+    tomada al momento del pedido), nunca membresia.user.email, porque para
+    cuando se marca atendida la cuenta ya puede estar eliminada. No bloquea
+    la acción del admin si Resend falla."""
+    if not solicitud.email:
+        logger.warning("SolicitudEliminacion #%s marcada atendida sin email guardado -- no se pudo avisar.", solicitud.pk)
+        return
+    contexto = {
+        "platform_name": settings.PLATFORM_NAME,
+        "nombre": solicitud.nombre,
+        "email_contacto": EMAIL_CONTACTO_DEVQUAD,
+    }
+    texto_plano = (
+        f"Hola {solicitud.nombre},\n\n"
+        f"Confirmamos que tu cuenta y tus datos personales en {settings.PLATFORM_NAME} ya fueron eliminados, "
+        f"según tu solicitud.\n\n"
+        f"Cualquier duda, escríbenos a {EMAIL_CONTACTO_DEVQUAD}."
+    )
+    try:
+        correo = EmailMultiAlternatives(
+            subject=f"Tu cuenta en {settings.PLATFORM_NAME} fue eliminada",
+            body=texto_plano,
+            from_email=None,
+            to=[solicitud.email],
+        )
+        correo.attach_alternative(render_to_string("core/emails/eliminacion_confirmada.html", contexto), "text/html")
+        correo.send()
+    except Exception:
+        logger.exception("No se pudo enviar el correo de confirmación de eliminación a %s (solicitud #%s).", solicitud.email, solicitud.pk)
+
+
 @staff_member_required
 @require_GET
 def probar_correo(request):
@@ -669,6 +702,7 @@ class SolicitarEliminacionView(LoginRequiredMixin, View):
             membresia=membresia,
             nombre=request.user.get_full_name() or request.user.username,
             username=request.user.username,
+            email=request.user.email,
             condominio_nombre=membresia.condominio.nombre if membresia else "",
             motivo=motivo,
         )

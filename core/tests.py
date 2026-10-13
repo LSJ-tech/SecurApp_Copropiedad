@@ -12,6 +12,7 @@ from django.utils.http import urlsafe_base64_encode
 
 from .forms import CrearMiembroForm, RegistroCondominioForm, RegistroResidenteForm
 from .models import CodigoInvitacion, Condominio, Membresia, Torre, Unidad
+from .views import EMAIL_CONTACTO_DEVQUAD
 
 
 def crear_membresia(condominio, rol, unidad=None, terminos=True, **user_kwargs):
@@ -978,7 +979,7 @@ class SolicitarEliminacionViewTests(TestCase):
         cls.condominio = Condominio.objects.create(nombre="Test Eliminacion", plan="premium")
 
     def setUp(self):
-        self.membresia = crear_membresia(self.condominio, "residente", username="elim_residente")
+        self.membresia = crear_membresia(self.condominio, "residente", username="elim_residente", email="elim_residente@example.com")
         self.client.force_login(self.membresia.user)
 
     def test_get_muestra_el_formulario(self):
@@ -992,6 +993,59 @@ class SolicitarEliminacionViewTests(TestCase):
         self.assertRedirects(r, reverse("mi-perfil"))
         solicitud = SolicitudEliminacion.objects.get(username="elim_residente")
         self.assertEqual(solicitud.motivo, "Ya no vivo aquí")
+        self.assertEqual(solicitud.email, "elim_residente@example.com")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [EMAIL_CONTACTO_DEVQUAD])
+
+
+class MarcarSolicitudEliminacionAtendidaTests(TestCase):
+    """Al marcar atendida una SolicitudEliminacion (acción del admin), se le
+    avisa a la persona por correo que ya se procesó -- usando el email
+    guardado al momento del pedido, no membresia.user.email (que puede ya
+    no existir para entonces, ver core/models.py)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Marcar Eliminacion", plan="premium")
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="marcar_elim_staff", password="x")
+        self.client.force_login(self.staff)
+
+    def _solicitud(self, **kwargs):
+        from .models import SolicitudEliminacion
+        kwargs.setdefault("nombre", "Ana Soto")
+        kwargs.setdefault("username", "ana_elim")
+        kwargs.setdefault("email", "ana_elim@example.com")
+        kwargs.setdefault("condominio_nombre", self.condominio.nombre)
+        return SolicitudEliminacion.objects.create(**kwargs)
+
+    def _marcar_atendida(self, *pks):
+        return self.client.post("/admin/core/solicitudeliminacion/", {
+            "action": "marcar_atendida",
+            "_selected_action": [str(pk) for pk in pks],
+        })
+
+    def test_marca_atendida_y_manda_el_correo(self):
+        solicitud = self._solicitud()
+        self._marcar_atendida(solicitud.pk)
+        solicitud.refresh_from_db()
+        self.assertTrue(solicitud.atendida)
+        self.assertIsNotNone(solicitud.fecha_atencion)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["ana_elim@example.com"])
+
+    def test_sin_email_guardado_no_falla_y_no_manda_correo(self):
+        solicitud = self._solicitud(email="", username="sin_email_elim")
+        self._marcar_atendida(solicitud.pk)
+        solicitud.refresh_from_db()
+        self.assertTrue(solicitud.atendida)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_repetir_la_accion_no_reenvia_el_correo(self):
+        solicitud = self._solicitud()
+        self._marcar_atendida(solicitud.pk)
+        self._marcar_atendida(solicitud.pk)
         self.assertEqual(len(mail.outbox), 1)
 
 

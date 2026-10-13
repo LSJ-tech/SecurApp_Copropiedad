@@ -274,6 +274,11 @@ class SolicitudEliminacion(models.Model):
     )
     nombre = models.CharField(max_length=150)
     username = models.CharField(max_length=150)
+    email = models.EmailField(
+        blank=True,
+        help_text="Copia del email al momento del pedido -- para poder avisar que ya se procesó la "
+        "eliminación aunque para entonces la cuenta (y membresia.user.email) ya no exista.",
+    )
     condominio_nombre = models.CharField(max_length=150)
     motivo = models.TextField(blank=True)
     atendida = models.BooleanField(default=False, help_text="Marca cuando ya se procesó la eliminación.")
