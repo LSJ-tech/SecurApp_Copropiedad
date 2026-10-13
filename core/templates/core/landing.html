@@ -4,27 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ PLATFORM_NAME }}: administración de condominios y juntas de vecinos. Botón de pánico, avisos, accesos y gastos comunes en un solo lugar.">
+    <meta name="description" content="{{ PLATFORM_NAME }}: el botón de pánico que avisa a todo tu condominio al instante. Además, avisos, accesos y gastos comunes en un solo panel.">
     <meta name="theme-color" content="#1A2E40">
     <link rel="icon" type="image/svg+xml" href="{% static 'core/logo.svg' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/favicon-32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'core/favicon-16.png' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'core/apple-touch-icon.png' %}">
     <link rel="canonical" href="https://securapp.devquad.cl/">
-    <title>{{ PLATFORM_NAME }} · Administración de condominios</title>
+    <title>{{ PLATFORM_NAME }} · Botón de pánico y seguridad para tu condominio</title>
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ PLATFORM_NAME }}">
     <meta property="og:url" content="https://securapp.devquad.cl/">
-    <meta property="og:title" content="{{ PLATFORM_NAME }} · Administración de condominios y juntas de vecinos">
-    <meta property="og:description" content="Botón de pánico, avisos, accesos y gastos comunes en un solo panel, para directiva, administración, conserjería y residentes.">
+    <meta property="og:title" content="{{ PLATFORM_NAME }} · El botón de pánico de tu condominio">
+    <meta property="og:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos, accesos y gastos comunes, para directiva, administración, conserjería y residentes.">
     <meta property="og:image" content="https://securapp.devquad.cl{% static 'core/img/og-securapp.jpg' %}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:locale" content="es_CL">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ PLATFORM_NAME }} · Administración de condominios y juntas de vecinos">
-    <meta name="twitter:description" content="Botón de pánico, avisos, accesos y gastos comunes en un solo panel, para directiva, administración, conserjería y residentes.">
+    <meta name="twitter:title" content="{{ PLATFORM_NAME }} · El botón de pánico de tu condominio">
+    <meta name="twitter:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos, accesos y gastos comunes, para directiva, administración, conserjería y residentes.">
     <meta name="twitter:image" content="https://securapp.devquad.cl{% static 'core/img/og-securapp.jpg' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
@@ -38,7 +38,7 @@
         "name": "{{ PLATFORM_NAME }}",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "description": "Administración de condominios y juntas de vecinos: botón de pánico, avisos, control de accesos y gastos comunes.",
+        "description": "Botón de pánico que avisa a todo el condominio al instante, más administración de condominios y juntas de vecinos: avisos, control de accesos y gastos comunes.",
         "url": "https://securapp.devquad.cl/",
         "publisher": {
             "@type": "Organization",
@@ -339,10 +339,10 @@
 
     <header class="hero">
         <div class="container py-5 text-center">
-            <span class="eyebrow mb-3"><i class="bi bi-shield-check"></i> Hecho en Chile, para condominios y juntas de vecinos</span>
-            <h1 class="display-4 mb-3">Administra tu condominio sin planillas sueltas ni grupos de WhatsApp perdidos</h1>
+            <span class="eyebrow mb-3"><i class="bi bi-shield-check"></i> Hecho en Chile, pensado primero para la seguridad de tu condominio</span>
+            <h1 class="display-4 mb-3">Que la ayuda llegue al instante a tu condominio</h1>
             <p class="fs-5 mb-4 mx-auto" style="max-width: 640px; opacity: 0.95;">
-                {{ PLATFORM_NAME }} junta botón de pánico, avisos, control de accesos y gastos comunes en un solo panel, para directiva, administración, conserjería y residentes.
+                Un botón de pánico avisa a todo tu condominio al instante, sin depender de que alguien vea el WhatsApp a tiempo. Y en el mismo panel, también avisos, control de accesos y gastos comunes, para directiva, administración, conserjería y residentes.
             </p>
             <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
                 <a href="#solicitar" class="btn btn-light btn-lg px-4">Solicitar acceso</a>
@@ -489,6 +489,9 @@
     <section class="py-5 bg-white reveal">
         <div class="container">
             <p class="text-center text-muted small text-uppercase fw-semibold mb-4" style="letter-spacing: 0.06em;">Números reales, no de marketing</p>
+            {% if stat_alertas_resueltas %}
+            <p class="text-center fw-bold mb-4" style="font-size: 1.35rem; color: #BE123C;"><i class="bi bi-check-circle-fill"></i> {{ stat_alertas_resueltas }} alertas de pánico resueltas hasta ahora</p>
+            {% endif %}
             <div class="row text-center g-4">
                 <div class="col-md-4">
                     <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_organizaciones }}</div>
@@ -503,17 +506,14 @@
                     <p class="text-muted mb-0">Vecinos usando la plataforma</p>
                 </div>
             </div>
-            {% if stat_alertas_resueltas %}
-            <p class="text-center text-muted small mt-4 mb-0"><i class="bi bi-check-circle text-success"></i> {{ stat_alertas_resueltas }} alertas de pánico resueltas hasta ahora.</p>
-            {% endif %}
         </div>
     </section>
     {% endif %}
 
     <section id="caracteristicas" class="py-5 reveal" style="margin-top: 2rem; scroll-margin-top: 5rem;">
         <div class="container">
-            <h2 class="text-center fw-bold mb-2 section-title">Todo lo que necesita tu comunidad</h2>
-            <p class="text-center text-muted mb-5 mx-auto" style="max-width: 560px;">Un solo panel para directiva, administración y conserjería, y un acceso simple para cada residente.</p>
+            <h2 class="text-center fw-bold mb-2 section-title">Seguridad primero, administración también</h2>
+            <p class="text-center text-muted mb-5 mx-auto" style="max-width: 560px;">Botón de pánico y números de emergencia a la mano de todos; y en el mismo panel, lo que directiva, administración y conserjería necesitan para el día a día.</p>
             <div class="row g-4">
                 <div class="col-md-6 col-lg-4">
                     <div class="card-feature">
@@ -525,7 +525,15 @@
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="card-feature">
-                        <div class="numero-grande numero-amber mb-2">02</div>
+                        <div class="numero-grande numero-rose mb-2">02</div>
+                        <div class="icono-feature icono-rose mb-3"><i class="bi bi-telephone"></i></div>
+                        <h3 class="h5 fw-semibold">Números de emergencia</h3>
+                        <p class="text-muted mb-0">Carabineros, Bomberos y Ambulancia ya vienen cargados; Plan Cuadrante, la eléctrica o la sanitaria de tu comuna las agrega directiva/administración, o cualquier vecino las propone.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card-feature">
+                        <div class="numero-grande numero-amber mb-2">03</div>
                         <div class="icono-feature icono-amber mb-3"><i class="bi bi-megaphone"></i></div>
                         <h3 class="h5 fw-semibold">Avisos a todos los vecinos</h3>
                         <p class="text-muted mb-0">Directiva o administración publica un aviso para todo el condominio; un delegado de torre también puede publicar, acotado solo a su propia torre. Todos los destinatarios lo ven en su panel, sin reenviar mensajes grupo por grupo.</p>
@@ -533,7 +541,7 @@
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="card-feature">
-                        <div class="numero-grande mb-2">03</div>
+                        <div class="numero-grande mb-2">04</div>
                         <div class="icono-feature mb-3"><i class="bi bi-door-open"></i></div>
                         <h3 class="h5 fw-semibold">Registro de accesos</h3>
                         <p class="text-muted mb-0">Conserjería deja registrado quién entra y sale, con historial ordenado por unidad en vez de un cuaderno en portería.</p>
@@ -541,18 +549,10 @@
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="card-feature">
-                        <div class="numero-grande numero-emerald mb-2">04</div>
+                        <div class="numero-grande numero-emerald mb-2">05</div>
                         <div class="icono-feature icono-emerald mb-3"><i class="bi bi-cash-coin"></i></div>
                         <h3 class="h5 fw-semibold">Gastos comunes claros</h3>
                         <p class="text-muted mb-0">El cargo se prorratea solo por unidad, cada residente ve su cuota pendiente y los datos para transferir, y directiva marca los pagos recibidos.</p>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande numero-rose mb-2">05</div>
-                        <div class="icono-feature icono-rose mb-3"><i class="bi bi-telephone"></i></div>
-                        <h3 class="h5 fw-semibold">Números de emergencia</h3>
-                        <p class="text-muted mb-0">Carabineros, Bomberos y Ambulancia ya vienen cargados; Plan Cuadrante, la eléctrica o la sanitaria de tu comuna las agrega directiva/administración, o cualquier vecino las propone.</p>
                     </div>
                 </div>
             </div>
@@ -613,6 +613,12 @@
             <div class="row g-4">
                 <div class="col-md-6 col-lg-3">
                     <div class="pain-card">
+                        <p class="pain-quote">"Si pasa algo de noche, hay que llamar uno por uno."</p>
+                        <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el botón de pánico avisa a todo el condominio al instante.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="pain-card">
                         <p class="pain-quote">"El grupo de WhatsApp tiene 300 mensajes sin leer y nadie vio el aviso importante."</p>
                         <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el aviso queda en el panel de cada residente, no se pierde en el chat.</p>
                     </div>
@@ -621,12 +627,6 @@
                     <div class="pain-card">
                         <p class="pain-quote">"Nadie sabe cuánto debe cada departamento hasta fin de mes."</p>
                         <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el gasto común se prorratea solo y cada residente ve su cuota al día.</p>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="pain-card">
-                        <p class="pain-quote">"Si pasa algo de noche, hay que llamar uno por uno."</p>
-                        <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el botón de pánico avisa a todo el condominio al instante.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-3">
@@ -727,8 +727,8 @@
     <section class="py-5 reveal">
         <div class="container">
             <div class="cta-final text-center p-5">
-                <h2 class="h3 fw-bold mb-2">Lleva {{ PLATFORM_NAME }} a tu condominio o junta de vecinos</h2>
-                <p class="mb-4 mx-auto" style="max-width: 520px; opacity: 0.9;">Coordinamos el acceso con tu directiva, con todas las funciones activas desde el primer día.</p>
+                <h2 class="h3 fw-bold mb-2">Lleva el botón de pánico a tu condominio o junta de vecinos</h2>
+                <p class="mb-4 mx-auto" style="max-width: 520px; opacity: 0.9;">El botón de pánico, los avisos y el resto de las funciones quedan activos desde el primer día. Coordinamos el acceso con tu directiva.</p>
                 <a href="#solicitar" class="btn btn-light btn-lg px-4">Solicitar acceso</a>
             </div>
         </div>
@@ -742,7 +742,7 @@
                         <img src="{% static 'core/logo.svg' %}" width="24" height="24" alt="">
                         {{ PLATFORM_NAME }}
                     </div>
-                    <p class="small mb-0">Administración de condominios y juntas de vecinos en Chile.</p>
+                    <p class="small mb-0">Seguridad y administración de condominios y juntas de vecinos en Chile.</p>
                 </div>
                 <div class="col-6 col-md-3">
                     <h3 class="h6 text-dark">Producto</h3>
