@@ -171,9 +171,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <label class="form-label">Tipo de emergencia</label>
+                <div class="form-label" id="panico-tipo-label">Tipo de emergencia</div>
                 <input type="hidden" id="panico-tipo" value="otro">
-                <div id="panico-tipo-grid" class="row row-cols-3 row-cols-sm-4 g-2 mb-3">
+                <div id="panico-tipo-grid" class="row row-cols-3 row-cols-sm-4 g-2 mb-3" role="group" aria-labelledby="panico-tipo-label">
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="robo"><i class="bi bi-shield-exclamation d-block fs-4 mb-1"></i><span class="small">Robo</span></button></div>
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="incendio"><i class="bi bi-fire d-block fs-4 mb-1"></i><span class="small">Incendio</span></button></div>
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="accidente"><i class="bi bi-bandaid d-block fs-4 mb-1"></i><span class="small">Accidente</span></button></div>

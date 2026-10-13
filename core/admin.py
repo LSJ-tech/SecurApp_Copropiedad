@@ -152,7 +152,13 @@ class CondominioAdminForm(forms.ModelForm):
 
     class Meta:
         model = Condominio
-        fields = "__all__"
+        # Explícitos en vez de "__all__" -- así un campo nuevo que se agregue
+        # al modelo más adelante no aparece solo en el admin sin que alguien
+        # decida a propósito mostrarlo acá.
+        fields = [
+            "nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "activo", "plan",
+            "pagado_hasta", "es_fundador", "datos_transferencia", "etiqueta_torre", "etiqueta_unidad", "genero_unidad",
+        ]
 
     def clean(self):
         cleaned = super().clean()

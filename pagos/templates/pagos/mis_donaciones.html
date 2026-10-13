@@ -4,7 +4,11 @@
 {% block extra_head %}
 <style>
     .donacion-hero {
-        background: linear-gradient(135deg, #E07A5F 0%, #c2495f 55%, #1A2E40 100%);
+        /* #B55D42 (no el coral de marca #E07A5F) a propósito: el texto
+           blanco encima necesita 4.5:1 de contraste y el coral de marca
+           solo da ~3:1 -- Sonar lo marcó (css:S7924) y de verdad se veía
+           más pálido justo en esa esquina del degradado. */
+        background: linear-gradient(135deg, #B55D42 0%, #c2495f 55%, #1A2E40 100%);
         border-radius: 1rem;
         color: #fff;
         padding: 2.5rem 2rem;

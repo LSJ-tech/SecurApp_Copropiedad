@@ -13,7 +13,7 @@ function initMedidorContrasena({ passwordInputId, usernameInputId }) {
     indicador.style.marginTop = "0.35rem";
     indicador.style.fontWeight = "600";
     indicador.style.display = "none";
-    passwordInput.insertAdjacentElement("afterend", indicador);
+    passwordInput.after(indicador);
 
     function evaluar(password) {
         if (!password) {
@@ -22,7 +22,7 @@ function initMedidorContrasena({ passwordInputId, usernameInputId }) {
         var username = usernameInput ? usernameInput.value || "" : "";
         var muyCorta = password.length < 8;
         var soloNumeros = /^\d+$/.test(password);
-        var pareceUsername = username.length >= 3 && password.toLowerCase().indexOf(username.toLowerCase()) !== -1;
+        var pareceUsername = username.length >= 3 && password.toLowerCase().includes(username.toLowerCase());
 
         if (muyCorta || soloNumeros || pareceUsername) {
             return "baja";
@@ -31,7 +31,7 @@ function initMedidorContrasena({ passwordInputId, usernameInputId }) {
         var categorias = 0;
         if (/[a-z]/.test(password)) categorias++;
         if (/[A-Z]/.test(password)) categorias++;
-        if (/[0-9]/.test(password)) categorias++;
+        if (/\d/.test(password)) categorias++;
         if (/[^a-zA-Z0-9]/.test(password)) categorias++;
 
         if (password.length >= 10 && categorias >= 3) {

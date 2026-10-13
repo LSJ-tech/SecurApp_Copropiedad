@@ -14,7 +14,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
-from core.mixins import CondominioRequiredMixin, EsDirectivaOAdministracionMixin
+from core.mixins import MENSAJE_SIN_CONDOMINIO, CondominioRequiredMixin, EsDirectivaOAdministracionMixin
 
 from .mercadopago_client import (
     cancelar_suscripcion_recurrente,
@@ -127,7 +127,7 @@ class DonarView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
-            messages.error(request, "Tu cuenta no está vinculada a ningún condominio.")
+            messages.error(request, MENSAJE_SIN_CONDOMINIO)
             return redirect("login")
 
         if not settings.MERCADOPAGO_ACCESS_TOKEN:
@@ -156,7 +156,7 @@ class CancelarDonacionRecurrenteView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
-            messages.error(request, "Tu cuenta no está vinculada a ningún condominio.")
+            messages.error(request, MENSAJE_SIN_CONDOMINIO)
             return redirect("login")
 
         suscripcion = SuscripcionRecurrente.objects.filter(
@@ -185,7 +185,7 @@ class SuscripcionPagarView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
-            messages.error(request, "Tu cuenta no está vinculada a ningún condominio.")
+            messages.error(request, MENSAJE_SIN_CONDOMINIO)
             return redirect("login")
         if membresia.rol not in ("administracion", "directiva"):
             messages.error(request, "Activar el pago de la suscripción es exclusivo de directiva/administración.")
@@ -220,7 +220,7 @@ class CancelarSuscripcionRecurrenteView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
-            messages.error(request, "Tu cuenta no está vinculada a ningún condominio.")
+            messages.error(request, MENSAJE_SIN_CONDOMINIO)
             return redirect("login")
         if membresia.rol not in ("administracion", "directiva"):
             messages.error(request, "Cancelar la suscripción es exclusivo de directiva/administración.")
