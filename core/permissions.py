@@ -18,6 +18,19 @@ class TieneMembresia(BasePermission):
         return getattr(request.user, "membresia", None) is not None
 
 
+class EsAutorODirectivaOAdministracion(BasePermission):
+    """Para contenido que cualquier miembro puede crear (ej. el muro de
+    vecinos): solo quien lo escribió puede borrarlo, salvo directiva/
+    administración, que pueden moderar lo de cualquiera."""
+
+    def has_permission(self, request, view):
+        return getattr(request.user, "membresia", None) is not None
+
+    def has_object_permission(self, request, view, obj):
+        membresia = request.user.membresia
+        return obj.autor_id == membresia.id or membresia.rol in ("directiva", "administracion")
+
+
 class CondominioQuerysetMixin:
     """Mezclar en cualquier ViewSet/APIView de la API: filtra siempre por el
     condominio de la membresía del usuario logueado. Sin esto, un endpoint

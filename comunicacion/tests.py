@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from core.models import Condominio, Membresia
 
-from .models import Aviso, AvisoLectura
+from .models import Aviso, AvisoLectura, Publicacion
 
 
 def crear_membresia(condominio, rol, **user_kwargs):
@@ -162,3 +162,79 @@ class AvisoAdminTests(TestCase):
             self.client.get("/admin/comunicacion/aviso/")
 
         self.assertEqual(len(ctx_una_fila.captured_queries), len(ctx_cuatro_filas.captured_queries))
+
+
+class PublicacionApiTests(TestCase):
+    """Muro de vecinos: a diferencia de Aviso, CUALQUIER miembro puede
+    publicar -- solo borrar queda restringido al autor o a directiva/
+    administración (moderación, ver EsAutorODirectivaOAdministracion)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Muro A", plan="premium")
+        cls.otro_condominio = Condominio.objects.create(nombre="Test Muro B", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="muro_residente")
+        self.otro_residente = crear_membresia(self.condominio, "residente", username="muro_otro_residente")
+        self.directiva = crear_membresia(self.condominio, "directiva", username="muro_directiva")
+
+    def test_cualquier_rol_puede_publicar(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("publicacion-list"), {"categoria": "se_vende", "titulo": "Bicicleta", "cuerpo": "Poco uso"})
+        self.assertEqual(r.status_code, 201)
+        publicacion = Publicacion.objects.get(titulo="Bicicleta")
+        self.assertEqual(publicacion.condominio, self.condominio)
+        self.assertEqual(publicacion.autor, self.residente)
+
+    def test_lista_solo_las_del_propio_condominio(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente, titulo="Propia", cuerpo="...")
+        autor_ajeno = crear_membresia(self.otro_condominio, "residente", username="muro_ajeno")
+        Publicacion.objects.create(condominio=self.otro_condominio, autor=autor_ajeno, titulo="Ajena", cuerpo="...")
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([p["titulo"] for p in resultados], ["Propia"])
+
+    def test_el_autor_puede_borrar_lo_suyo(self):
+        publicacion = Publicacion.objects.create(condominio=self.condominio, autor=self.residente, titulo="Mía", cuerpo="...")
+        self.client.force_login(self.residente.user)
+        r = self.client.delete(reverse("publicacion-detail", args=[publicacion.pk]))
+        self.assertEqual(r.status_code, 204)
+        self.assertFalse(Publicacion.objects.filter(pk=publicacion.pk).exists())
+
+    def test_otro_residente_no_puede_borrar_lo_ajeno(self):
+        publicacion = Publicacion.objects.create(condominio=self.condominio, autor=self.residente, titulo="Mía", cuerpo="...")
+        self.client.force_login(self.otro_residente.user)
+        r = self.client.delete(reverse("publicacion-detail", args=[publicacion.pk]))
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Publicacion.objects.filter(pk=publicacion.pk).exists())
+
+    def test_directiva_puede_moderar_borrando_lo_de_cualquiera(self):
+        publicacion = Publicacion.objects.create(condominio=self.condominio, autor=self.residente, titulo="Mía", cuerpo="...")
+        self.client.force_login(self.directiva.user)
+        r = self.client.delete(reverse("publicacion-detail", args=[publicacion.pk]))
+        self.assertEqual(r.status_code, 204)
+
+    def test_puede_eliminar_refleja_quien_consulta(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente, titulo="Mía", cuerpo="...")
+
+        self.client.force_login(self.otro_residente.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertFalse(resultados[0]["puede_eliminar"])
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertTrue(resultados[0]["puede_eliminar"])
+
+
+class MuroVecinosViewTests(TestCase):
+    def test_cualquier_rol_puede_entrar(self):
+        condominio = Condominio.objects.create(nombre="Test Muro Pagina", plan="premium")
+        residente = crear_membresia(condominio, "residente", username="muro_pagina_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("muro-vecinos"))
+        self.assertEqual(r.status_code, 200)

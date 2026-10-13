@@ -33,3 +33,30 @@ class AvisoLectura(models.Model):
 
     def __str__(self):
         return f"{self.membresia} leyó «{self.aviso.titulo}»"
+
+
+CATEGORIA_PUBLICACION_CHOICES = [
+    ("objeto_perdido", "Objeto perdido"),
+    ("se_vende", "Se vende"),
+    ("pregunta", "Pregunta"),
+    ("otro", "Otro"),
+]
+
+
+class Publicacion(models.Model):
+    """Muro de vecinos -- a diferencia de Aviso (oficial, solo directiva/
+    administración), cualquier miembro puede publicar acá: objetos
+    perdidos, cosas que vende, preguntas al resto del condominio, etc."""
+
+    condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="publicaciones")
+    autor = models.ForeignKey(Membresia, on_delete=models.CASCADE, related_name="publicaciones")
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_PUBLICACION_CHOICES, default="otro")
+    titulo = models.CharField(max_length=150)
+    cuerpo = models.TextField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_creacion"]
+
+    def __str__(self):
+        return self.titulo

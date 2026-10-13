@@ -13,6 +13,7 @@ urlpatterns = [
     path('', include('pagos.urls')),
     path('', include('alertas.urls')),
     path('', include('personal.urls')),
+    path('', include('comunicacion.urls')),
 
     path(API_V1_PREFIX, include('core.api_urls')),
     path(API_V1_PREFIX, include('notificaciones.api_urls')),

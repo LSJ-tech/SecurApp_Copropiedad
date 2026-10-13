@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from core.models import Membresia
 
-from .models import Aviso
+from .models import Aviso, Publicacion
 
 
 class AvisoSerializer(serializers.ModelSerializer):
@@ -30,3 +30,27 @@ class AvisoSerializer(serializers.ModelSerializer):
         if not self._puede_ver_estadisticas():
             return None
         return Membresia.objects.filter(condominio_id=obj.condominio_id).count()
+
+
+class PublicacionSerializer(serializers.ModelSerializer):
+    autor_nombre = serializers.CharField(source="autor.user.get_full_name", read_only=True)
+    autor_unidad = serializers.CharField(source="autor.unidad.numero", read_only=True, default=None)
+    autor_torre = serializers.CharField(source="autor.unidad.torre.nombre", read_only=True, default=None)
+    categoria_display = serializers.CharField(source="get_categoria_display", read_only=True)
+    puede_eliminar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Publicacion
+        fields = [
+            "id", "categoria", "categoria_display", "titulo", "cuerpo", "fecha_creacion",
+            "autor_nombre", "autor_unidad", "autor_torre", "puede_eliminar",
+        ]
+
+    def get_puede_eliminar(self, obj):
+        """El autor siempre puede borrar lo suyo; directiva/administración
+        pueden moderar lo de cualquiera (es un muro abierto a todos)."""
+        request = self.context.get("request")
+        membresia = getattr(request.user, "membresia", None) if request else None
+        if not membresia:
+            return False
+        return obj.autor_id == membresia.id or membresia.rol in ("directiva", "administracion")
