@@ -1,7 +1,7 @@
 import datetime
 import json
 import logging
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
@@ -25,6 +25,7 @@ from .models import Pago, SuscripcionRecurrente
 logger = logging.getLogger(__name__)
 
 MONTO_SUSCRIPCION = Decimal("19990")
+MONTO_DONACION = Decimal("2000")
 
 # Mercado Pago manda el tipo de notificación como "type" (cuerpo) o "topic"
 # (query string, estilo IPN viejo). Estos valores de "subscription_*" están
@@ -54,7 +55,8 @@ class DonarView(LoginRequiredMixin, View):
     """Cualquier miembro (directiva, administración, conserjería o residente)
     puede activar una donación mensual automática para apoyar el desarrollo
     de la plataforma -- cobro recurrente vía Mercado Pago (API Preapproval)
-    hasta que la cancele, sin relación con la suscripción del condominio."""
+    hasta que la cancele, sin relación con la suscripción del condominio.
+    Monto fijo (MONTO_DONACION), no lo elige quien dona."""
 
     def post(self, request, *args, **kwargs):
         membresia = getattr(request.user, "membresia", None)
@@ -72,18 +74,10 @@ class DonarView(LoginRequiredMixin, View):
             return redirect("inicio")
 
         if SuscripcionRecurrente.objects.filter(membresia=membresia, tipo="donacion", estado__in=["pendiente", "autorizada"]).exists():
-            messages.error(request, "Ya tienes una donación automática activa. Cancélala primero si quieres cambiar el monto.")
+            messages.error(request, "Ya tienes una donación automática activa.")
             return redirect("inicio")
 
-        try:
-            monto = Decimal((request.POST.get("monto") or "").replace(",", "."))
-        except InvalidOperation:
-            monto = None
-        if not monto or monto <= 0:
-            messages.error(request, "Ingresa un monto válido para donar.")
-            return redirect("inicio")
-
-        suscripcion = SuscripcionRecurrente.objects.create(condominio=membresia.condominio, membresia=membresia, tipo="donacion", monto=monto)
+        suscripcion = SuscripcionRecurrente.objects.create(condominio=membresia.condominio, membresia=membresia, tipo="donacion", monto=MONTO_DONACION)
         url_autorizacion = crear_suscripcion_recurrente(suscripcion, email, request)
         if not url_autorizacion:
             suscripcion.delete()

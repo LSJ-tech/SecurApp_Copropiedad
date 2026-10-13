@@ -47,21 +47,16 @@ class DonarViewTests(TestCase):
 
     @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
     def test_residente_puede_activar_donacion_automatica(self, mock_crear):
-        r = self.client.post(reverse("donar"), {"monto": "3000"})
+        r = self.client.post(reverse("donar"))
         self.assertEqual(r.status_code, 302)
         suscripcion = SuscripcionRecurrente.objects.get(condominio=self.condominio, tipo="donacion")
         self.assertEqual(suscripcion.membresia_id, self.residente.pk)
-        self.assertEqual(suscripcion.monto, Decimal("3000"))
+        self.assertEqual(suscripcion.monto, Decimal("2000"))
         mock_crear.assert_called_once()
-
-    def test_monto_invalido_no_crea_suscripcion(self):
-        r = self.client.post(reverse("donar"), {"monto": "no-es-numero"})
-        self.assertEqual(r.status_code, 302)
-        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
 
     @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
     def test_sin_token_configurado_no_crea_suscripcion(self):
-        r = self.client.post(reverse("donar"), {"monto": "3000"})
+        r = self.client.post(reverse("donar"))
         self.assertEqual(r.status_code, 302)
         self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
 
@@ -69,14 +64,14 @@ class DonarViewTests(TestCase):
         sin_membresia = User.objects.create_user(username="sin_membresia")
         self.client.logout()
         self.client.force_login(sin_membresia)
-        r = self.client.post(reverse("donar"), {"monto": "3000"})
+        r = self.client.post(reverse("donar"))
         self.assertEqual(r.status_code, 302)
         self.assertFalse(SuscripcionRecurrente.objects.exists())
 
     def test_sin_email_no_puede_activar_la_donacion(self):
         self.residente.user.email = ""
         self.residente.user.save(update_fields=["email"])
-        r = self.client.post(reverse("donar"), {"monto": "3000"}, follow=True)
+        r = self.client.post(reverse("donar"), follow=True)
         self.assertContains(r, "Agrega tu email")
         self.assertFalse(SuscripcionRecurrente.objects.exists())
 
@@ -84,9 +79,9 @@ class DonarViewTests(TestCase):
     def test_no_deja_activar_una_segunda_donacion_si_ya_hay_una_activa(self, mock_crear):
         SuscripcionRecurrente.objects.create(
             condominio=self.condominio, membresia=self.residente, tipo="donacion",
-            monto=Decimal("1000"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-1", estado="autorizada",
         )
-        r = self.client.post(reverse("donar"), {"monto": "5000"}, follow=True)
+        r = self.client.post(reverse("donar"), follow=True)
         self.assertContains(r, "Ya tienes una donación automática activa")
         self.assertEqual(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="donacion").count(), 1)
 

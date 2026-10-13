@@ -267,12 +267,10 @@
             <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar donación automática</button>
         </form>
         {% else %}
-        <p class="text-muted small mb-2">¿{{ PLATFORM_NAME }} te ha sido útil? Puedes activar una donación mensual automática para apoyar el desarrollo de la plataforma.</p>
-        <form method="post" action="{% url 'donar' %}" class="d-flex gap-2">
+        <p class="text-muted small mb-2">¿{{ PLATFORM_NAME }} te ha sido útil? Puedes activar una donación automática de $2.000/mes para apoyar el desarrollo de la plataforma.</p>
+        <form method="post" action="{% url 'donar' %}">
             {% csrf_token %}
-            <label for="donar-monto" class="visually-hidden">Monto a donar en CLP</label>
-            <input type="number" id="donar-monto" name="monto" min="1" step="1" class="form-control" placeholder="Monto mensual en CLP" required>
-            <button type="submit" class="btn btn-outline-primary text-nowrap">Donar con Mercado Pago</button>
+            <button type="submit" class="btn btn-outline-primary">Donar $2.000/mes con Mercado Pago</button>
         </form>
         {% endif %}
     </div>
