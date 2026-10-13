@@ -18,6 +18,9 @@ def _es_credencial_de_prueba():
     return _access_token().startswith("TEST-")
 
 
+LARGO_MAXIMO_REASON = 60  # Límite real de Mercado Pago -- confirmado por su propio error, no documentado.
+
+
 def crear_suscripcion_recurrente(suscripcion, payer_email, request):
     """Crea la autorización de cobro automático mensual (API Preapproval,
     no Checkout Pro) para esta SuscripcionRecurrente y devuelve la URL a la
@@ -37,6 +40,11 @@ def crear_suscripcion_recurrente(suscripcion, payer_email, request):
         razon = f"Donación mensual a {settings.PLATFORM_NAME} - {origen}"
     else:
         razon = f"Suscripción mensual {settings.PLATFORM_NAME} - {suscripcion.condominio.nombre}"
+    # Mercado Pago rechaza el "reason" si pasa de 60 caracteres (ver
+    # LARGO_MAXIMO_REASON) -- nombres de condominio/torre largos ya hicieron
+    # fallar esto en la práctica, así que se recorta siempre por las dudas
+    # en vez de confiar en que el texto arriba nunca se pase.
+    razon = razon[:LARGO_MAXIMO_REASON]
 
     preapproval_object = {
         "reason": razon,

@@ -368,6 +368,27 @@ class MercadoPagoClientTests(TestCase):
         self.assertEqual(suscripcion.mercadopago_preapproval_id, "preap-1")
 
     @patch("pagos.mercadopago_client._sdk")
+    def test_la_razon_nunca_pasa_los_60_caracteres(self, mock_sdk_factory):
+        """Mercado Pago rechaza el reason si pasa de 60 caracteres (bug real
+        encontrado en producción: un condominio con torre/depto largo armaba
+        un texto más largo que eso y la API lo rechazaba con 400)."""
+        mock_sdk = MagicMock()
+        mock_sdk.preapproval.return_value.create.return_value = MPResponse(
+            {"status": 201, "response": {"id": "preap-largo", "init_point": "https://fake-mp.test/autorizar/largo"}}
+        )
+        mock_sdk_factory.return_value = mock_sdk
+        condominio_nombre_largo = Condominio.objects.create(nombre="Condominio Con Un Nombre Verdaderamente Larguísimo", plan="premium")
+        torre = Torre.objects.create(condominio=condominio_nombre_largo, nombre="Torre Norte Edificio Principal")
+        unidad = Unidad.objects.create(condominio=condominio_nombre_largo, torre=torre, numero="1504-B")
+        membresia = crear_membresia(condominio_nombre_largo, "residente", unidad=unidad, username="razon_larga_residente")
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=condominio_nombre_largo, membresia=membresia, tipo="donacion", monto=Decimal("2000"),
+        )
+        crear_suscripcion_recurrente(suscripcion, "donante@example.com", self._request())
+        cuerpo = mock_sdk.preapproval.return_value.create.call_args[0][0]
+        self.assertLessEqual(len(cuerpo["reason"]), 60)
+
+    @patch("pagos.mercadopago_client._sdk")
     def test_suscripcion_usa_razon_distinta_a_la_de_donacion(self, mock_sdk_factory):
         mock_sdk = MagicMock()
         mock_sdk.preapproval.return_value.create.return_value = MPResponse(
