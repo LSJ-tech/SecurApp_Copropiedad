@@ -11,14 +11,20 @@ from mercadopago.errors.response import MPResponse
 
 from core.models import Condominio, Membresia, Torre, Unidad
 
-from .mercadopago_client import crear_preferencia_pago, obtener_pago_mercadopago
-from .models import Pago
+from .mercadopago_client import (
+    cancelar_suscripcion_recurrente,
+    crear_suscripcion_recurrente,
+    obtener_pago_mercadopago,
+    obtener_preapproval_mercadopago,
+)
+from .models import Pago, SuscripcionRecurrente
 
 
 def crear_membresia(condominio, rol, unidad=None, **user_kwargs):
     """Sin password: los tests se autentican con force_login."""
     username = user_kwargs.pop("username", f"t_{rol}_{Membresia.objects.count()}")
-    user = User.objects.create_user(username=username, **user_kwargs)
+    email = user_kwargs.pop("email", f"{username}@example.com")
+    user = User.objects.create_user(username=username, email=email, **user_kwargs)
     return Membresia.objects.create(
         user=user, condominio=condominio, rol=rol, unidad=unidad, terminos_aceptados_en=timezone.now(),
     )
@@ -26,8 +32,8 @@ def crear_membresia(condominio, rol, unidad=None, **user_kwargs):
 
 @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
 class DonarViewTests(TestCase):
-    """Cualquier miembro puede donar (commit 6e4a108) -- sin tocar la red real
-    de Mercado Pago, se mockea crear_preferencia_pago."""
+    """Cualquier miembro puede activar una donación mensual automática --
+    sin tocar la red real de Mercado Pago, se mockea crear_suscripcion_recurrente."""
 
     @classmethod
     def setUpTestData(cls):
@@ -39,25 +45,25 @@ class DonarViewTests(TestCase):
         self.residente = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="don_residente")
         self.client.force_login(self.residente.user)
 
-    @patch("pagos.views.crear_preferencia_pago", return_value="https://fake-mp.test/pagar/1")
-    def test_residente_puede_donar(self, mock_pref):
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_residente_puede_activar_donacion_automatica(self, mock_crear):
         r = self.client.post(reverse("donar"), {"monto": "3000"})
         self.assertEqual(r.status_code, 302)
-        pago = Pago.objects.get(condominio=self.condominio, tipo="donacion")
-        self.assertEqual(pago.membresia_id, self.residente.pk)
-        self.assertEqual(pago.monto, Decimal("3000"))
-        self.assertEqual(pago.plan, "")
+        suscripcion = SuscripcionRecurrente.objects.get(condominio=self.condominio, tipo="donacion")
+        self.assertEqual(suscripcion.membresia_id, self.residente.pk)
+        self.assertEqual(suscripcion.monto, Decimal("3000"))
+        mock_crear.assert_called_once()
 
-    def test_monto_invalido_no_crea_pago(self):
+    def test_monto_invalido_no_crea_suscripcion(self):
         r = self.client.post(reverse("donar"), {"monto": "no-es-numero"})
         self.assertEqual(r.status_code, 302)
-        self.assertFalse(Pago.objects.filter(condominio=self.condominio).exists())
+        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
 
     @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
-    def test_sin_token_configurado_no_crea_pago(self):
+    def test_sin_token_configurado_no_crea_suscripcion(self):
         r = self.client.post(reverse("donar"), {"monto": "3000"})
         self.assertEqual(r.status_code, 302)
-        self.assertFalse(Pago.objects.filter(condominio=self.condominio).exists())
+        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
 
     def test_usuario_sin_membresia_no_puede_donar(self):
         sin_membresia = User.objects.create_user(username="sin_membresia")
@@ -65,20 +71,70 @@ class DonarViewTests(TestCase):
         self.client.force_login(sin_membresia)
         r = self.client.post(reverse("donar"), {"monto": "3000"})
         self.assertEqual(r.status_code, 302)
-        self.assertFalse(Pago.objects.exists())
+        self.assertFalse(SuscripcionRecurrente.objects.exists())
+
+    def test_sin_email_no_puede_activar_la_donacion(self):
+        self.residente.user.email = ""
+        self.residente.user.save(update_fields=["email"])
+        r = self.client.post(reverse("donar"), {"monto": "3000"}, follow=True)
+        self.assertContains(r, "Agrega tu email")
+        self.assertFalse(SuscripcionRecurrente.objects.exists())
+
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_no_deja_activar_una_segunda_donacion_si_ya_hay_una_activa(self, mock_crear):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("1000"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+        )
+        r = self.client.post(reverse("donar"), {"monto": "5000"}, follow=True)
+        self.assertContains(r, "Ya tienes una donación automática activa")
+        self.assertEqual(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="donacion").count(), 1)
+
+
+class CancelarDonacionRecurrenteViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Cancelar Donacion", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="cancel_don_residente")
+        self.client.force_login(self.residente.user)
+
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=True)
+    def test_cancela_la_donacion_activa(self, mock_cancelar):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("1000"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+        )
+        r = self.client.post(reverse("cancelar-donacion"), follow=True)
+        self.assertContains(r, "cancelamos tu donación")
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+        self.assertIsNotNone(suscripcion.fecha_cancelacion)
+
+    def test_sin_donacion_activa_muestra_error(self):
+        r = self.client.post(reverse("cancelar-donacion"), follow=True)
+        self.assertContains(r, "No tienes ninguna donación automática activa")
+
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=False)
+    def test_si_mercadopago_rechaza_la_cancelacion_no_marca_cancelada(self, mock_cancelar):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("1000"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+        )
+        r = self.client.post(reverse("cancelar-donacion"), follow=True)
+        self.assertContains(r, "No pudimos cancelar")
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "autorizada")
 
 
 @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
 class SuscripcionPagarViewTests(TestCase):
-    """Solo directiva/administración pagan la suscripción (monto fijo, no lo
-    elige quien paga), y se bloquea si el mes ya está pagado -- para no
-    duplicar el cobro."""
+    """Solo directiva/administración activan el cobro automático de la
+    suscripción (monto fijo), y no se puede activar dos veces."""
 
     @classmethod
     def setUpTestData(cls):
-        # pagado_hasta=None a propósito -- Condominio ahora trae 20 días de
-        # prueba gratis por defecto (ver _pagado_hasta_prueba_gratis), pero
-        # estos tests quieren probar el caso de "todavía no está pagado".
         cls.condominio = Condominio.objects.create(nombre="Test Suscripcion", plan="premium", pagado_hasta=None)
 
     def setUp(self):
@@ -86,96 +142,202 @@ class SuscripcionPagarViewTests(TestCase):
         self.directiva = crear_membresia(self.condominio, "directiva", username="susc_directiva")
         self.residente = crear_membresia(self.condominio, "residente", username="susc_residente")
 
-    @patch("pagos.views.crear_preferencia_pago", return_value="https://fake-mp.test/pagar/1")
-    def test_administracion_puede_pagar_la_suscripcion(self, mock_pref):
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_administracion_puede_activar_la_suscripcion(self, mock_crear):
         self.client.force_login(self.administracion.user)
         r = self.client.post(reverse("pagar-suscripcion"))
         self.assertEqual(r.status_code, 302)
-        pago = Pago.objects.get(condominio=self.condominio, tipo="suscripcion")
-        self.assertEqual(pago.monto, Decimal("19990"))
-        self.assertEqual(pago.plan, "premium")
-        self.assertEqual(pago.membresia_id, self.administracion.pk)
+        suscripcion = SuscripcionRecurrente.objects.get(condominio=self.condominio, tipo="suscripcion")
+        self.assertEqual(suscripcion.monto, Decimal("19990"))
+        self.assertEqual(suscripcion.membresia_id, self.administracion.pk)
 
-    @patch("pagos.views.crear_preferencia_pago", return_value="https://fake-mp.test/pagar/1")
-    def test_directiva_tambien_puede_pagar(self, mock_pref):
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_directiva_tambien_puede_activarla(self, mock_crear):
         self.client.force_login(self.directiva.user)
         r = self.client.post(reverse("pagar-suscripcion"))
         self.assertEqual(r.status_code, 302)
-        self.assertTrue(Pago.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
+        self.assertTrue(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
 
-    def test_residente_no_puede_pagar_la_suscripcion(self):
+    def test_residente_no_puede_activarla(self):
         self.client.force_login(self.residente.user)
         r = self.client.post(reverse("pagar-suscripcion"))
         self.assertEqual(r.status_code, 302)
-        self.assertFalse(Pago.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
+        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
 
-    def test_no_deja_pagar_de_nuevo_si_el_mes_ya_esta_pagado(self):
-        self.condominio.pagado_hasta = timezone.localdate() + datetime.timedelta(days=10)
-        self.condominio.save(update_fields=["pagado_hasta"])
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_no_deja_activar_dos_veces(self, mock_crear):
         self.client.force_login(self.administracion.user)
-        r = self.client.post(reverse("pagar-suscripcion"))
-        self.assertEqual(r.status_code, 302)
-        self.assertFalse(Pago.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
+        self.client.post(reverse("pagar-suscripcion"))
+        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
+        self.assertContains(r, "Ya existe una suscripción automática activa")
+        self.assertEqual(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="suscripcion").count(), 1)
 
-    @patch("pagos.views.crear_preferencia_pago", return_value="https://fake-mp.test/pagar/1")
-    def test_si_la_suscripcion_vencida_si_deja_pagar_de_nuevo(self, mock_pref):
-        self.condominio.pagado_hasta = timezone.localdate() - datetime.timedelta(days=1)
-        self.condominio.save(update_fields=["pagado_hasta"])
+    def test_sin_email_no_puede_activarla(self):
+        self.administracion.user.email = ""
+        self.administracion.user.save(update_fields=["email"])
         self.client.force_login(self.administracion.user)
-        r = self.client.post(reverse("pagar-suscripcion"))
-        self.assertEqual(r.status_code, 302)
-        self.assertTrue(Pago.objects.filter(condominio=self.condominio, tipo="suscripcion").exists())
+        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
+        self.assertContains(r, "Agrega tu email")
+        self.assertFalse(SuscripcionRecurrente.objects.exists())
+
+
+class CancelarSuscripcionRecurrenteViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Cancelar Suscripcion", plan="premium")
+
+    def setUp(self):
+        self.administracion = crear_membresia(self.condominio, "administracion", username="cancel_susc_admon")
+        self.residente = crear_membresia(self.condominio, "residente", username="cancel_susc_residente")
+
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=True)
+    def test_administracion_cancela_la_suscripcion_activa(self, mock_cancelar):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.administracion, tipo="suscripcion",
+            monto=Decimal("19990"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+        )
+        self.client.force_login(self.administracion.user)
+        r = self.client.post(reverse("cancelar-suscripcion"), follow=True)
+        self.assertContains(r, "cancelamos el cobro automático")
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+
+    def test_residente_no_puede_cancelarla(self):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.administracion, tipo="suscripcion",
+            monto=Decimal("19990"), mercadopago_preapproval_id="pre-1", estado="autorizada",
+        )
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("cancelar-suscripcion"), follow=True)
+        self.assertContains(r, "exclusivo de directiva/administración")
+
+    def test_sin_suscripcion_activa_muestra_error(self):
+        self.client.force_login(self.administracion.user)
+        r = self.client.post(reverse("cancelar-suscripcion"), follow=True)
+        self.assertContains(r, "No hay ninguna suscripción automática activa")
 
 
 class WebhookMercadoPagoTests(TestCase):
-    """La donación aprobada NO debe tocar pagado_hasta/plan del condominio --
-    eso es exclusivo de un pago de tipo 'suscripcion' (commit c8c030c)."""
+    """La donación aprobada NO debe tocar pagado_hasta/plan del condominio
+    -- eso es exclusivo de un cobro de tipo 'suscripcion'."""
 
     @classmethod
     def setUpTestData(cls):
         cls.condominio = Condominio.objects.create(nombre="Test Webhook", plan="free", pagado_hasta=None)
 
-    def _simular_webhook(self, pago, estado_mp="approved"):
+    def _suscripcion(self, tipo="suscripcion", monto="9990", estado="autorizada", preapproval_id="pre-1"):
+        return SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo=tipo, monto=Decimal(monto),
+            mercadopago_preapproval_id=preapproval_id, estado=estado,
+        )
+
+    def _simular_webhook_cobro(self, payment_id, preapproval_id, estado_mp="approved"):
         with patch(
             "pagos.views.obtener_pago_mercadopago",
-            return_value={"status": estado_mp, "external_reference": str(pago.pk)},
+            return_value={"status": estado_mp, "preapproval_id": preapproval_id},
         ):
             return self.client.post(
-                reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json",
+                reverse("pago-webhook"),
+                data=json.dumps({"type": "payment", "data": {"id": payment_id}}),
+                content_type="application/json",
             )
 
-    def test_donacion_aprobada_no_extiende_plan_ni_vencimiento(self):
-        pago = Pago.objects.create(condominio=self.condominio, tipo="donacion", monto=Decimal("5000"))
-        self._simular_webhook(pago)
-        pago.refresh_from_db()
+    def test_cobro_de_donacion_aprobado_no_extiende_plan_ni_vencimiento(self):
+        suscripcion = self._suscripcion(tipo="donacion", preapproval_id="pre-don")
+        self._simular_webhook_cobro("pay-1", "pre-don")
         self.condominio.refresh_from_db()
-        self.assertEqual(pago.estado, "aprobado")
         self.assertIsNone(self.condominio.pagado_hasta)
         self.assertEqual(self.condominio.plan, "free")
-
-    def test_suscripcion_aprobada_si_extiende_plan_y_vencimiento(self):
-        pago = Pago.objects.create(condominio=self.condominio, tipo="suscripcion", monto=Decimal("9990"), plan="premium")
-        self._simular_webhook(pago)
-        pago.refresh_from_db()
-        self.condominio.refresh_from_db()
+        pago = Pago.objects.get(mercadopago_payment_id="pay-1")
+        self.assertEqual(pago.suscripcion_recurrente, suscripcion)
         self.assertEqual(pago.estado, "aprobado")
+
+    def test_cobro_de_suscripcion_aprobado_si_extiende_plan_y_vencimiento(self):
+        self._suscripcion(tipo="suscripcion", preapproval_id="pre-susc")
+        self._simular_webhook_cobro("pay-2", "pre-susc")
+        self.condominio.refresh_from_db()
         self.assertIsNotNone(self.condominio.pagado_hasta)
         self.assertEqual(self.condominio.plan, "premium")
 
-    def test_pago_rechazado_queda_marcado(self):
-        pago = Pago.objects.create(condominio=self.condominio, tipo="donacion", monto=Decimal("1000"))
-        self._simular_webhook(pago, estado_mp="rejected")
-        pago.refresh_from_db()
-        self.assertEqual(pago.estado, "rechazado")
+    def test_cobro_no_aprobado_no_crea_pago(self):
+        self._suscripcion(tipo="suscripcion", preapproval_id="pre-pend")
+        self._simular_webhook_cobro("pay-3", "pre-pend", estado_mp="pending")
+        self.assertFalse(Pago.objects.filter(mercadopago_payment_id="pay-3").exists())
+
+    def test_cobro_sin_suscripcion_relacionada_no_crea_pago_ni_falla(self):
+        r = self._simular_webhook_cobro("pay-4", "preapproval-inexistente")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Pago.objects.filter(mercadopago_payment_id="pay-4").exists())
+
+    def test_el_mismo_payment_id_no_duplica_el_pago(self):
+        self._suscripcion(tipo="suscripcion", preapproval_id="pre-dup")
+        self._simular_webhook_cobro("pay-5", "pre-dup")
+        self._simular_webhook_cobro("pay-5", "pre-dup")
+        self.assertEqual(Pago.objects.filter(mercadopago_payment_id="pay-5").count(), 1)
+
+    def test_cambio_de_estado_de_preapproval_actualiza_la_suscripcion(self):
+        suscripcion = self._suscripcion(tipo="suscripcion", estado="pendiente", preapproval_id="pre-estado")
+        with patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"}):
+            r = self.client.post(
+                reverse("pago-webhook"),
+                data=json.dumps({"type": "preapproval", "data": {"id": "pre-estado"}}),
+                content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "autorizada")
+
+    def test_preapproval_cancelada_registra_fecha_de_cancelacion(self):
+        suscripcion = self._suscripcion(tipo="suscripcion", estado="autorizada", preapproval_id="pre-cancel")
+        with patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "cancelled"}):
+            self.client.post(
+                reverse("pago-webhook"),
+                data=json.dumps({"type": "preapproval", "data": {"id": "pre-cancel"}}),
+                content_type="application/json",
+            )
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+        self.assertIsNotNone(suscripcion.fecha_cancelacion)
 
 
-@override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
+class WebhookMercadoPagoRamasFaltantesTests(TestCase):
+    """Las ramas de salida temprana del webhook -- nunca se confía en el
+    cuerpo del POST, así que cualquiera de estos casos debe responder
+    200/400 sin tocar ningún Pago/SuscripcionRecurrente."""
+
+    def test_body_invalido_devuelve_400(self):
+        r = self.client.post(reverse("pago-webhook"), data="esto no es json", content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_sin_id_devuelve_200_sin_hacer_nada(self):
+        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {}}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+
+    @patch("pagos.views.obtener_pago_mercadopago", return_value=None)
+    def test_mercadopago_no_devuelve_el_pago_devuelve_200(self, mock_obtener):
+        r = self.client.post(
+            reverse("pago-webhook"),
+            data=json.dumps({"type": "payment", "data": {"id": "999"}}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value=None)
+    def test_mercadopago_no_devuelve_el_preapproval_devuelve_200(self, mock_obtener):
+        r = self.client.post(
+            reverse("pago-webhook"),
+            data=json.dumps({"type": "preapproval", "data": {"id": "999"}}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+
+
 class MercadoPagoClientTests(TestCase):
     """Tests directos de pagos/mercadopago_client.py -- el resto de los
-    tests de esta app mockean crear_preferencia_pago/obtener_pago_mercadopago
-    a nivel de vista a propósito (sin tocar la red real de Mercado Pago), así
-    que este módulo (el único que arma la preferencia de verdad) se quedaba
-    sin ningún test propio."""
+    tests de esta app mockean crear_suscripcion_recurrente/
+    cancelar_suscripcion_recurrente/obtener_* a nivel de vista a propósito
+    (sin tocar la red real de Mercado Pago), así que este módulo (el único
+    que arma la autorización de verdad) se quedaba sin ningún test propio."""
 
     @classmethod
     def setUpTestData(cls):
@@ -184,116 +346,111 @@ class MercadoPagoClientTests(TestCase):
     def _request(self):
         return RequestFactory().get("/")
 
-    def _pago(self, **kwargs):
+    def _suscripcion(self, **kwargs):
         kwargs.setdefault("condominio", self.condominio)
         kwargs.setdefault("tipo", "donacion")
         kwargs.setdefault("monto", Decimal("5000"))
-        return Pago.objects.create(**kwargs)
+        kwargs.setdefault("mercadopago_preapproval_id", "")
+        return SuscripcionRecurrente.objects.create(**kwargs)
 
     @patch("pagos.mercadopago_client._sdk")
-    def test_donacion_sin_unidad_usa_nombre_del_condominio_como_origen(self, mock_sdk_factory):
+    def test_donacion_arma_la_razon_con_nombre_del_condominio(self, mock_sdk_factory):
         mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse(
-            {"status": 201, "response": {"id": "pref-1", "init_point": "https://fake-mp.test/pagar/1"}}
+        mock_sdk.preapproval.return_value.create.return_value = MPResponse(
+            {"status": 201, "response": {"id": "preap-1", "init_point": "https://fake-mp.test/autorizar/1"}}
         )
         mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago()
-        url = crear_preferencia_pago(pago, self._request())
-        self.assertEqual(url, "https://fake-mp.test/pagar/1")
-        titulo = mock_sdk.preference.return_value.create.call_args[0][0]["items"][0]["title"]
-        self.assertIn(self.condominio.nombre, titulo)
-        pago.refresh_from_db()
-        self.assertEqual(pago.mercadopago_preference_id, "pref-1")
+        suscripcion = self._suscripcion()
+        url = crear_suscripcion_recurrente(suscripcion, "donante@example.com", self._request())
+        self.assertEqual(url, "https://fake-mp.test/autorizar/1")
+        cuerpo = mock_sdk.preapproval.return_value.create.call_args[0][0]
+        self.assertIn(self.condominio.nombre, cuerpo["reason"])
+        self.assertEqual(cuerpo["payer_email"], "donante@example.com")
+        self.assertEqual(cuerpo["auto_recurring"]["frequency_type"], "months")
+        self.assertEqual(cuerpo["auto_recurring"]["currency_id"], "CLP")
+        self.assertNotIn("end_date", cuerpo)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.mercadopago_preapproval_id, "preap-1")
 
     @patch("pagos.mercadopago_client._sdk")
-    def test_donacion_con_torre_arma_origen_con_torre_y_depto(self, mock_sdk_factory):
-        torre = Torre.objects.create(condominio=self.condominio, nombre="3")
-        unidad = Unidad.objects.create(condominio=self.condominio, torre=torre, numero="301")
-        membresia = crear_membresia(self.condominio, "residente", unidad=unidad, username="mp_con_torre")
+    def test_suscripcion_usa_razon_distinta_a_la_de_donacion(self, mock_sdk_factory):
         mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse(
-            {"status": 201, "response": {"id": "pref-2", "init_point": "https://fake-mp.test/pagar/2"}}
+        mock_sdk.preapproval.return_value.create.return_value = MPResponse(
+            {"status": 201, "response": {"id": "preap-2", "init_point": "https://fake-mp.test/autorizar/2"}}
         )
         mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago(membresia=membresia)
-        crear_preferencia_pago(pago, self._request())
-        titulo = mock_sdk.preference.return_value.create.call_args[0][0]["items"][0]["title"]
-        self.assertIn("Torre 3", titulo)
-        self.assertIn("Depto 301", titulo)
+        suscripcion = self._suscripcion(tipo="suscripcion", monto=Decimal("19990"))
+        crear_suscripcion_recurrente(suscripcion, "admin@example.com", self._request())
+        cuerpo = mock_sdk.preapproval.return_value.create.call_args[0][0]
+        self.assertIn("Suscripción", cuerpo["reason"])
+        self.assertNotIn("Donación", cuerpo["reason"])
 
     @patch("pagos.mercadopago_client._sdk")
-    def test_donacion_sin_torre_arma_origen_solo_con_depto(self, mock_sdk_factory):
-        unidad = Unidad.objects.create(condominio=self.condominio, numero="99")
-        membresia = crear_membresia(self.condominio, "residente", unidad=unidad, username="mp_sin_torre")
+    def test_mercadopago_rechaza_la_solicitud_devuelve_none(self, mock_sdk_factory):
         mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse(
-            {"status": 201, "response": {"id": "pref-3", "init_point": "https://fake-mp.test/pagar/3"}}
-        )
-        mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago(membresia=membresia)
-        crear_preferencia_pago(pago, self._request())
-        titulo = mock_sdk.preference.return_value.create.call_args[0][0]["items"][0]["title"]
-        self.assertIn("Depto 99", titulo)
-        self.assertNotIn("Torre", titulo)
-
-    @patch("pagos.mercadopago_client._sdk")
-    def test_suscripcion_usa_titulo_distinto_al_de_donacion(self, mock_sdk_factory):
-        mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse(
-            {"status": 201, "response": {"id": "pref-4", "init_point": "https://fake-mp.test/pagar/4"}}
-        )
-        mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago(tipo="suscripcion", monto=Decimal("19990"), plan="premium")
-        crear_preferencia_pago(pago, self._request())
-        titulo = mock_sdk.preference.return_value.create.call_args[0][0]["items"][0]["title"]
-        self.assertIn("Suscripción", titulo)
-        self.assertNotIn("Donación", titulo)
-
-    @patch("pagos.mercadopago_client._sdk")
-    def test_mercadopago_rechaza_la_preferencia_devuelve_none(self, mock_sdk_factory):
-        mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse(
+        mock_sdk.preapproval.return_value.create.return_value = MPResponse(
             {"status": 400, "response": {"message": "bad request"}}
         )
         mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago()
-        url = crear_preferencia_pago(pago, self._request())
+        suscripcion = self._suscripcion()
+        url = crear_suscripcion_recurrente(suscripcion, "donante@example.com", self._request())
         self.assertIsNone(url)
-        pago.refresh_from_db()
-        self.assertEqual(pago.mercadopago_preference_id, "")
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.mercadopago_preapproval_id, "")
 
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
     @patch("pagos.mercadopago_client._sdk")
-    def test_credencial_de_prueba_usa_sandbox_init_point(self, mock_sdk_factory):
+    def test_credencial_de_prueba_usa_sandbox_init_point_si_viene(self, mock_sdk_factory):
         mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse({
+        mock_sdk.preapproval.return_value.create.return_value = MPResponse({
             "status": 201,
-            "response": {
-                "id": "pref-5",
-                "init_point": "https://fake-mp.test/prod",
-                "sandbox_init_point": "https://fake-mp.test/sandbox",
-            },
+            "response": {"id": "preap-3", "init_point": "https://fake-mp.test/prod", "sandbox_init_point": "https://fake-mp.test/sandbox"},
         })
         mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago()
-        url = crear_preferencia_pago(pago, self._request())
+        suscripcion = self._suscripcion()
+        url = crear_suscripcion_recurrente(suscripcion, "donante@example.com", self._request())
         self.assertEqual(url, "https://fake-mp.test/sandbox")
 
-    @override_settings(MERCADOPAGO_ACCESS_TOKEN="APP_USR-prod-token")
     @patch("pagos.mercadopago_client._sdk")
-    def test_credencial_de_produccion_usa_init_point_aunque_haya_sandbox(self, mock_sdk_factory):
+    def test_cancelar_suscripcion_exitoso_devuelve_true(self, mock_sdk_factory):
         mock_sdk = MagicMock()
-        mock_sdk.preference.return_value.create.return_value = MPResponse({
-            "status": 201,
-            "response": {
-                "id": "pref-6",
-                "init_point": "https://fake-mp.test/prod",
-                "sandbox_init_point": "https://fake-mp.test/sandbox",
-            },
-        })
+        mock_sdk.preapproval.return_value.update.return_value = MPResponse(
+            {"status": 200, "response": {"id": "preap-4", "status": "cancelled"}}
+        )
         mock_sdk_factory.return_value = mock_sdk
-        pago = self._pago()
-        url = crear_preferencia_pago(pago, self._request())
-        self.assertEqual(url, "https://fake-mp.test/prod")
+        suscripcion = self._suscripcion(mercadopago_preapproval_id="preap-4")
+        self.assertTrue(cancelar_suscripcion_recurrente(suscripcion))
+        mock_sdk.preapproval.return_value.update.assert_called_once_with("preap-4", {"status": "cancelled"})
+
+    @patch("pagos.mercadopago_client._sdk")
+    def test_cancelar_suscripcion_fallido_devuelve_false(self, mock_sdk_factory):
+        mock_sdk = MagicMock()
+        mock_sdk.preapproval.return_value.update.return_value = MPResponse(
+            {"status": 404, "response": {"message": "not found"}}
+        )
+        mock_sdk_factory.return_value = mock_sdk
+        suscripcion = self._suscripcion(mercadopago_preapproval_id="preap-5")
+        self.assertFalse(cancelar_suscripcion_recurrente(suscripcion))
+
+    @patch("pagos.mercadopago_client._sdk")
+    def test_obtener_preapproval_exitoso_devuelve_el_body(self, mock_sdk_factory):
+        mock_sdk = MagicMock()
+        mock_sdk.preapproval.return_value.get.return_value = MPResponse(
+            {"status": 200, "response": {"id": "preap-6", "status": "authorized"}}
+        )
+        mock_sdk_factory.return_value = mock_sdk
+        resultado = obtener_preapproval_mercadopago("preap-6")
+        self.assertEqual(resultado["status"], "authorized")
+
+    @patch("pagos.mercadopago_client._sdk")
+    def test_obtener_preapproval_fallido_devuelve_none(self, mock_sdk_factory):
+        mock_sdk = MagicMock()
+        mock_sdk.preapproval.return_value.get.return_value = MPResponse(
+            {"status": 404, "response": {"message": "not found"}}
+        )
+        mock_sdk_factory.return_value = mock_sdk
+        resultado = obtener_preapproval_mercadopago("preap-404")
+        self.assertIsNone(resultado)
 
     @patch("pagos.mercadopago_client._sdk")
     def test_obtener_pago_exitoso_devuelve_el_body(self, mock_sdk_factory):
@@ -354,50 +511,48 @@ class PagoAdminTests(TestCase):
         pago = Pago.objects.create(condominio=self.condominio, tipo="donacion", monto=Decimal("1000"), membresia=membresia)
         self.assertEqual(self.admin.donante(pago), "sin_nombre_admin")
 
+    def test_changelist_renderiza_con_la_insignia(self):
+        Pago.objects.create(condominio=self.condominio, tipo="suscripcion", plan="premium", monto=19990, estado="aprobado")
+        staff = User.objects.create_superuser(username="admin_pago_staff", password="x", email="admin_pago_staff@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/admin/pagos/pago/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Aprobado")
 
-class DonarViewRamasFaltantesTests(TestCase):
+
+class SuscripcionRecurrenteAdminTests(TestCase):
+    """Insignia de color para estado y la acción "cancelar en Mercado Pago"
+    (ver pagos/admin.py)."""
+
     @classmethod
     def setUpTestData(cls):
-        cls.condominio = Condominio.objects.create(nombre="Test Donar Ramas", plan="premium")
+        cls.condominio = Condominio.objects.create(nombre="Test Suscripcion Admin", plan="premium")
 
     def setUp(self):
-        self.residente = crear_membresia(self.condominio, "residente", username="donar_ramas_residente")
-        self.client.force_login(self.residente.user)
+        self.staff = User.objects.create_superuser(username="admin_susc_staff", password="x")
+        self.client.force_login(self.staff)
 
-    @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
-    @patch("pagos.views.crear_preferencia_pago", return_value=None)
-    def test_mercadopago_no_devuelve_url_no_crea_preferencia_utilizable(self, mock_pref):
-        r = self.client.post(reverse("donar"), {"monto": "3000"}, follow=True)
-        self.assertContains(r, "No pudimos iniciar la donación")
-        self.assertEqual(Pago.objects.filter(condominio=self.condominio).count(), 1)
+    def test_changelist_renderiza_con_la_insignia(self):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=19990,
+            mercadopago_preapproval_id="pre-admin-1", estado="autorizada",
+        )
+        r = self.client.get("/admin/pagos/suscripcionrecurrente/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Autorizada")
 
-
-class SuscripcionPagarViewRamasFaltantesTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.condominio = Condominio.objects.create(nombre="Test Suscripcion Ramas", plan="premium", pagado_hasta=None)
-
-    def test_sin_membresia_redirige_a_login(self):
-        user = User.objects.create_user(username="susc_sin_membresia")
-        self.client.force_login(user)
-        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
-        self.assertContains(r, "no está vinculada a ningún condominio")
-
-    @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
-    def test_sin_token_configurado_no_crea_pago(self):
-        administracion = crear_membresia(self.condominio, "administracion", username="susc_sin_token")
-        self.client.force_login(administracion.user)
-        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
-        self.assertContains(r, "todavía no está disponible")
-        self.assertFalse(Pago.objects.filter(condominio=self.condominio).exists())
-
-    @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
-    @patch("pagos.views.crear_preferencia_pago", return_value=None)
-    def test_mercadopago_no_devuelve_url_no_bloquea_reintentar(self, mock_pref):
-        administracion = crear_membresia(self.condominio, "administracion", username="susc_sin_url")
-        self.client.force_login(administracion.user)
-        r = self.client.post(reverse("pagar-suscripcion"), follow=True)
-        self.assertContains(r, "No pudimos iniciar el pago")
+    @patch("pagos.admin.cancelar_suscripcion_recurrente", return_value=True)
+    def test_accion_cancela_en_mercadopago(self, mock_cancelar):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=19990,
+            mercadopago_preapproval_id="pre-admin-2", estado="autorizada",
+        )
+        self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "cancelar_en_mercadopago",
+            "_selected_action": [str(suscripcion.pk)],
+        })
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
 
 
 class PagoResultadoViewTests(TestCase):
@@ -407,40 +562,3 @@ class PagoResultadoViewTests(TestCase):
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("pago-resultado") + "?status=approved")
         self.assertEqual(r.context["estado"], "approved")
-
-
-class WebhookMercadoPagoRamasFaltantesTests(TestCase):
-    """Las ramas de salida temprana del webhook -- nunca se confía en el
-    cuerpo del POST, así que cualquiera de estos casos debe responder 200/400
-    sin tocar ningún Pago."""
-
-    def test_body_invalido_devuelve_400(self):
-        r = self.client.post(reverse("pago-webhook"), data="esto no es json", content_type="application/json")
-        self.assertEqual(r.status_code, 400)
-
-    def test_sin_payment_id_devuelve_200_sin_hacer_nada(self):
-        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {}}), content_type="application/json")
-        self.assertEqual(r.status_code, 200)
-
-    @patch("pagos.views.obtener_pago_mercadopago", return_value=None)
-    def test_mercadopago_no_devuelve_el_pago_devuelve_200(self, mock_obtener):
-        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json")
-        self.assertEqual(r.status_code, 200)
-
-    @patch("pagos.views.obtener_pago_mercadopago", return_value={"status": "approved", "external_reference": "99999"})
-    def test_pago_inexistente_devuelve_200(self, mock_obtener):
-        r = self.client.post(reverse("pago-webhook"), data=json.dumps({"data": {"id": "999"}}), content_type="application/json")
-        self.assertEqual(r.status_code, 200)
-
-
-class PagoAdminTests(TestCase):
-    """Insignia de color para estado (ver estado_badge en pagos/admin.py)."""
-
-    def test_changelist_renderiza_con_la_insignia(self):
-        condominio = Condominio.objects.create(nombre="Test Admin Pago", plan="premium")
-        Pago.objects.create(condominio=condominio, tipo="suscripcion", plan="premium", monto=19990, estado="aprobado")
-        staff = User.objects.create_superuser(username="admin_pago_staff", password="x", email="admin_pago_staff@example.com")
-        self.client.force_login(staff)
-        r = self.client.get("/admin/pagos/pago/")
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Aprobado")

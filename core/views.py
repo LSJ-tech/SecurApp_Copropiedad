@@ -514,9 +514,13 @@ class InicioView(TemplateView):
                 context["deuda_pendiente"] = sum((c.monto for c in pendientes), Decimal("0"))
                 context["cuotas_pendientes_count"] = pendientes.count()
             if self.membresia.rol == "residente":
+                from pagos.models import SuscripcionRecurrente
                 context["total_torres"] = self.condominio.total_torres
                 context["total_unidades"] = self.condominio.total_unidades
                 context["total_miembros"] = Membresia.objects.filter(condominio=self.condominio).count()
+                context["donacion_recurrente_activa"] = SuscripcionRecurrente.objects.filter(
+                    membresia=self.membresia, tipo="donacion", estado__in=["pendiente", "autorizada"],
+                ).first()
             if self.membresia.rol in ("directiva", "administracion"):
                 context.update(self._resumen_administracion())
         else:
@@ -540,6 +544,7 @@ class InicioView(TemplateView):
     def _resumen_administracion(self):
         from alertas.models import Alerta
         from gastoscomunes.models import CuotaUnidad, GastoComun
+        from pagos.models import SuscripcionRecurrente
 
         condominio = self.condominio
         resumen = {
@@ -547,6 +552,9 @@ class InicioView(TemplateView):
             "total_miembros": Membresia.objects.filter(condominio=condominio).count(),
             "alertas_activas_count": Alerta.objects.filter(condominio=condominio, estado="activa").count(),
             "suscripcion_al_dia": bool(condominio.pagado_hasta and condominio.pagado_hasta >= timezone.localdate()),
+            "suscripcion_recurrente_activa": SuscripcionRecurrente.objects.filter(
+                condominio=condominio, tipo="suscripcion", estado__in=["pendiente", "autorizada"],
+            ).first(),
         }
 
         gasto_actual = GastoComun.objects.filter(condominio=condominio).order_by("-periodo").first()

@@ -14,59 +14,95 @@ def _sdk():
     return mercadopago.SDK(_access_token())
 
 
-def crear_preferencia_pago(pago, request):
-    """Crea la preferencia de Checkout Pro para este Pago y devuelve la URL
-    a la que hay que redirigir al condominio para pagar. None si Mercado
-    Pago rechazó la solicitud."""
+def _es_credencial_de_prueba():
+    return _access_token().startswith("TEST-")
+
+
+def crear_suscripcion_recurrente(suscripcion, payer_email, request):
+    """Crea la autorización de cobro automático mensual (API Preapproval,
+    no Checkout Pro) para esta SuscripcionRecurrente y devuelve la URL a la
+    que hay que redirigir para que la persona autorice el cobro con su
+    tarjeta. Sin end_date -- queda cobrando indefinidamente hasta que se
+    cancele (ver cancelar_suscripcion_recurrente). None si Mercado Pago
+    rechazó la solicitud."""
     base_url = request.build_absolute_uri("/").rstrip("/")
-    if pago.tipo == "donacion":
-        origen = pago.condominio.nombre
-        if pago.membresia and pago.membresia.unidad:
-            unidad = pago.membresia.unidad
+    if suscripcion.tipo == "donacion":
+        origen = suscripcion.condominio.nombre
+        if suscripcion.membresia and suscripcion.membresia.unidad:
+            unidad = suscripcion.membresia.unidad
             if unidad.torre:
-                origen = f"{pago.condominio.nombre}, Torre {unidad.torre.nombre} - Depto {unidad.numero}"
+                origen = f"{suscripcion.condominio.nombre}, Torre {unidad.torre.nombre} - Depto {unidad.numero}"
             else:
-                origen = f"{pago.condominio.nombre}, Depto {unidad.numero}"
-        titulo = f"Donación a {settings.PLATFORM_NAME} - {origen}"
+                origen = f"{suscripcion.condominio.nombre}, Depto {unidad.numero}"
+        razon = f"Donación mensual a {settings.PLATFORM_NAME} - {origen}"
     else:
-        titulo = f"Suscripción {settings.PLATFORM_NAME} - {pago.condominio.nombre}"
-    preferencia = {
-        "items": [{
-            "title": titulo,
-            "quantity": 1,
-            "unit_price": float(pago.monto),
+        razon = f"Suscripción mensual {settings.PLATFORM_NAME} - {suscripcion.condominio.nombre}"
+
+    preapproval_object = {
+        "reason": razon,
+        "auto_recurring": {
+            "frequency": 1,
+            "frequency_type": "months",
+            "transaction_amount": float(suscripcion.monto),
             "currency_id": "CLP",
-        }],
-        "external_reference": str(pago.pk),
-        "back_urls": {
-            "success": f"{base_url}/pago/resultado/",
-            "pending": f"{base_url}/pago/resultado/",
-            "failure": f"{base_url}/pago/resultado/",
         },
-        "auto_return": "approved",
+        "payer_email": payer_email,
+        "back_url": f"{base_url}/pago/resultado/",
+        "external_reference": str(suscripcion.pk),
         "notification_url": f"{base_url}/pago/webhook/",
     }
-    resultado = _sdk().preference().create(preferencia)
+    resultado = _sdk().preapproval().create(preapproval_object)
     if not resultado.is_success:
         logger.error(
-            "Mercado Pago rechazó la preferencia del pago #%s: status=%s respuesta=%s",
-            pago.pk, resultado.get("status"), resultado.get("response"),
+            "Mercado Pago rechazó la suscripción recurrente #%s: status=%s respuesta=%s",
+            suscripcion.pk, resultado.get("status"), resultado.get("response"),
         )
         return None
 
     datos = resultado["response"]
-    pago.mercadopago_preference_id = datos["id"]
-    pago.save(update_fields=["mercadopago_preference_id"])
+    suscripcion.mercadopago_preapproval_id = datos["id"]
+    suscripcion.save(update_fields=["mercadopago_preapproval_id"])
 
-    es_credencial_de_prueba = _access_token().startswith("TEST-")
-    if es_credencial_de_prueba and datos.get("sandbox_init_point"):
+    # Mismo criterio que Checkout Pro (preferencias): con credencial de
+    # prueba, usar el init_point de sandbox si Mercado Pago lo entrega --
+    # sin confirmar si Preapproval siempre lo incluye, por eso el fallback.
+    if _es_credencial_de_prueba() and datos.get("sandbox_init_point"):
         return datos["sandbox_init_point"]
-    return datos["init_point"]
+    return datos.get("init_point")
+
+
+def cancelar_suscripcion_recurrente(suscripcion):
+    """Cancela la autorización de cobro automático en Mercado Pago -- deja
+    de cobrar desde el próximo ciclo. True si Mercado Pago confirmó la
+    cancelación."""
+    resultado = _sdk().preapproval().update(suscripcion.mercadopago_preapproval_id, {"status": "cancelled"})
+    if not resultado.is_success:
+        logger.error(
+            "No se pudo cancelar la suscripción recurrente #%s en Mercado Pago: status=%s respuesta=%s",
+            suscripcion.pk, resultado.get("status"), resultado.get("response"),
+        )
+        return False
+    return True
+
+
+def obtener_preapproval_mercadopago(preapproval_id):
+    """Consulta una autorización recurrente por su ID directo a la API de
+    Mercado Pago. Nunca se confía en el estado que venga en el cuerpo del
+    webhook."""
+    resultado = _sdk().preapproval().get(preapproval_id)
+    if not resultado.is_success:
+        logger.error(
+            "No se pudo consultar la suscripción recurrente %s en Mercado Pago: status=%s respuesta=%s",
+            repr(preapproval_id), resultado.get("status"), resultado.get("response"),
+        )
+        return None
+    return resultado["response"]
 
 
 def obtener_pago_mercadopago(payment_id):
-    """Consulta un pago por su ID directo a la API de Mercado Pago. Nunca se
-    confía en el estado que venga en el cuerpo del webhook."""
+    """Consulta un pago (un cobro individual, único o dentro de un ciclo
+    recurrente) por su ID directo a la API de Mercado Pago. Nunca se confía
+    en el estado que venga en el cuerpo del webhook."""
     resultado = _sdk().payment().get(payment_id)
     if not resultado.is_success:
         logger.error(

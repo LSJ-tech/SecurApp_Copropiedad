@@ -239,9 +239,17 @@
             $19.990 al mes, fijo, sin importar cantidad de unidades.
             {% if condominio.pagado_hasta %}Venció el {{ condominio.pagado_hasta|date:"d-m-Y" }}.{% endif %}
         </p>
+        {% endif %}
+        {% if suscripcion_recurrente_activa %}
+        <p class="text-muted small mb-2"><i class="bi bi-arrow-repeat"></i> Cobro automático mensual activo con Mercado Pago.</p>
+        <form method="post" action="{% url 'cancelar-suscripcion' %}" onsubmit="return confirm('¿Cancelar el cobro automático? No se harán más cobros.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar cobro automático</button>
+        </form>
+        {% else %}
         <form method="post" action="{% url 'pagar-suscripcion' %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Pagar suscripción con Mercado Pago</button>
+            <button type="submit" class="btn btn-primary">Activar cobro automático mensual con Mercado Pago</button>
         </form>
         {% endif %}
     </div>
@@ -252,13 +260,21 @@
 <div class="card mt-4">
     <div class="card-body">
         <h2 class="h6 mb-1"><i class="bi bi-heart text-danger"></i> Apoya el proyecto</h2>
-        <p class="text-muted small mb-2">¿{{ PLATFORM_NAME }} te ha sido útil? Puedes hacer una donación voluntaria para apoyar el desarrollo de la plataforma.</p>
+        {% if donacion_recurrente_activa %}
+        <p class="text-muted small mb-2"><i class="bi bi-arrow-repeat"></i> Donación automática activa: ${{ donacion_recurrente_activa.monto|floatformat:0 }}/mes con Mercado Pago. ¡Gracias por tu apoyo!</p>
+        <form method="post" action="{% url 'cancelar-donacion' %}" onsubmit="return confirm('¿Cancelar tu donación automática? No se harán más cobros.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar donación automática</button>
+        </form>
+        {% else %}
+        <p class="text-muted small mb-2">¿{{ PLATFORM_NAME }} te ha sido útil? Puedes activar una donación mensual automática para apoyar el desarrollo de la plataforma.</p>
         <form method="post" action="{% url 'donar' %}" class="d-flex gap-2">
             {% csrf_token %}
             <label for="donar-monto" class="visually-hidden">Monto a donar en CLP</label>
-            <input type="number" id="donar-monto" name="monto" min="1" step="1" class="form-control" placeholder="Monto en CLP" required>
+            <input type="number" id="donar-monto" name="monto" min="1" step="1" class="form-control" placeholder="Monto mensual en CLP" required>
             <button type="submit" class="btn btn-outline-primary text-nowrap">Donar con Mercado Pago</button>
         </form>
+        {% endif %}
     </div>
 </div>
 {% endif %}

@@ -1,9 +1,42 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils import timezone
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
 from unfold.decorators import display
 
-from .models import Pago
+from .mercadopago_client import cancelar_suscripcion_recurrente
+from .models import Pago, SuscripcionRecurrente
+
+
+@admin.action(description="Cancelar en Mercado Pago (deja de cobrar)")
+def cancelar_en_mercadopago(modeladmin, request, queryset):
+    for suscripcion in queryset.exclude(estado="cancelada"):
+        if cancelar_suscripcion_recurrente(suscripcion):
+            suscripcion.estado = "cancelada"
+            suscripcion.fecha_cancelacion = timezone.now()
+            suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
+        else:
+            messages.error(request, f"No se pudo cancelar la suscripción recurrente #{suscripcion.pk} en Mercado Pago.")
+
+
+@admin.register(SuscripcionRecurrente)
+class SuscripcionRecurrenteAdmin(ModelAdmin):
+    list_display = ["condominio", "donante", "tipo", "monto", "estado_badge", "fecha_creacion"]
+    list_filter = [("condominio", AutocompleteSelectFilter), "tipo", "estado"]
+    list_filter_submit = True
+    list_select_related = ["condominio", "membresia__user"]
+    actions = [cancelar_en_mercadopago]
+    readonly_fields = ["mercadopago_preapproval_id", "fecha_creacion", "fecha_cancelacion"]
+
+    @admin.display(description="Donante")
+    def donante(self, obj):
+        if not obj.membresia:
+            return "-"
+        return obj.membresia.user.get_full_name() or obj.membresia.user.username
+
+    @display(description="Estado", ordering="estado", label={"pendiente": "warning", "autorizada": "success", "pausada": "info", "cancelada": "danger"})
+    def estado_badge(self, obj):
+        return obj.estado, obj.get_estado_display()
 
 
 @admin.register(Pago)

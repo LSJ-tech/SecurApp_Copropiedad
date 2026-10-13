@@ -171,10 +171,13 @@ else:
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@securapp.local')
 
 
-# Donación voluntaria vía Mercado Pago (Checkout Pro) de un condominio a
-# DevQuad, además de la suscripción mensual ($19.990, ver README) -- no
-# extiende ni cambia el plan interno de Condominio (legado, ver core/models.py).
-# Distinto del pago de gastos comunes, ver gastoscomunes/models.py.
+# Cobro automático recurrente vía Mercado Pago (API Preapproval, no
+# Checkout Pro) de la suscripción mensual ($19.990, ver README) y de
+# donaciones voluntarias, ambos condominio/residente -> DevQuad, hasta que
+# se cancelen (ver pagos/models.py SuscripcionRecurrente). Solo un cobro de
+# tipo "suscripcion" extiende pagado_hasta/plan de Condominio -- una
+# donación nunca los toca. Distinto del pago de gastos comunes (manual, ver
+# gastoscomunes/models.py).
 MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
 
 

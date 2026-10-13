@@ -2,13 +2,13 @@
 {% block titulo %}Resultado del pago{% endblock %}
 {% block contenido %}
 <div class="text-center py-5">
-    {% if estado == "approved" %}
+    {% if estado == "approved" or estado == "authorized" %}
     <i class="bi bi-check-circle display-1 text-success"></i>
-    <h1 class="h4 mt-3">¡Pago recibido!</h1>
+    <h1 class="h4 mt-3">¡Cobro automático activado!</h1>
     <p class="text-muted">Puede tardar unos segundos en reflejarse en tu cuenta.</p>
     {% else %}
     <i class="bi bi-hourglass-split display-1 text-warning"></i>
-    <h1 class="h4 mt-3">Estamos procesando tu pago</h1>
+    <h1 class="h4 mt-3">Estamos procesando la autorización</h1>
     <p class="text-muted">Estado: {{ estado|default:"desconocido" }}</p>
     {% endif %}
     <a href="{% url 'inicio' %}" class="btn btn-primary">Volver al inicio</a>
