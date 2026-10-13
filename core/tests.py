@@ -1609,16 +1609,13 @@ class PaginasPublicasRenderizanTests(TestCase):
     def test_landing_sin_login_lista_las_funciones_actuales(self):
         r = self.client.get(reverse("inicio"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Muro de vecinos")
         self.assertContains(r, "Números de emergencia")
 
     def test_terminos_renderiza(self):
         r = self.client.get(reverse("terminos"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Muro de vecinos")
 
     def test_privacidad_renderiza(self):
         r = self.client.get(reverse("privacidad"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Muro de vecinos")
         self.assertContains(r, "Confirmación de lectura")

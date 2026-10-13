@@ -14,7 +14,7 @@ Implementado y probado de punta a punta:
 - Multi-tenant real: cada condominio solo ve sus propios datos (verificado con tests de aislamiento).
 - 4 roles: **directiva** (gobierno: miembros, unidades, avisos, accesos, Mi condominio), **administración** (día a día, incluyendo lo exclusivo de gastos comunes -- generar el cargo del periodo y los datos de transferencia, que ni la directiva puede tocar), **conserjería** (accesos), **residente**.
 - Botón de pánico: la app/API crea una `Alerta` con ubicación GPS, se envía push a todo el condominio (vía Expo), y **cualquier miembro** (no solo directiva/conserjería) puede ver el mapa y resolverla o marcarla como falsa alarma. Se auto-cierra sola si nadie responde en 30 minutos. Historial completo filtrable en `/alertas/historial/`.
-- Avisos (muro de noticias simple): directiva/administración publican, todos los miembros leen.
+- Avisos (muro de noticias simple): directiva/administración publican y se manda push a todo el condominio, todos los miembros leen.
 - Accesos: registro manual de ingresos por conserjería/directiva/administración desde el panel (sin QR todavía).
 - Gastos comunes: **administración** (exclusivo, ni directiva, y solo con la suscripción al día) genera el cargo del periodo (se prorratea automático por alícuota, cuota fija por unidad, o en partes iguales) y define los datos de transferencia; directiva/administración marcan cuotas como pagadas a mano; cada residente solo lee las suyas (sin pago online todavía), y nunca pierde acceso a lo ya generado aunque la suscripción venza.
 - Panel de directiva/administración con KPIs (unidades, miembros, alertas activas, morosidad) y accesos directos a las secciones principales.
