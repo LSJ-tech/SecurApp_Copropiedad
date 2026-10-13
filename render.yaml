@@ -26,6 +26,34 @@ services:
       # RESEND_API_KEY, DEFAULT_FROM_EMAIL (sin RESEND_API_KEY los correos solo se imprimen en logs)
       # MERCADOPAGO_ACCESS_TOKEN (sin ella no aparece el botón de pago en línea)
 
+  # Respaldo del webhook de Mercado Pago, que no ha llegado de forma
+  # confiable para transacciones reales (ver pagos/views.py) -- re-consulta
+  # periódicamente el estado de cada suscripción/donación activa, igual que
+  # el botón "Sincronizar con Mercado Pago" del admin, pero sin depender de
+  # que alguien entre a apretarlo.
+  - type: cron
+    name: securapp-copropiedad-sincronizar-suscripciones
+    env: python
+    plan: free
+    schedule: "0 */4 * * *"  # cada 4 horas
+    buildCommand: "./build.sh"
+    startCommand: "python manage.py sincronizar_suscripciones"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DJANGO_SECRET_KEY
+        sync: false  # mismo valor que el del servicio web -- se copia a mano en el panel de Render
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: securapp.devquad.cl,condofy.devquad.cl
+      - key: DATABASE_URL
+        fromDatabase:
+          name: securapp-copropiedad-db
+          property: connectionString
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        sync: false  # mismo valor que el del servicio web -- se copia a mano en el panel de Render
+
 databases:
   - name: securapp-copropiedad-db
     plan: free

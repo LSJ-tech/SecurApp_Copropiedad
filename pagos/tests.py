@@ -1,9 +1,11 @@
 import datetime
 import json
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from io import StringIO
+from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -726,3 +728,50 @@ class PagoResultadoViewTests(TestCase):
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("pago-resultado") + "?status=approved")
         self.assertEqual(r.context["estado"], "approved")
+
+
+@override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
+class SincronizarSuscripcionesCommandTests(TestCase):
+    """Comando sincronizar_suscripciones (pagos/management/commands/) --
+    respaldo del webhook pensado para correr periódico (Render Cron Job)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Comando Sync", plan="premium")
+
+    def _suscripcion(self, **kwargs):
+        kwargs.setdefault("condominio", self.condominio)
+        kwargs.setdefault("tipo", "suscripcion")
+        kwargs.setdefault("monto", Decimal("19990"))
+        kwargs.setdefault("estado", "pendiente")
+        return SuscripcionRecurrente.objects.create(**kwargs)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_sincroniza_todas_las_no_canceladas(self, mock_obtener):
+        pendiente = self._suscripcion(mercadopago_preapproval_id="pre-cmd-1")
+        pausada = self._suscripcion(mercadopago_preapproval_id="pre-cmd-2", estado="pausada")
+        cancelada = self._suscripcion(mercadopago_preapproval_id="pre-cmd-3", estado="cancelada")
+
+        call_command("sincronizar_suscripciones")
+
+        pendiente.refresh_from_db()
+        pausada.refresh_from_db()
+        self.assertEqual(pendiente.estado, "autorizada")
+        self.assertEqual(pausada.estado, "autorizada")
+        mock_obtener.assert_any_call("pre-cmd-1")
+        mock_obtener.assert_any_call("pre-cmd-2")
+        self.assertNotIn(call("pre-cmd-3"), mock_obtener.call_args_list)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value=None)
+    def test_informa_las_que_fallan_sin_frenar_el_resto(self, mock_obtener):
+        self._suscripcion(mercadopago_preapproval_id="pre-cmd-falla")
+        out = StringIO()
+        call_command("sincronizar_suscripciones", stdout=out)
+        self.assertIn("No se pudo consultar", out.getvalue())
+
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
+    def test_no_hace_nada_sin_token_configurado(self):
+        self._suscripcion(mercadopago_preapproval_id="pre-cmd-sin-token")
+        out = StringIO()
+        call_command("sincronizar_suscripciones", stdout=out)
+        self.assertIn("no está configurado", out.getvalue())
