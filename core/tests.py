@@ -406,20 +406,29 @@ class AutoregistroCasasLibresTests(TestCase):
         user = User.objects.get(email="rosa_casas@example.com")
         self.assertEqual(user.membresia.unidad, unidad)
 
-    def test_form_con_torres_pide_elegir_de_la_lista_como_antes(self):
+    def test_form_con_torres_tambien_permite_depto_libre(self):
         """La señal de "condominio estructurado" es tener torres cargadas
         (como Empart) -- no solo que exista alguna unidad, porque las
         unidades de un condominio de casas también se van creando solas
         (ver test_dos_personas_con_el_mismo_numero_comparten_la_unidad) y
-        eso no debería "trabar" el modo libre para el segundo vecino."""
+        eso no debería "trabar" el modo libre para el segundo vecino.
+
+        A diferencia de casas, acá la torre no se escribe libre -- se elige
+        de un desplegable de torres ya existentes (nunca se inventa una
+        nueva), ver test_con_torres_la_torre_libre_debe_existir."""
         from .models import Torre
 
         torre = Torre.objects.create(condominio=self.condominio, nombre="1")
         Unidad.objects.create(condominio=self.condominio, torre=torre, numero="1")
         form = RegistroResidenteForm(condominio=self.condominio)
         self.assertIn("unidad", form.fields)
-        self.assertNotIn("numero_unidad_libre", form.fields)
-        self.assertTrue(form.fields["unidad"].required)
+        self.assertIn("numero_unidad_libre", form.fields)
+        self.assertIn("torre_unidad_libre", form.fields)
+        self.assertNotIn("calle_unidad_libre", form.fields)
+        self.assertFalse(form.fields["unidad"].required)
+        self.assertFalse(form.fields["numero_unidad_libre"].required)
+        self.assertFalse(form.fields["torre_unidad_libre"].required)
+        self.assertIn(torre, form.fields["torre_unidad_libre"].queryset)
 
     def test_registrarse_con_numero_libre_crea_la_unidad_sin_block(self):
         r = self.client.post(
@@ -505,6 +514,116 @@ class AutoregistroCasasLibresTests(TestCase):
             self._datos_base(unidad=unidad.pk),
         )
         self.assertEqual(r.status_code, 302)
+
+
+class AutoregistroDeptoLibreConTorresTests(TestCase):
+    """Mismo problema que resuelven calle+número en modo casas
+    (AutoregistroCasasLibresTests), pero para condominios con torres: el
+    depto puede no estar todavía en la lista de Unidad. A diferencia de
+    casas, la torre no se escribe libre -- se elige de las ya creadas por
+    administración/DevQuad (ver SoloStaffMixin), nunca se inventa una
+    nueva por typo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Torres Depto Libre", plan="premium")
+        cls.torre1 = Torre.objects.create(condominio=cls.condominio, nombre="1")
+        cls.torre2 = Torre.objects.create(condominio=cls.condominio, nombre="2")
+
+    def _datos_base(self, **extra):
+        datos = {
+            "nombre": "Rosa", "apellido": "Mena", "email": "rosa_torres@example.com",
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        }
+        datos.update(extra)
+        return datos
+
+    def test_registrarse_con_depto_libre_crea_la_unidad_en_la_torre_elegida(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(torre_unidad_libre=self.torre1.pk, numero_unidad_libre="302"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="302")
+        self.assertEqual(unidad.torre, self.torre1)
+        user = User.objects.get(email="rosa_torres@example.com")
+        self.assertEqual(user.membresia.unidad, unidad)
+
+    def test_dos_personas_con_el_mismo_numero_en_la_misma_torre_comparten_la_unidad(self):
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(torre_unidad_libre=self.torre1.pk, numero_unidad_libre="302"),
+        )
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(
+                nombre="Juan", apellido="Mena", email="juan_torres@example.com",
+                torre_unidad_libre=self.torre1.pk, numero_unidad_libre="302",
+            ),
+        )
+        unidad = Unidad.objects.get(condominio=self.condominio, torre=self.torre1, numero="302")
+        self.assertEqual(unidad.membresias.count(), 2)
+
+    def test_mismo_numero_en_torres_distintas_son_unidades_distintas(self):
+        """El problema real que resuelve la torre: "Depto 302" puede
+        repetirse en más de una torre -- sin elegir la torre, el segundo
+        registro se habría mezclado con el primero."""
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(torre_unidad_libre=self.torre1.pk, numero_unidad_libre="302"),
+        )
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(
+                nombre="Juan", apellido="Soto", email="juan_otra_torre@example.com",
+                torre_unidad_libre=self.torre2.pk, numero_unidad_libre="302",
+            ),
+        )
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="302").count(), 2)
+        self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="302", torre=self.torre1).exists())
+        self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="302", torre=self.torre2).exists())
+
+    def test_sin_numero_no_se_puede_registrar(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(torre_unidad_libre=self.torre1.pk, numero_unidad_libre=""),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(email="rosa_torres@example.com").exists())
+
+    def test_sin_torre_no_se_puede_crear_un_depto_nuevo(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="88", torre_unidad_libre=""),
+        )
+        self.assertEqual(r.status_code, 200)  # se queda en el form con el error, no redirige
+        self.assertContains(r, "Elige tu")
+        self.assertFalse(Unidad.objects.filter(condominio=self.condominio, numero="88").exists())
+        self.assertFalse(User.objects.filter(email="rosa_torres@example.com").exists())
+
+    def test_la_torre_libre_debe_ser_una_torre_existente(self):
+        """A diferencia de calle (texto libre en casas), acá no se puede
+        inventar una torre por typo -- solo se puede elegir una de las ya
+        creadas (ModelChoiceField), nunca texto arbitrario."""
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="88", torre_unidad_libre="9999"),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Unidad.objects.filter(condominio=self.condominio, numero="88").exists())
+
+    def test_elegir_unidad_existente_de_la_lista_no_exige_torre_libre(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, torre=self.torre1, numero="55")
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(unidad=unidad.pk),
+        )
+        self.assertEqual(r.status_code, 302)
+
+    def test_pagina_de_registro_ofrece_el_depto_libre(self):
+        r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "no apareció en la lista de arriba")
 
 
 class CorreoBienvenidaTests(TestCase):

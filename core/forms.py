@@ -169,7 +169,7 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
     """Autoregistro público de un residente -- elige su propio depto de una lista, vía el link/QR del condominio."""
 
     field_order = [
-        "nombre", "apellido", "email", "unidad", "calle_unidad_libre", "numero_unidad_libre",
+        "nombre", "apellido", "email", "unidad", "calle_unidad_libre", "torre_unidad_libre", "numero_unidad_libre",
         "password1", "password2", "acepto_terminos",
     ]
 
@@ -184,6 +184,11 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
     calle_unidad_libre = forms.CharField(
         max_length=150, required=False, label="Nombre de tu calle",
         widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    torre_unidad_libre = forms.ModelChoiceField(
+        queryset=Torre.objects.none(), required=False, label="Torre",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Elige esto solo si tu depto no apareció en la lista de arriba.",
     )
     numero_unidad_libre = forms.CharField(
         max_length=100, required=False, label="Número de tu casa",
@@ -209,6 +214,7 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             return
         etiqueta = condominio.etiqueta_unidad.lower()
         if self.modo_casas:
+            del self.fields["torre_unidad_libre"]
             # Ninguno de los dos campos es obligatorio por separado -- clean()
             # exige al menos uno. Así el primer vecino puede escribir su
             # número (todavía no hay nada que elegir) y el segundo puede
@@ -222,32 +228,50 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
             self.fields["calle_unidad_libre"].widget.attrs["list"] = "calles-existentes"
         else:
-            del self.fields["numero_unidad_libre"]
             del self.fields["calle_unidad_libre"]
-            self.fields["unidad"].required = True
-            self.fields["unidad"].label = f"Tu {etiqueta}"
+            # A diferencia de casas, acá la torre NO se escribe libre -- ya
+            # existe de antes (la crea DevQuad/administración, ver
+            # SoloStaffMixin) así que se elige de un desplegable real, nunca
+            # se inventa una nueva por typo. unidad deja de ser obligatorio
+            # por el mismo motivo que en modo casas: clean() exige elegir
+            # una existente O escribir torre+número si la suya no aparece.
+            self.fields["unidad"].label = f"Tu {etiqueta} (si ya está en la lista)"
             self.fields["unidad"].queryset = (
                 Unidad.objects.filter(condominio=condominio)
                 .select_related("torre")
                 .annotate(_torre_len=Length("torre__nombre"), _num_len=Length("numero"))
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
+            etiqueta_torre = condominio.etiqueta_torre
+            self.fields["torre_unidad_libre"].label = etiqueta_torre
+            self.fields["torre_unidad_libre"].queryset = (
+                Torre.objects.filter(condominio=condominio).annotate(_len=Length("nombre")).order_by("_len", "nombre")
+            )
+            self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
+            self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
 
     def clean(self):
         cleaned = super().clean()
-        if self.modo_casas and not cleaned.get("unidad"):
-            numero = (cleaned.get("numero_unidad_libre") or "").strip()
-            calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
-            etiqueta = self.condominio.etiqueta_unidad.lower()
-            if not numero:
-                raise ValidationError(f"Elige tu {etiqueta} de la lista, o escribe el número si todavía no aparece.")
+        if self.condominio is None or cleaned.get("unidad"):
+            return cleaned
+        etiqueta = self.condominio.etiqueta_unidad.lower()
+        numero = (cleaned.get("numero_unidad_libre") or "").strip()
+        if not numero:
+            raise ValidationError(f"Elige tu {etiqueta} de la lista, o escribe el número si todavía no aparece.")
+        if self.modo_casas:
             # calle no es required=False a nivel de campo porque elegir una
             # unidad ya existente de la lista no debería exigirla -- pero
             # para crear una casa nueva por texto libre, sí o sí hace falta.
+            calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
             if not calle:
                 raise ValidationError("Escribe el nombre de tu calle.")
             unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
-            cleaned["unidad"] = unidad
+        else:
+            torre = cleaned.get("torre_unidad_libre")
+            if not torre:
+                raise ValidationError(f"Elige tu {self.condominio.etiqueta_torre.lower()}.")
+            unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
+        cleaned["unidad"] = unidad
         return cleaned
 
     def clean_email(self):

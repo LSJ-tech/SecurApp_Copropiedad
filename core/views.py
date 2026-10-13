@@ -417,13 +417,13 @@ class RegistroResidenteView(FormView):
             unidades_por_torre.setdefault(clave, []).append({"id": unidad.pk, "numero": unidad.numero})
         context["unidades_por_torre"] = unidades_por_torre
         context["hay_unidades_sin_torre"] = hay_sin_torre
+        # Lista de números ya registrados por otros vecinos, para que quien
+        # se registra por texto libre (su depto/casa no está en la lista,
+        # ver RegistroResidenteForm) vea los números ya usados antes de
+        # escribir el suyo y no cree sin querer un casi-duplicado por una
+        # diferencia de tipeo. Las calles solo aplican en modo casas.
+        context["numeros_unidad_existentes"] = list(unidades.values_list("numero", flat=True))
         if not context["torres"].exists():
-            # Modo casas (ver RegistroResidenteForm) -- lista de números ya
-            # registrados por otros vecinos, para que quien se registra vea
-            # si su casa ya existe (y no cree sin querer una casi-duplicada
-            # por una diferencia de tipeo) antes de escribir la suya. Mismo
-            # criterio para las calles ya usadas.
-            context["numeros_unidad_existentes"] = list(unidades.values_list("numero", flat=True))
             context["calles_existentes"] = sorted(set(unidades.exclude(calle="").values_list("calle", flat=True)))
         return context
 
