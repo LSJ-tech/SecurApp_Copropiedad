@@ -258,6 +258,13 @@ class UnidadAdmin(ModelAdmin):
     search_fields = ["numero", "calle", "torre__nombre", "condominio__nombre"]
     actions_list = ["crear_unidades_en_lote"]
     list_select_related = ["condominio", "torre"]
+    # Con varios condominios reales, el desplegable de torre mostraba TODAS
+    # las de TODOS los condominios en una sola lista plana (ver
+    # Torre.__str__, que agrega el condominio entre paréntesis justo porque
+    # se mezclan) -- con autocomplete se busca escribiendo en vez de
+    # desplazarse por cientos de opciones. El guardado también queda
+    # protegido aunque se elija mal (ver Unidad.clean()).
+    autocomplete_fields = ["condominio", "torre"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(

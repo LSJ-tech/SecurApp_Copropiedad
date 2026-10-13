@@ -201,6 +201,15 @@ class Unidad(models.Model):
             return f"{self.calle} {self.numero} - {self.condominio}"
         return f"{self.numero} - {self.condominio}"
 
+    def clean(self):
+        # El desplegable de torre en el admin no está acotado al condominio
+        # elegido (lista TODAS las torres de TODOS los condominios, con el
+        # nombre del condominio al lado para distinguirlas) -- con varios
+        # clientes reales ya es fácil elegir una de otro condominio por
+        # error. Esto lo bloquea al guardar, sea cual sea el formulario.
+        if self.torre_id and self.condominio_id and self.torre.condominio_id != self.condominio_id:
+            raise ValidationError({"torre": f"Esa torre pertenece a {self.torre.condominio}, no a {self.condominio}."})
+
 
 class Membresia(models.Model):
     """Liga un usuario de login a su condominio y le asigna un rol."""

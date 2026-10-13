@@ -2,6 +2,7 @@ import datetime
 
 from django.contrib import admin
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -286,6 +287,45 @@ class TorreYUnidadAdminFiltroCondominioTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Unidad filtro A")
         self.assertNotContains(r, unidad_otra_torre.numero)
+
+
+class UnidadTorreDeOtroCondominioTests(TestCase):
+    """El desplegable de torre en el admin de Unidad lista TODAS las torres
+    de TODOS los condominios (ver Torre.__str__, que agrega el condominio
+    entre paréntesis justo por eso) -- con varios clientes reales es fácil
+    elegir una de otro condominio por error. Esto lo bloquea al guardar,
+    sea cual sea el formulario (admin normal o la acción en lote)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .models import Torre
+
+        cls.condominio_a = Condominio.objects.create(nombre="Test Torre Ajena A", plan="premium")
+        cls.condominio_b = Condominio.objects.create(nombre="Test Torre Ajena B", plan="premium")
+        cls.torre_b = Torre.objects.create(condominio=cls.condominio_b, nombre="1")
+
+    def test_el_modelo_rechaza_una_torre_de_otro_condominio(self):
+        unidad = Unidad(condominio=self.condominio_a, torre=self.torre_b, numero="101")
+        with self.assertRaises(ValidationError) as ctx:
+            unidad.full_clean()
+        self.assertIn("torre", ctx.exception.message_dict)
+
+    def test_una_torre_del_mismo_condominio_no_da_error(self):
+        from .models import Torre
+
+        torre_propia = Torre.objects.create(condominio=self.condominio_a, nombre="1")
+        unidad = Unidad(condominio=self.condominio_a, torre=torre_propia, numero="101")
+        unidad.full_clean()  # no debe lanzar
+
+    def test_el_admin_no_permite_guardar_la_combinacion_invalida(self):
+        staff = User.objects.create_superuser(username="torre_ajena_staff", password="x")
+        self.client.force_login(staff)
+        r = self.client.post("/admin/core/unidad/add/", {
+            "condominio": self.condominio_a.pk, "torre": self.torre_b.pk, "numero": "101", "alicuota": "0",
+        })
+        self.assertEqual(r.status_code, 200)  # se queda en el form con el error, no redirige
+        self.assertContains(r, "no a Test Torre Ajena A")
+        self.assertFalse(Unidad.objects.filter(condominio=self.condominio_a, numero="101").exists())
 
 
 class MembresiaAdminFiltroBlockYDeptoTests(TestCase):
