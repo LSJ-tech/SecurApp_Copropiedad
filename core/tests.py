@@ -95,7 +95,7 @@ class RolesPermisosTests(TestCase):
     def test_crear_miembro_form_rol_aware(self):
         """Administración no puede nombrar directiva/administración, directiva sí."""
         form_admon = CrearMiembroForm(condominio=self.condominio, creador_rol="administracion")
-        self.assertEqual([c[0] for c in form_admon.fields["rol"].choices], ["conserje", "residente"])
+        self.assertEqual([c[0] for c in form_admon.fields["rol"].choices], ["conserje", "residente", "delegado"])
 
         form_directiva = CrearMiembroForm(condominio=self.condominio, creador_rol="directiva")
         choices_directiva = [c[0] for c in form_directiva.fields["rol"].choices]
@@ -109,6 +109,17 @@ class RolesPermisosTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("Selecciona la unidad", str(form.errors))
+
+    def test_crear_miembro_delegado_exige_unidad(self):
+        form = CrearMiembroForm(
+            data={"nombre": "Ana", "apellido": "Soto", "email": "ana2@example.com", "rol": "delegado"},
+            condominio=self.condominio, creador_rol="directiva",
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("Selecciona la unidad", str(form.errors))
+
+    def test_administracion_puede_nombrar_delegado(self):
+        self.assertIn("delegado", [c[0] for c in CrearMiembroForm(condominio=self.condominio, creador_rol="administracion").fields["rol"].choices])
 
 
 class MembresiaValidacionTests(TestCase):
@@ -142,6 +153,17 @@ class MembresiaValidacionTests(TestCase):
     def test_residente_con_unidad_correcta_es_valido(self):
         user = User.objects.create(username="residente_ok")
         m = Membresia(user=user, condominio=self.cond1, rol="residente", unidad=self.unidad_cond1)
+        m.full_clean()  # no debe lanzar
+
+    def test_delegado_sin_unidad_es_invalido(self):
+        user = User.objects.create(username="delegado_sin_unidad")
+        m = Membresia(user=user, condominio=self.cond1, rol="delegado", unidad=None)
+        with self.assertRaises(ValidationError):
+            m.full_clean()
+
+    def test_delegado_con_unidad_correcta_es_valido(self):
+        user = User.objects.create(username="delegado_ok")
+        m = Membresia(user=user, condominio=self.cond1, rol="delegado", unidad=self.unidad_cond1)
         m.full_clean()  # no debe lanzar
 
 

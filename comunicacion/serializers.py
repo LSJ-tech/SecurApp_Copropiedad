@@ -9,12 +9,16 @@ from .models import Aviso
 
 class AvisoSerializer(serializers.ModelSerializer):
     autor_nombre = serializers.CharField(source="autor.user.get_full_name", read_only=True)
+    torre_nombre = serializers.CharField(source="torre.nombre", read_only=True, default=None)
     leido_por_count = serializers.SerializerMethodField()
     total_destinatarios = serializers.SerializerMethodField()
 
     class Meta:
         model = Aviso
-        fields = ["id", "titulo", "cuerpo", "fecha_creacion", "autor_nombre", "leido_por_count", "total_destinatarios"]
+        fields = [
+            "id", "titulo", "cuerpo", "fecha_creacion", "autor_nombre", "torre_nombre",
+            "leido_por_count", "total_destinatarios",
+        ]
 
     def _puede_ver_estadisticas(self):
         """Solo directiva/administración ven cuántos vecinos vieron el aviso
@@ -31,4 +35,7 @@ class AvisoSerializer(serializers.ModelSerializer):
     def get_total_destinatarios(self, obj) -> Optional[int]:
         if not self._puede_ver_estadisticas():
             return None
-        return Membresia.objects.filter(condominio_id=obj.condominio_id).count()
+        qs = Membresia.objects.filter(condominio_id=obj.condominio_id)
+        if obj.torre_id:
+            qs = qs.filter(unidad__torre_id=obj.torre_id)
+        return qs.count()

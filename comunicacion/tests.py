@@ -176,3 +176,83 @@ class AvisoAdminTests(TestCase):
 
         self.assertEqual(len(ctx_una_fila.captured_queries), len(ctx_cuatro_filas.captured_queries))
 
+
+class AvisoDelegadoTests(TestCase):
+    """Un delegado puede publicar avisos, pero acotados a su propia torre --
+    a diferencia de directiva/administración, que publican a todo el
+    condominio. Solo directiva/administración pueden eliminar (moderación)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from core.models import Torre, Unidad
+
+        cls.condominio = Condominio.objects.create(nombre="Test Aviso Delegado", plan="premium")
+        cls.torre1 = Torre.objects.create(condominio=cls.condominio, nombre="1")
+        cls.torre2 = Torre.objects.create(condominio=cls.condominio, nombre="2")
+        cls.unidad_t1 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre1, numero="101")
+        cls.unidad_t2 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre2, numero="201")
+
+    def setUp(self):
+        self.delegado_t1 = crear_membresia(self.condominio, "delegado", username="aviso_delegado_t1")
+        self.delegado_t1.unidad = self.unidad_t1
+        self.delegado_t1.save(update_fields=["unidad"])
+
+        self.residente_t1 = crear_membresia(self.condominio, "residente", username="aviso_residente_t1")
+        self.residente_t1.unidad = self.unidad_t1
+        self.residente_t1.save(update_fields=["unidad"])
+
+        self.residente_t2 = crear_membresia(self.condominio, "residente", username="aviso_residente_t2")
+        self.residente_t2.unidad = self.unidad_t2
+        self.residente_t2.save(update_fields=["unidad"])
+
+        self.directiva = crear_membresia(self.condominio, "directiva", username="aviso_delegado_directiva")
+
+    def test_delegado_puede_crear_un_aviso(self):
+        self.client.force_login(self.delegado_t1.user)
+        r = self.client.post(reverse("aviso-list"), {"titulo": "Reunión de torre", "cuerpo": "Este sábado"})
+        self.assertEqual(r.status_code, 201)
+        aviso = Aviso.objects.get(titulo="Reunión de torre")
+        self.assertEqual(aviso.torre, self.torre1)
+
+    def test_residente_de_otra_torre_no_ve_el_aviso_del_delegado(self):
+        Aviso.objects.create(condominio=self.condominio, autor=self.delegado_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        self.client.force_login(self.residente_t2.user)
+        r = self.client.get(reverse("aviso-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([a["titulo"] for a in resultados], [])
+
+    def test_residente_de_la_misma_torre_si_ve_el_aviso_del_delegado(self):
+        Aviso.objects.create(condominio=self.condominio, autor=self.delegado_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        self.client.force_login(self.residente_t1.user)
+        r = self.client.get(reverse("aviso-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([a["titulo"] for a in resultados], ["Solo T1"])
+
+    def test_directiva_ve_los_avisos_de_cualquier_torre(self):
+        Aviso.objects.create(condominio=self.condominio, autor=self.delegado_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("aviso-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([a["titulo"] for a in resultados], ["Solo T1"])
+
+    def test_delegado_no_puede_eliminar_su_propio_aviso(self):
+        aviso = Aviso.objects.create(condominio=self.condominio, autor=self.delegado_t1, torre=self.torre1, titulo="Mío", cuerpo="...")
+        self.client.force_login(self.delegado_t1.user)
+        r = self.client.delete(reverse("aviso-detail", args=[aviso.pk]))
+        self.assertEqual(r.status_code, 403)
+
+    def test_notificacion_del_delegado_queda_acotada_a_su_torre(self):
+        self.client.force_login(self.delegado_t1.user)
+        with patch("comunicacion.services.enviar_push_a_condominio") as mock_expo, \
+             patch("comunicacion.services.enviar_web_push_a_condominio") as mock_web:
+            r = self.client.post(reverse("aviso-list"), {"titulo": "Reunión de torre", "cuerpo": "Este sábado"})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(mock_expo.call_args.kwargs["torre"], self.torre1)
+        self.assertEqual(mock_web.call_args.kwargs["torre"], self.torre1)
+
+    def test_aviso_de_directiva_no_queda_acotado_a_ninguna_torre(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.post(reverse("aviso-list"), {"titulo": "General", "cuerpo": "..."})
+        self.assertEqual(r.status_code, 201)
+        self.assertIsNone(Aviso.objects.get(titulo="General").torre)
+

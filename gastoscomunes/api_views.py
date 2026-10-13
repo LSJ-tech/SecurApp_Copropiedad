@@ -18,6 +18,6 @@ class CuotaUnidadViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         membresia = self.request.user.membresia
         qs = CuotaUnidad.objects.filter(gasto_comun__condominio_id=membresia.condominio_id).select_related("gasto_comun", "unidad")
-        if membresia.rol == "residente":
+        if membresia.rol not in ("directiva", "administracion", "conserje"):
             qs = qs.filter(unidad_id=membresia.unidad_id)
         return qs

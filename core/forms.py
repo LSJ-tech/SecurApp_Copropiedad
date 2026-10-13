@@ -139,7 +139,7 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
     email = forms.EmailField(label=LABEL_EMAIL, widget=forms.EmailInput(attrs={"class": "form-control"}))
     rol = forms.ChoiceField(choices=[c for c in ROL_CHOICES if c[0] != "directiva"], widget=forms.Select(attrs={"class": "form-select"}))
     unidad = forms.ModelChoiceField(
-        queryset=Unidad.objects.none(), required=False, label="Unidad (obligatorio para residentes)",
+        queryset=Unidad.objects.none(), required=False, label="Unidad (obligatorio para residentes y delegados)",
         empty_label="---------", widget=forms.Select(attrs={"class": "form-select"}),
     )
 
@@ -148,9 +148,9 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
         if creador_rol == "directiva":
             self.fields["rol"].choices = ROL_CHOICES
         else:
-            self.fields["rol"].choices = [c for c in ROL_CHOICES if c[0] in ("conserje", "residente")]
+            self.fields["rol"].choices = [c for c in ROL_CHOICES if c[0] in ("conserje", "residente", "delegado")]
         if condominio is not None:
-            self.fields["unidad"].label = f"{condominio.etiqueta_unidad} (obligatorio para residentes)"
+            self.fields["unidad"].label = f"{condominio.etiqueta_unidad} (obligatorio para residentes y delegados)"
             self.fields["unidad"].queryset = (
                 Unidad.objects.filter(condominio=condominio)
                 .select_related("torre")
@@ -163,8 +163,8 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("rol") == "residente" and not cleaned.get("unidad"):
-            raise ValidationError("Selecciona la unidad del residente.")
+        if cleaned.get("rol") in ("residente", "delegado") and not cleaned.get("unidad"):
+            raise ValidationError("Selecciona la unidad.")
         return cleaned
 
 

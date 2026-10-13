@@ -11,6 +11,15 @@ class EsDirectivaOAdministracion(BasePermission):
         return _rol(request) in ("directiva", "administracion")
 
 
+class EsDirectivaAdministracionODelegado(BasePermission):
+    """Para crear avisos: directiva/administración publican a todo el
+    condominio, un delegado solo a su propia torre (ver
+    AvisoViewSet.perform_create)."""
+
+    def has_permission(self, request, view):
+        return _rol(request) in ("directiva", "administracion", "delegado")
+
+
 class TieneMembresia(BasePermission):
     """Cualquier rol, siempre que tenga una Membresia asociada (aislamiento básico de tenant)."""
 

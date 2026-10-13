@@ -6,7 +6,7 @@
     {% if user.membresia.rol == "directiva" or user.membresia.rol == "administracion" or user.membresia.rol == "conserje" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'registro-ingreso-list' %}active{% endif %}" href="{% url 'registro-ingreso-list' %}"><i class="bi bi-door-open"></i> Accesos</a></li>
     {% endif %}
-    {% if user.membresia.rol == "residente" %}
+    {% if user.membresia.rol == "residente" or user.membresia.rol == "delegado" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mis-cuotas' %}active{% endif %}" href="{% url 'mis-cuotas' %}"><i class="bi bi-cash-coin"></i> Mis gastos comunes</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mis-donaciones' %}active{% endif %}" href="{% url 'mis-donaciones' %}"><i class="bi bi-heart"></i> Mis donaciones</a></li>
     {% endif %}

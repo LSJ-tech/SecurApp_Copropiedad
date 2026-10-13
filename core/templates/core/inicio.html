@@ -6,7 +6,7 @@
 {% block contenido %}
 <h1 class="h4 mb-4">Hola, {{ user.first_name|default:user.username }}</h1>
 
-{% if membresia.rol == "residente" %}
+{% if membresia.rol == "residente" or membresia.rol == "delegado" %}
 <div class="card mb-4">
     <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
@@ -217,7 +217,7 @@
 
 <div class="card">
     <div class="card-header">Últimos avisos</div>
-    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+    {% if membresia.rol == "directiva" or membresia.rol == "administracion" or membresia.rol == "delegado" %}
     <div class="card-body border-bottom">
         <form id="form-aviso" class="row g-2">
             <div class="col-md-4">
@@ -229,6 +229,11 @@
                 <input type="text" id="aviso-cuerpo" class="form-control" placeholder="Mensaje" required>
             </div>
             <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Publicar</button></div>
+            {% if membresia.rol == "delegado" %}
+            <div class="col-12">
+                <div class="form-text">Se publica solo para {{ condominio.etiqueta_torre|lower }} {{ membresia.unidad.torre.nombre|default:"—" }}, no para todo {{ condominio.nombre }}.</div>
+            </div>
+            {% endif %}
         </form>
     </div>
     {% endif %}
@@ -265,7 +270,7 @@
 </div>
 {% endif %}
 
-{% if membresia.rol == "residente" %}
+{% if membresia.rol == "residente" or membresia.rol == "delegado" %}
 <div class="card mt-4">
     <div class="card-body">
         <h2 class="h6 mb-1"><i class="bi bi-heart text-danger"></i> Apoya el proyecto</h2>
@@ -297,6 +302,8 @@
 function csrfToken() {
     return document.cookie.split("; ").find(r => r.startsWith("csrftoken="))?.split("=")[1] || "";
 }
+
+const ETIQUETA_TORRE = "{{ condominio.etiqueta_torre|default:"Torre"|escapejs }}";
 
 // Compartir una alerta por WhatsApp -- lo manda el propio residente a quien
 // quiera (su grupo del edificio, un vecino puntual), sin ninguna API ni
@@ -536,7 +543,10 @@ function cargarAvisos() {
             }
             ul.innerHTML = avisos.map(a => `
                 <li class="list-group-item">
-                    <strong>${a.titulo}</strong>
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <strong>${a.titulo}</strong>
+                        ${a.torre_nombre ? `<span class="badge bg-dark">Solo ${ETIQUETA_TORRE} ${a.torre_nombre}</span>` : ""}
+                    </div>
                     <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre || ""}</div>
                     <div>${a.cuerpo}</div>
                     ${a.leido_por_count !== null && a.leido_por_count !== undefined ? `<div class="small text-muted mt-1"><i class="bi bi-eye"></i> Visto por ${a.leido_por_count} de ${a.total_destinatarios} vecinos</div>` : ""}
@@ -551,7 +561,7 @@ function cargarAvisos() {
 }
 cargarAvisos();
 
-{% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+{% if membresia.rol == "directiva" or membresia.rol == "administracion" or membresia.rol == "delegado" %}
 document.getElementById("form-aviso").addEventListener("submit", function (e) {
     e.preventDefault();
     const titulo = document.getElementById("aviso-titulo").value;

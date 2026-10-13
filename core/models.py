@@ -37,6 +37,7 @@ ROL_CHOICES = [
     ("administracion", "Administración"),
     ("conserje", "Conserjería"),
     ("residente", "Residente"),
+    ("delegado", "Delegado"),
 ]
 
 GENERO_UNIDAD_CHOICES = [
@@ -216,7 +217,7 @@ class Membresia(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="membresia")
     condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="membresias")
-    unidad = models.ForeignKey(Unidad, on_delete=models.SET_NULL, null=True, blank=True, related_name="membresias", help_text="Obligatoria para residentes. No aplica a directiva/administración/conserjería.")
+    unidad = models.ForeignKey(Unidad, on_delete=models.SET_NULL, null=True, blank=True, related_name="membresias", help_text="Obligatoria para residentes y delegados. No aplica a directiva/administración/conserjería.")
     rol = models.CharField(max_length=15, choices=ROL_CHOICES, default="residente")
     terminos_aceptados_en = models.DateTimeField(
         null=True, blank=True,
@@ -228,8 +229,8 @@ class Membresia(models.Model):
 
     def clean(self):
         super().clean()
-        if self.rol == "residente" and self.unidad_id is None:
-            raise ValidationError({"unidad": "Las cuentas de residente deben tener una unidad asignada."})
+        if self.rol in ("residente", "delegado") and self.unidad_id is None:
+            raise ValidationError({"unidad": "Las cuentas de residente y delegado deben tener una unidad asignada."})
         if self.unidad_id and self.condominio_id and self.unidad.condominio_id != self.condominio_id:
             raise ValidationError({"unidad": "La unidad debe pertenecer al mismo condominio de la membresía."})
 

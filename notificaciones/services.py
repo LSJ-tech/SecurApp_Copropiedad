@@ -12,17 +12,22 @@ logger = logging.getLogger(__name__)
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
-def enviar_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_user_id=None):
+def enviar_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_user_id=None, torre=None):
     """Envía una push notification a todos los dispositivos registrados de
     usuarios con membresía en `condominio`, vía el servicio de push de Expo
     (que a su vez enruta a FCM en Android y APNs en iOS -- no hace falta
     hablar directo con Firebase mientras la app sea 100% Expo).
+
+    Si se pasa `torre`, se acota a los residentes de esa torre (ej. un
+    aviso de un delegado, publicado solo para su propia torre).
 
     No lanza excepción si Expo falla o no hay red: una alerta no debe
     fallar en crearse solo porque el push no salió, así que el error
     solo se registra en el log.
     """
     dispositivos = DispositivoPush.objects.filter(user__membresia__condominio=condominio)
+    if torre:
+        dispositivos = dispositivos.filter(user__membresia__unidad__torre=torre)
     if excluir_user_id:
         dispositivos = dispositivos.exclude(user_id=excluir_user_id)
 
@@ -45,7 +50,7 @@ def enviar_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_user
             logger.exception("Falló el envío de push a Expo para %s dispositivos.", len(lote))
 
 
-def enviar_web_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_user_id=None):
+def enviar_web_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_user_id=None, torre=None):
     """Igual que enviar_push_a_condominio, pero para navegadores (la PWA)
     vía el protocolo estándar de Web Push -- sin pasar por Expo. No hace
     nada si no hay VAPID configurado (todavía no se armó en producción) ni
@@ -54,6 +59,8 @@ def enviar_web_push_a_condominio(condominio, titulo, cuerpo, data=None, excluir_
         return
 
     suscripciones = SuscripcionWebPush.objects.filter(user__membresia__condominio=condominio)
+    if torre:
+        suscripciones = suscripciones.filter(user__membresia__unidad__torre=torre)
     if excluir_user_id:
         suscripciones = suscripciones.exclude(user_id=excluir_user_id)
 
