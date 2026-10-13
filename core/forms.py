@@ -138,7 +138,10 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
     apellido = forms.CharField(max_length=150, label="Apellido", widget=forms.TextInput(attrs={"class": "form-control"}))
     email = forms.EmailField(label=LABEL_EMAIL, widget=forms.EmailInput(attrs={"class": "form-control"}))
     rol = forms.ChoiceField(choices=[c for c in ROL_CHOICES if c[0] != "directiva"], widget=forms.Select(attrs={"class": "form-select"}))
-    unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), required=False, label="Unidad (obligatorio para residentes)", widget=forms.Select(attrs={"class": "form-select"}))
+    unidad = forms.ModelChoiceField(
+        queryset=Unidad.objects.none(), required=False, label="Unidad (obligatorio para residentes)",
+        empty_label="---------", widget=forms.Select(attrs={"class": "form-select"}),
+    )
 
     def __init__(self, *args, condominio=None, creador_rol=None, **kwargs):
         super().__init__(*args, **kwargs)

@@ -215,9 +215,12 @@ class CrearUnidadesEnLoteForm(BaseDialogForm):
 
     MAX_UNIDADES_POR_LOTE = 500
 
-    condominio = forms.ModelChoiceField(queryset=Condominio.objects.all(), label="Condominio")
+    # empty_label explícito en español en los dos -- el default de Django
+    # 6.1 ("- Select an option -") no está traducido en el catálogo "es-cl"
+    # instalado.
+    condominio = forms.ModelChoiceField(queryset=Condominio.objects.all(), label="Condominio", empty_label="Elige un condominio")
     torre = forms.ModelChoiceField(
-        queryset=Torre.objects.all(), required=False, label="Torre (opcional)",
+        queryset=Torre.objects.all(), required=False, label="Torre (opcional)", empty_label="No aplica",
         help_text="Dejar vacío si son casas o unidades sin torre.",
     )
     calle = forms.CharField(
