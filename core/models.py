@@ -181,6 +181,11 @@ class Unidad(models.Model):
     condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="unidades")
     torre = models.ForeignKey(Torre, on_delete=models.SET_NULL, null=True, blank=True, related_name="unidades")
     numero = models.CharField(max_length=20, help_text="Número o identificador del departamento/casa, ej. '304' o 'Casa 12'.")
+    calle = models.CharField(
+        max_length=150, blank=True,
+        help_text="Nombre de la calle -- útil si la junta de vecinos tiene varias calles y un mismo número de "
+        "casa podría repetirse en más de una. Vacío si no aplica (ej. torres/deptos, o juntas con una sola calle).",
+    )
     alicuota = models.DecimalField(max_digits=6, decimal_places=4, default=0, help_text="Coeficiente de copropiedad usado para prorratear gastos comunes (0 si no se usa).")
 
     class Meta:
@@ -192,6 +197,8 @@ class Unidad(models.Model):
     def __str__(self):
         if self.torre_id:
             return f"Torre {self.torre.nombre} - Depto {self.numero}"
+        if self.calle:
+            return f"{self.calle} {self.numero} - {self.condominio}"
         return f"{self.numero} - {self.condominio}"
 
 

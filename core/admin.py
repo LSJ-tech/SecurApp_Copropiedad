@@ -70,7 +70,7 @@ MAX_FILAS_INLINE = 30
 class UnidadInline(TabularInline):
     model = Unidad
     extra = 0
-    fields = ["numero", "torre", "alicuota"]
+    fields = ["numero", "calle", "torre", "alicuota"]
     verbose_name_plural = f"Unidades (primeras {MAX_FILAS_INLINE} -- para ver/editar el resto, ir a Unidades y filtrar por este condominio)"
 
     def get_queryset(self, request):
@@ -214,6 +214,10 @@ class CrearUnidadesEnLoteForm(BaseDialogForm):
         queryset=Torre.objects.all(), required=False, label="Torre (opcional)",
         help_text="Dejar vacío si son casas o unidades sin torre.",
     )
+    calle = forms.CharField(
+        required=False, label="Calle (opcional)",
+        help_text="Si la junta de vecinos tiene varias calles, para no mezclar casas con el mismo número.",
+    )
     prefijo = forms.CharField(required=False, label="Prefijo", help_text="Ej. \"A-\" para generar A-101, A-102...")
     desde = forms.IntegerField(label="Número inicial", min_value=1)
     hasta = forms.IntegerField(label="Número final", min_value=1)
@@ -239,10 +243,10 @@ class CrearUnidadesEnLoteForm(BaseDialogForm):
 
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
-    list_display = ["numero", "condominio", "torre", "alicuota"]
+    list_display = ["numero", "calle", "condominio", "torre", "alicuota"]
     list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
     list_filter_submit = True
-    search_fields = ["numero", "torre__nombre", "condominio__nombre"]
+    search_fields = ["numero", "calle", "torre__nombre", "condominio__nombre"]
     actions_list = ["crear_unidades_en_lote"]
     list_select_related = ["condominio", "torre"]
 
@@ -268,6 +272,7 @@ class UnidadAdmin(ModelAdmin):
     def crear_unidades_en_lote(self, request, form):
         condominio = form.cleaned_data["condominio"]
         torre = form.cleaned_data["torre"]
+        calle = form.cleaned_data["calle"] or ""
         prefijo = form.cleaned_data["prefijo"] or ""
         alicuota = form.cleaned_data["alicuota"]
 
@@ -276,7 +281,7 @@ class UnidadAdmin(ModelAdmin):
         for n in range(form.cleaned_data["desde"], form.cleaned_data["hasta"] + 1):
             numero = f"{prefijo}{n}"
             defaults = {"alicuota": alicuota} if alicuota is not None else {}
-            _, creada = Unidad.objects.get_or_create(condominio=condominio, torre=torre, numero=numero, defaults=defaults)
+            _, creada = Unidad.objects.get_or_create(condominio=condominio, torre=torre, numero=numero, calle=calle, defaults=defaults)
             if creada:
                 creadas += 1
             else:

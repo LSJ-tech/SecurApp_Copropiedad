@@ -452,6 +452,44 @@ class AutoregistroCasasLibresTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertFalse(User.objects.filter(email="rosa_casas@example.com").exists())
 
+    def test_registrarse_con_calle_y_numero_guarda_la_calle(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(calle_unidad_libre="los aromos", numero_unidad_libre="45"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="45")
+        # se normaliza igual que nombre/apellido (primera letra en mayúscula)
+        self.assertEqual(unidad.calle, "Los Aromos")
+
+    def test_mismo_numero_en_calles_distintas_son_unidades_distintas(self):
+        """El problema real que resuelve la calle: una junta de vecinos
+        grande puede tener "Casa 45" repetido en más de una calle -- sin
+        la calle, el segundo registro se habría mezclado con el primero."""
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(calle_unidad_libre="Los Aromos", numero_unidad_libre="45"),
+        )
+        self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(
+                nombre="Juan", apellido="Soto", email="juan_otra_calle@example.com",
+                calle_unidad_libre="Los Pinos", numero_unidad_libre="45",
+            ),
+        )
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="45").count(), 2)
+        self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="45", calle="Los Aromos").exists())
+        self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="45", calle="Los Pinos").exists())
+
+    def test_calle_es_opcional(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="77"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="77")
+        self.assertEqual(unidad.calle, "")
+
 
 class CorreoBienvenidaTests(TestCase):
     """El email es obligatorio en ambos formularios de alta (autoregistro y
@@ -1336,6 +1374,11 @@ class ConteosTorreYUnidadTests(TestCase):
         self.assertEqual(r.status_code, 200)
         unidad = next(u for u in r.context["unidades"] if u.pk == self.unidad_1_1.pk)
         self.assertEqual(unidad.miembros_count, 2)
+
+    def test_unidades_muestra_la_calle_cuando_tiene(self):
+        Unidad.objects.create(condominio=self.condominio, numero="99", calle="Los Aromos")
+        r = self.client.get(reverse("unidades"))
+        self.assertContains(r, "Los Aromos")
 
 
 class ComoInstalarTests(TestCase):

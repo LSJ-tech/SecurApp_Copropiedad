@@ -168,7 +168,10 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
 class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
     """Autoregistro público de un residente -- elige su propio depto de una lista, vía el link/QR del condominio."""
 
-    field_order = ["nombre", "apellido", "email", "unidad", "password1", "password2", "acepto_terminos"]
+    field_order = [
+        "nombre", "apellido", "email", "unidad", "calle_unidad_libre", "numero_unidad_libre",
+        "password1", "password2", "acepto_terminos",
+    ]
 
     nombre = forms.CharField(max_length=150, label=LABEL_TU_NOMBRE, widget=forms.TextInput(attrs={"class": "form-control"}))
     apellido = forms.CharField(max_length=150, label="Tu apellido", widget=forms.TextInput(attrs={"class": "form-control"}))
@@ -178,6 +181,11 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         help_text="Te mandamos un correo de bienvenida.",
     )
     unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), required=False, label="Tu departamento", widget=forms.Select(attrs={"class": "form-select"}))
+    calle_unidad_libre = forms.CharField(
+        max_length=150, required=False, label="Nombre de tu calle (opcional)",
+        help_text="Solo hace falta si la junta de vecinos tiene más de una calle.",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
     numero_unidad_libre = forms.CharField(
         max_length=100, required=False, label="Número de tu casa",
         widget=forms.TextInput(attrs={"class": "form-control"}),
@@ -213,8 +221,10 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             )
             self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
+            self.fields["calle_unidad_libre"].widget.attrs["list"] = "calles-existentes"
         else:
             del self.fields["numero_unidad_libre"]
+            del self.fields["calle_unidad_libre"]
             self.fields["unidad"].required = True
             self.fields["unidad"].label = f"Tu {etiqueta}"
             self.fields["unidad"].queryset = (
@@ -228,8 +238,9 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         cleaned = super().clean()
         if self.modo_casas and not cleaned.get("unidad"):
             numero = (cleaned.get("numero_unidad_libre") or "").strip()
+            calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
             if numero:
-                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero)
+                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
                 cleaned["unidad"] = unidad
             else:
                 etiqueta = self.condominio.etiqueta_unidad.lower()
@@ -285,9 +296,10 @@ class TorreForm(forms.ModelForm):
 class UnidadForm(forms.ModelForm):
     class Meta:
         model = Unidad
-        fields = ["numero", "torre", "alicuota"]
+        fields = ["numero", "calle", "torre", "alicuota"]
         widgets = {
             "numero": forms.TextInput(attrs={"class": "form-control"}),
+            "calle": forms.TextInput(attrs={"class": "form-control"}),
             "torre": forms.Select(attrs={"class": "form-select"}),
             "alicuota": forms.NumberInput(attrs={"class": "form-control", "step": "0.0001"}),
         }

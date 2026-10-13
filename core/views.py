@@ -388,8 +388,10 @@ class RegistroResidenteView(FormView):
             # Modo casas (ver RegistroResidenteForm) -- lista de números ya
             # registrados por otros vecinos, para que quien se registra vea
             # si su casa ya existe (y no cree sin querer una casi-duplicada
-            # por una diferencia de tipeo) antes de escribir la suya.
+            # por una diferencia de tipeo) antes de escribir la suya. Mismo
+            # criterio para las calles ya usadas.
             context["numeros_unidad_existentes"] = list(unidades.values_list("numero", flat=True))
+            context["calles_existentes"] = sorted(set(unidades.exclude(calle="").values_list("calle", flat=True)))
         return context
 
     def form_valid(self, form):

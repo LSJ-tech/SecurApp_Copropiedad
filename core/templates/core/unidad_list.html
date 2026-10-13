@@ -31,12 +31,12 @@
 
 <div class="table-responsive">
 <table class="table table-striped">
-    <thead><tr><th>Número</th><th>{{ condominio.etiqueta_torre }}</th><th>Alícuota</th><th>Personas registradas</th></tr></thead>
+    <thead><tr><th>Número</th><th>Calle</th><th>{{ condominio.etiqueta_torre }}</th><th>Alícuota</th><th>Personas registradas</th></tr></thead>
     <tbody>
         {% for u in unidades %}
-        <tr><td>{{ u.numero }}</td><td>{{ u.torre|default:"—" }}</td><td>{{ u.alicuota }}</td><td>{{ u.miembros_count }}</td></tr>
+        <tr><td>{{ u.numero }}</td><td>{{ u.calle|default:"—" }}</td><td>{{ u.torre|default:"—" }}</td><td>{{ u.alicuota }}</td><td>{{ u.miembros_count }}</td></tr>
         {% empty %}
-        <tr><td colspan="4" class="text-muted">Sin {{ condominio.etiqueta_unidad|lower }}s todavía.</td></tr>
+        <tr><td colspan="5" class="text-muted">Sin {{ condominio.etiqueta_unidad|lower }}s todavía.</td></tr>
         {% endfor %}
     </tbody>
 </table>

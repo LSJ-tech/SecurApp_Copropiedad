@@ -661,6 +661,13 @@ class CrearUnidadesEnLoteTests(TestCase):
         for unidad in creadas:
             self.assertEqual(str(unidad.alicuota), "0.0033")
 
+    def test_respeta_la_calle(self):
+        self._post(calle="Los Aromos", desde="1", hasta="2")
+        creadas = Unidad.objects.filter(condominio=self.condominio, numero__in=["1", "2"])
+        self.assertEqual(creadas.count(), 2)
+        for unidad in creadas:
+            self.assertEqual(unidad.calle, "Los Aromos")
+
     def test_no_duplica_unidades_que_ya_existian(self):
         Unidad.objects.create(condominio=self.condominio, numero="101")
         self._post()

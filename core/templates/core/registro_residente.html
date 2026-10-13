@@ -44,6 +44,11 @@
                     <div class="mb-3">
                         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
+                        {% if field.name == "calle_unidad_libre" and calles_existentes %}
+                        <datalist id="calles-existentes">
+                            {% for calle in calles_existentes %}<option value="{{ calle }}">{% endfor %}
+                        </datalist>
+                        {% endif %}
                         {% if field.name == "numero_unidad_libre" and numeros_unidad_existentes %}
                         <datalist id="numeros-unidad-existentes">
                             {% for numero in numeros_unidad_existentes %}<option value="{{ numero }}">{% endfor %}
