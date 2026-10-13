@@ -14,6 +14,7 @@
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'unidades' %}active{% endif %}" href="{% url 'unidades' %}"><i class="bi bi-building"></i> {{ user.membresia.condominio.etiqueta_unidad|default:"Unidad" }}s</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'gastos-comunes-list' %}active{% endif %}" href="{% url 'gastos-comunes-list' %}"><i class="bi bi-cash-coin"></i> Gastos comunes</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'empleados' %}active{% endif %}" href="{% url 'empleados' %}"><i class="bi bi-person-badge"></i> Personal</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'historial-pagos' %}active{% endif %}" href="{% url 'historial-pagos' %}"><i class="bi bi-credit-card"></i> Pagos y donaciones</a></li>
     {% endif %}
     {% if user.membresia.rol == "directiva" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mi-condominio' %}active{% endif %}" href="{% url 'mi-condominio' %}"><i class="bi bi-gear"></i> Mi {{ user.membresia.condominio.etiqueta_organizacion|default:"Condominio"|lower }}</a></li>

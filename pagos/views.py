@@ -14,6 +14,8 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
+from core.mixins import CondominioRequiredMixin, EsDirectivaOAdministracionMixin
+
 from .mercadopago_client import (
     cancelar_suscripcion_recurrente,
     crear_suscripcion_recurrente,
@@ -250,6 +252,31 @@ class PagoResultadoView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["estado"] = self.request.GET.get("status", "")
+        return context
+
+
+class HistorialPagosView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, TemplateView):
+    """Para directiva/administración: historial de pagos del condominio
+    como cliente de la plataforma (suscripción) y de las donaciones que
+    hacen sus residentes -- hasta ahora solo se podía ver en el admin de
+    Django."""
+
+    template_name = "pagos/historial_pagos.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["suscripcion_actual"] = SuscripcionRecurrente.objects.filter(
+            condominio=self.condominio, tipo="suscripcion",
+        ).order_by("-fecha_creacion").first()
+        context["pagos_suscripcion"] = Pago.objects.filter(
+            condominio=self.condominio, tipo="suscripcion",
+        ).order_by("-fecha_creacion")
+        context["donaciones_activas"] = SuscripcionRecurrente.objects.filter(
+            condominio=self.condominio, tipo="donacion",
+        ).exclude(estado="cancelada").select_related("membresia__user").order_by("-fecha_creacion")
+        context["pagos_donacion"] = Pago.objects.filter(
+            condominio=self.condominio, tipo="donacion",
+        ).select_related("membresia__user").order_by("-fecha_creacion")
         return context
 
 

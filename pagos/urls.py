@@ -8,5 +8,6 @@ urlpatterns = [
     path("suscripcion/pagar/", views.SuscripcionPagarView.as_view(), name="pagar-suscripcion"),
     path("suscripcion/cancelar/", views.CancelarSuscripcionRecurrenteView.as_view(), name="cancelar-suscripcion"),
     path("pago/resultado/", views.PagoResultadoView.as_view(), name="pago-resultado"),
+    path("historial/", views.HistorialPagosView.as_view(), name="historial-pagos"),
     path("pago/webhook/", views.WebhookMercadoPagoView.as_view(), name="pago-webhook"),
 ]
