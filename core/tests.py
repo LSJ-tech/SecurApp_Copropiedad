@@ -1466,3 +1466,27 @@ class ComoInstalarTests(TestCase):
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, reverse("como-instalar"))
+
+
+class PaginasPublicasRenderizanTests(TestCase):
+    """Landing, Términos y Privacidad no tenían ningún test que las
+    renderizara -- un error de sintaxis en la plantilla solo se habría
+    notado en producción. Confirma 200 y que el listado de funciones esté
+    al día con lo que existe hoy (ver landing.html)."""
+
+    def test_landing_sin_login_lista_las_funciones_actuales(self):
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Muro de vecinos")
+        self.assertContains(r, "Números de emergencia")
+
+    def test_terminos_renderiza(self):
+        r = self.client.get(reverse("terminos"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Muro de vecinos")
+
+    def test_privacidad_renderiza(self):
+        r = self.client.get(reverse("privacidad"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Muro de vecinos")
+        self.assertContains(r, "Confirmación de lectura")
