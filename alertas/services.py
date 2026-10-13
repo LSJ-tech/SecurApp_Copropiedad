@@ -6,6 +6,11 @@ TITULOS_POR_TIPO = {
     "accidente": "🚑 Alerta de accidente",
     "emergencia_medica": "🚑 Alerta de emergencia médica",
     "persona_extrana": "⚠️ Persona extraña en el sector",
+    "fuga_gas": "⚠️ Fuga de gas",
+    "fuga_agua": "💧 Fuga o inundación de agua",
+    "atrapado_ascensor": "🛗 Persona atrapada en ascensor",
+    "objeto_sospechoso": "⚠️ Objeto o paquete sospechoso",
+    "rina_disturbio": "🚨 Riña o disturbio",
     "otro": "🚨 Alerta de emergencia",
     "prueba": "🧪 Prueba del botón de pánico (no es una emergencia real)",
 }

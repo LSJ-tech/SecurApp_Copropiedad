@@ -8,7 +8,8 @@ from django.utils import timezone
 
 from core.models import Condominio, Membresia
 
-from .models import Alerta
+from .models import TIPO_CHOICES, Alerta
+from .services import TITULOS_POR_TIPO
 
 
 def crear_membresia(condominio, rol, **user_kwargs):
@@ -103,15 +104,28 @@ class NotificarAlertaTests(TestCase):
         self.assertEqual(mock_expo.call_args.kwargs["excluir_user_id"], membresia.user_id)
         self.assertEqual(mock_web.call_args.kwargs["excluir_user_id"], membresia.user_id)
 
-    def test_emergencia_medica_y_persona_extrana_tienen_su_propio_titulo(self):
+    def test_todos_los_tipos_de_alerta_tienen_titulo_de_notificacion(self):
+        """Si se agrega un tipo nuevo a TIPO_CHOICES sin agregarle su título en
+        TITULOS_POR_TIPO, notificar_alerta no explota (usa el de "otro" como
+        respaldo) pero manda un título genérico -- este test obliga a no
+        olvidarlo."""
+        codigos_con_titulo = set(TITULOS_POR_TIPO)
+        codigos_declarados = {codigo for codigo, _ in TIPO_CHOICES}
+        self.assertEqual(codigos_declarados, codigos_con_titulo)
+
+    def test_cada_tipo_nuevo_crea_la_alerta_y_usa_su_propio_titulo(self):
         membresia = crear_membresia(self.condominio, "residente", username="notif_tipos")
         self.client.force_login(membresia.user)
-        for tipo, fragmento_titulo in [("emergencia_medica", "emergencia médica"), ("persona_extrana", "Persona extraña")]:
+        tipos_nuevos = [
+            "emergencia_medica", "persona_extrana", "fuga_gas", "fuga_agua",
+            "atrapado_ascensor", "objeto_sospechoso", "rina_disturbio",
+        ]
+        for tipo in tipos_nuevos:
             with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
                  patch("alertas.services.enviar_web_push_a_condominio"):
                 r = self.client.post(reverse("alerta-list"), {"tipo": tipo}, content_type="application/json")
             self.assertEqual(r.status_code, 201)
-            self.assertIn(fragmento_titulo, mock_expo.call_args.args[1])
+            self.assertEqual(mock_expo.call_args.args[1], TITULOS_POR_TIPO[tipo])
 
 
 class AlertaHistorialViewTests(TestCase):

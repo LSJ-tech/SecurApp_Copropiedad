@@ -8,6 +8,11 @@ TIPO_CHOICES = [
     ("accidente", "Accidente"),
     ("emergencia_medica", "Emergencia médica"),
     ("persona_extrana", "Persona extraña en el sector"),
+    ("fuga_gas", "Fuga de gas"),
+    ("fuga_agua", "Fuga o inundación de agua"),
+    ("atrapado_ascensor", "Persona atrapada en ascensor"),
+    ("objeto_sospechoso", "Objeto o paquete sospechoso"),
+    ("rina_disturbio", "Riña o disturbio"),
     ("otro", "Otro"),
     ("prueba", "Prueba"),
 ]

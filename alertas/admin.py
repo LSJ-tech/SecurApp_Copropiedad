@@ -12,7 +12,7 @@ class AlertaAdmin(ModelAdmin):
     list_filter = [("condominio", AutocompleteSelectFilter), "tipo", "estado"]
     list_filter_submit = True
 
-    @display(description="Tipo", ordering="tipo", label={"robo": "danger", "incendio": "danger", "accidente": "warning", "emergencia_medica": "danger", "persona_extrana": "warning", "otro": "info", "prueba": "info"})
+    @display(description="Tipo", ordering="tipo", label={"robo": "danger", "incendio": "danger", "accidente": "warning", "emergencia_medica": "danger", "persona_extrana": "warning", "fuga_gas": "danger", "fuga_agua": "warning", "atrapado_ascensor": "warning", "objeto_sospechoso": "warning", "rina_disturbio": "danger", "otro": "info", "prueba": "info"})
     def tipo_badge(self, obj):
         return obj.tipo, obj.get_tipo_display()
 
