@@ -289,9 +289,11 @@ class MisDonacionesView(CondominioRequiredMixin, TemplateView):
         context["donacion_actual"] = SuscripcionRecurrente.objects.filter(
             membresia=self.membresia, tipo="donacion",
         ).order_by("-fecha_creacion").first()
-        context["pagos_donacion"] = Pago.objects.filter(
-            membresia=self.membresia, tipo="donacion",
-        ).order_by("-fecha_creacion")
+        pagos_donacion = Pago.objects.filter(membresia=self.membresia, tipo="donacion").order_by("-fecha_creacion")
+        context["pagos_donacion"] = pagos_donacion
+        aprobados = [p for p in pagos_donacion if p.estado == "aprobado"]
+        context["total_donado"] = sum((p.monto for p in aprobados), Decimal("0"))
+        context["cantidad_aportes"] = len(aprobados)
         return context
 
 

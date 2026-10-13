@@ -821,7 +821,7 @@ class MisDonacionesViewTests(TestCase):
         r = self.client.get(reverse("mis-donaciones"))
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.context["donacion_actual"])
-        self.assertContains(r, "No tienes ninguna donación automática activa")
+        self.assertContains(r, "Activa una donación automática")
 
     def test_muestra_solo_las_propias(self):
         propia = SuscripcionRecurrente.objects.create(
@@ -846,6 +846,28 @@ class MisDonacionesViewTests(TestCase):
 
         self.assertEqual(r.context["donacion_actual"], propia)
         self.assertEqual(list(r.context["pagos_donacion"]), [Pago.objects.get(mercadopago_payment_id="pay-propia")])
+        self.assertEqual(r.context["total_donado"], Decimal("2000"))
+        self.assertEqual(r.context["cantidad_aportes"], 1)
+
+    def test_total_donado_no_cuenta_pagos_rechazados(self):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-rechazo", estado="autorizada",
+        )
+        Pago.objects.create(
+            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=suscripcion,
+            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-ok",
+        )
+        Pago.objects.create(
+            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=suscripcion,
+            tipo="donacion", monto=Decimal("2000"), estado="rechazado", mercadopago_payment_id="pay-mal",
+        )
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("mis-donaciones"))
+
+        self.assertEqual(r.context["total_donado"], Decimal("2000"))
+        self.assertEqual(r.context["cantidad_aportes"], 1)
 
 
 @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")

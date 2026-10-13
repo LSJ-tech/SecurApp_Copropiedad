@@ -1,24 +1,124 @@
 {% extends "core/base.html" %}
 {% block titulo %}Mis donaciones{% endblock %}
-{% block contenido %}
-<h1 class="h4 mb-3">Mis donaciones</h1>
 
-<div class="card mb-4">
+{% block extra_head %}
+<style>
+    .donacion-hero {
+        background: linear-gradient(135deg, #E07A5F 0%, #c2495f 55%, #1A2E40 100%);
+        border-radius: 1rem;
+        color: #fff;
+        padding: 2.5rem 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .donacion-hero i.bi-heart-fill {
+        font-size: 2.75rem;
+        color: #fff;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
+    }
+    .donacion-hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 85% 20%, rgba(255,255,255,0.18), transparent 55%);
+        pointer-events: none;
+    }
+    .donacion-stat {
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 2px 10px rgba(26,46,64,0.06);
+    }
+    .donacion-stat .valor {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1A2E40;
+    }
+    .donacion-stat .etiqueta {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    .badge-donacion-activa {
+        background: #2e9e6e;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="donacion-hero mb-4">
+    <div class="d-flex align-items-start gap-3">
+        <i class="bi bi-heart-fill"></i>
+        <div>
+            <h1 class="h4 mb-1">¡Gracias por tu apoyo!</h1>
+            <p class="mb-0" style="max-width: 48rem; opacity: 0.95;">
+                {{ PLATFORM_NAME }} es gratis para {{ condominio.nombre }} gracias a residentes como tú. Lo que
+                donas ayuda a pagar el hosting, el envío de notificaciones y el tiempo de desarrollo que mantiene
+                la plataforma funcionando y mejorando para todo el condominio.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="donacion-stat">
+            <div class="valor">${{ total_donado|floatformat:0 }}</div>
+            <div class="etiqueta">Aportado en total</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="donacion-stat">
+            <div class="valor">{{ cantidad_aportes }}</div>
+            <div class="etiqueta">{{ cantidad_aportes|pluralize:"Aporte,Aportes" }} confirmados</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="donacion-stat">
+            {% if donacion_actual and donacion_actual.estado == "autorizada" %}
+            <div class="valor text-success"><i class="bi bi-check-circle-fill"></i> Activa</div>
+            <div class="etiqueta">${{ donacion_actual.monto|floatformat:0 }}/mes con Mercado Pago</div>
+            {% elif donacion_actual %}
+            <div class="valor text-warning"><i class="bi bi-hourglass-split"></i> {{ donacion_actual.get_estado_display }}</div>
+            <div class="etiqueta">Donación automática</div>
+            {% else %}
+            <div class="valor text-muted"><i class="bi bi-heart"></i> Sin activar</div>
+            <div class="etiqueta">Todavía no donas</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 border-0" style="box-shadow: 0 2px 10px rgba(26,46,64,0.06);">
     <div class="card-body">
-        {% if not donacion_actual %}
-        <p class="text-muted small mb-0">No tienes ninguna donación automática activa. Puedes activarla desde el inicio.</p>
+        {% if donacion_actual and donacion_actual.estado == "autorizada" %}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge badge-donacion-activa mb-1"><i class="bi bi-arrow-repeat"></i> Donación automática activa</span>
+                <p class="text-muted small mb-0">${{ donacion_actual.monto|floatformat:0 }}/mes, hasta que la canceles. ¡Gracias por sumarte!</p>
+            </div>
+            <form method="post" action="{% url 'cancelar-donacion' %}" onsubmit="return confirm('¿Cancelar tu donación automática? No se harán más cobros.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar donación automática</button>
+            </form>
+        </div>
+        {% elif donacion_actual %}
+        <p class="text-muted small mb-0"><i class="bi bi-hourglass-split"></i> Tu donación está "{{ donacion_actual.get_estado_display|lower }}" en Mercado Pago -- puede tardar unos minutos en activarse.</p>
         {% else %}
-        <div class="d-flex justify-content-between align-items-center">
-            <p class="mb-0">${{ donacion_actual.monto|floatformat:0 }}/mes con Mercado Pago</p>
-            <span class="badge {% if donacion_actual.estado == 'autorizada' %}bg-success{% elif donacion_actual.estado == 'cancelada' %}bg-danger{% elif donacion_actual.estado == 'pausada' %}bg-info{% else %}bg-warning{% endif %}">{{ donacion_actual.get_estado_display }}</span>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <p class="text-muted small mb-0 mb-md-0">¿{{ PLATFORM_NAME }} te ha sido útil? Activa una donación automática de $2.000/mes para apoyar el desarrollo de la plataforma.</p>
+            <form method="post" action="{% url 'donar' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-heart"></i> Donar $2.000/mes</button>
+            </form>
         </div>
         {% endif %}
     </div>
 </div>
 
-<div class="card">
+<div class="card border-0" style="box-shadow: 0 2px 10px rgba(26,46,64,0.06);">
     <div class="card-body">
-        <h2 class="h6 mb-2">Historial de cobros</h2>
+        <h2 class="h6 mb-3"><i class="bi bi-clock-history text-primary"></i> Historial de cobros</h2>
         {% if not pagos_donacion %}
         <p class="text-muted small mb-0">Todavía no se registra ningún cobro.</p>
         {% else %}
