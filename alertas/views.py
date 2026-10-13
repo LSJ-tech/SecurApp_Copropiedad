@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, ListView
 
@@ -8,8 +9,8 @@ from core.mixins import CondominioFormMixin, CondominioRequiredMixin, EsDirectiv
 from core.models import REGION_CHOICES
 
 from .empresas_servicios import EMPRESAS_SUGERIDAS_POR_REGION
-from .forms import NumeroEmergenciaForm
-from .models import NUMEROS_NACIONALES, Alerta, NumeroEmergencia
+from .forms import NumeroEmergenciaForm, PropuestaNumeroEmergenciaForm
+from .models import NUMEROS_NACIONALES, Alerta, NumeroEmergencia, PropuestaNumeroEmergencia
 
 
 class AlertaHistorialView(CondominioRequiredMixin, ListView):
@@ -66,6 +67,13 @@ class NumeroEmergenciaListView(CondominioRequiredMixin, ListView):
         # -- no tiene choices= en el modelo (lo valida el form al crear el
         # condominio), así que no existe get_region_display().
         context["region_nombre"] = dict(REGION_CHOICES).get(self.condominio.region, self.condominio.region)
+        if self.membresia.rol in ("directiva", "administracion"):
+            context["propuestas_pendientes"] = PropuestaNumeroEmergencia.objects.filter(
+                condominio=self.condominio, estado="pendiente",
+            ).select_related("autor__user")
+        context["mis_propuestas"] = PropuestaNumeroEmergencia.objects.filter(
+            condominio=self.condominio, autor=self.membresia,
+        )
         return context
 
 
@@ -96,4 +104,45 @@ class EliminarNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRe
             messages.error(request, "Los números nacionales (Carabineros, Bomberos, etc.) no se pueden eliminar.")
             return redirect("numeros-emergencia")
         numero.delete()
+        return redirect("numeros-emergencia")
+
+
+class ProponerNumeroEmergenciaView(CondominioFormMixin, CreateView):
+    """Abierto a cualquier rol -- a diferencia de NumeroEmergenciaCreateView
+    (directiva/administración, directo), esto queda "Pendiente" hasta que
+    directiva/administración lo apruebe o rechace (ver
+    AprobarPropuestaNumeroEmergenciaView/RechazarPropuestaNumeroEmergenciaView)."""
+
+    model = PropuestaNumeroEmergencia
+    form_class = PropuestaNumeroEmergenciaForm
+    template_name = "alertas/propuesta_numero_emergencia_form.html"
+    success_url = reverse_lazy("numeros-emergencia")
+
+    def form_valid(self, form):
+        form.instance.autor = self.membresia
+        messages.success(self.request, "Gracias, tu propuesta quedó pendiente de revisión por directiva/administración.")
+        return super().form_valid(form)
+
+
+class AprobarPropuestaNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+    def post(self, request, pk):
+        propuesta = get_object_or_404(PropuestaNumeroEmergencia, pk=pk, condominio=self.condominio, estado="pendiente")
+        NumeroEmergencia.objects.create(
+            condominio=self.condominio, categoria=propuesta.categoria, nombre=propuesta.nombre, telefono=propuesta.telefono,
+        )
+        propuesta.estado = "aprobada"
+        propuesta.revisada_por = self.membresia
+        propuesta.fecha_revision = timezone.now()
+        propuesta.save(update_fields=["estado", "revisada_por", "fecha_revision"])
+        messages.success(request, f"«{propuesta.nombre}» se agregó a los números de emergencia.")
+        return redirect("numeros-emergencia")
+
+
+class RechazarPropuestaNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+    def post(self, request, pk):
+        propuesta = get_object_or_404(PropuestaNumeroEmergencia, pk=pk, condominio=self.condominio, estado="pendiente")
+        propuesta.estado = "rechazada"
+        propuesta.revisada_por = self.membresia
+        propuesta.fecha_revision = timezone.now()
+        propuesta.save(update_fields=["estado", "revisada_por", "fecha_revision"])
         return redirect("numeros-emergencia")

@@ -1,0 +1,18 @@
+{% extends "core/base.html" %}
+{% block titulo %}Proponer número de emergencia{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Proponer número de emergencia</h1>
+<p class="text-muted small mb-3">Plan Cuadrante, un guardia de sector, u otro número útil para el condominio. Directiva/administración lo revisa antes de que quede visible para todos.</p>
+<form method="post" class="col-md-5">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="mb-3">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {{ field.errors }}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Enviar propuesta</button>
+    <a href="{% url 'numeros-emergencia' %}" class="btn btn-outline-secondary">Cancelar</a>
+</form>
+{% endblock %}
