@@ -626,12 +626,30 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         self.assertEqual(suscripcion.estado, "autorizada")
 
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
-    def test_no_hace_nada_si_el_estado_ya_coincide(self, mock_obtener):
+    def test_rellena_el_pago_de_una_suscripcion_que_ya_estaba_autorizada_sin_pago(self, mock_obtener):
+        """Caso real reportado: una suscripción sincronizada ANTES de este
+        fix quedó "Autorizada" en SecurApp pero sin ningún Pago (el cobro
+        real en Mercado Pago sí existe -- se vio en la pantalla "Pagaste
+        $X"). Sincronizar de nuevo debe rellenar el Pago que falta, aunque
+        el estado ya estaba "autorizada" antes de esta llamada."""
         from pagos.views import sincronizar_estado_suscripcion
 
         suscripcion = self._suscripcion(estado="autorizada")
-        with self.assertNumQueries(0):  # no hay que guardar nada si el estado no cambió
-            sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(suscripcion.cobros.count(), 0)
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(suscripcion.cobros.count(), 1)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_duplica_el_pago_si_el_estado_ya_coincide_y_ya_tiene_pago(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(estado="autorizada")
+        Pago.objects.create(
+            condominio=self.condominio, suscripcion_recurrente=suscripcion, tipo="suscripcion",
+            plan="premium", monto=suscripcion.monto, estado="aprobado", mercadopago_payment_id="ya-existente",
+        )
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(suscripcion.cobros.count(), 1)
 
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value=None)
     def test_devuelve_false_si_mercadopago_no_responde(self, mock_obtener):

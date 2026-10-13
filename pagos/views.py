@@ -90,26 +90,26 @@ def sincronizar_estado_suscripcion(suscripcion):
     detalle = obtener_preapproval_mercadopago(suscripcion.mercadopago_preapproval_id)
     if not detalle:
         return False
-    nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
-    if not nuevo_estado or nuevo_estado == suscripcion.estado:
-        return True
 
-    estado_anterior = suscripcion.estado
-    suscripcion.estado = nuevo_estado
-    if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
-        suscripcion.fecha_cancelacion = timezone.now()
-        suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
-    else:
-        suscripcion.save(update_fields=["estado"])
+    nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
+    if nuevo_estado and nuevo_estado != suscripcion.estado:
+        suscripcion.estado = nuevo_estado
+        if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
+            suscripcion.fecha_cancelacion = timezone.now()
+            suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
+        else:
+            suscripcion.save(update_fields=["estado"])
 
     # Mercado Pago solo pasa una autorización a "authorized" después de
     # cobrar la primera cuota con éxito (lo confirmamos nosotros mismos: la
     # pantalla "Pagaste $X" aparece apenas se autoriza). Si el webhook nunca
     # avisó ese primer cobro, el Pago correspondiente nunca se creó -- se
-    # genera acá para no dejar un cobro real sin registrar. Solo la primera
-    # vez (pendiente -> autorizada) y solo si de verdad no hay ningún Pago
-    # todavía, para no duplicar si esto se vuelve a sincronizar después.
-    if nuevo_estado == "autorizada" and estado_anterior == "pendiente" and not suscripcion.cobros.exists():
+    # genera acá para no dejar un cobro real sin registrar. No se limita al
+    # momento exacto de la transición: una suscripción puede haber quedado
+    # "Autorizada" en una sincronización anterior (antes de este fix) sin su
+    # Pago, así que se revisa cada vez que el estado es "autorizada", y solo
+    # se crea si de verdad no hay ningún Pago todavía (no duplica).
+    if suscripcion.estado == "autorizada" and not suscripcion.cobros.exists():
         _crear_pago_por_cobro(suscripcion)
 
     return True
