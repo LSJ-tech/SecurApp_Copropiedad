@@ -232,9 +232,10 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             self.fields["unidad"].queryset = (
                 Unidad.objects.filter(condominio=condominio).annotate(_num_len=Length("numero")).order_by("_num_len", "numero")
             )
-            self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
-            self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
+            self.fields["calle_unidad_libre"].label = f"O escribe el nombre de tu calle si tu {etiqueta} no está en la lista"
             self.fields["calle_unidad_libre"].widget.attrs["list"] = "calles-existentes"
+            self.fields["numero_unidad_libre"].label = f"Y el número de tu {etiqueta}"
+            self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
         else:
             del self.fields["calle_unidad_libre"]
             # A diferencia de casas, acá la torre NO se escribe libre -- ya
