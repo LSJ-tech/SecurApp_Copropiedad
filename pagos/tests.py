@@ -650,6 +650,56 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         self.assertEqual(suscripcion.estado, "cancelada")
         self.assertIsNotNone(suscripcion.fecha_cancelacion)
 
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_crea_el_pago_de_suscripcion_cuando_autoriza_por_primera_vez(self, mock_obtener):
+        """Si el webhook nunca avisó el primer cobro, sincronizar a mano no
+        debe dejar la suscripción "Autorizada" sin su Pago correspondiente
+        (bug real: quedaba Autorizada pero /admin/pagos/pago/ vacío)."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion()
+        pagado_hasta_antes = self.condominio.pagado_hasta
+        sincronizar_estado_suscripcion(suscripcion)
+
+        pago = suscripcion.cobros.get()
+        self.assertEqual(pago.estado, "aprobado")
+        self.assertEqual(pago.plan, "premium")
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.pagado_hasta, pagado_hasta_antes + datetime.timedelta(days=30))
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_crea_el_pago_de_donacion_sin_tocar_el_plan_del_condominio(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Sync Donacion", plan="basico")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", monto=Decimal("2000"), mercadopago_preapproval_id="pre-sync-don",
+        )
+        pagado_hasta_antes = condominio.pagado_hasta
+        sincronizar_estado_suscripcion(suscripcion)
+
+        pago = suscripcion.cobros.get()
+        self.assertEqual(pago.tipo, "donacion")
+        self.assertEqual(pago.plan, "")
+        condominio.refresh_from_db()
+        self.assertEqual(condominio.pagado_hasta, pagado_hasta_antes)
+        self.assertEqual(condominio.plan, "basico")
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_duplica_el_pago_si_ya_hay_uno_registrado(self, mock_obtener):
+        """pausada -> autorizada (reactivación) no debe generar un segundo
+        Pago fantasma -- solo la transición pendiente -> autorizada lo hace."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(estado="pausada")
+        Pago.objects.create(
+            condominio=self.condominio, suscripcion_recurrente=suscripcion, tipo="suscripcion",
+            plan="premium", monto=suscripcion.monto, estado="aprobado", mercadopago_payment_id="ya-existente",
+        )
+        sincronizar_estado_suscripcion(suscripcion)
+
+        self.assertEqual(suscripcion.cobros.count(), 1)
+
 
 class PagoResultadoViewTests(TestCase):
     def test_muestra_el_estado_que_viene_en_la_url(self):

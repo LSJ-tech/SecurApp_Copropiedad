@@ -53,6 +53,33 @@ def _email_del_pagador(request):
     return (request.user.email or "").strip()
 
 
+def _extender_suscripcion(condominio, plan):
+    """Una donación aprobada NUNCA debe pasar por acá -- no regala días de
+    servicio ni cambia el plan, eso es exclusivo de un cobro de tipo
+    'suscripcion' (ver tests de WebhookMercadoPagoTests)."""
+    hoy = timezone.localdate()
+    desde = condominio.pagado_hasta if condominio.pagado_hasta and condominio.pagado_hasta > hoy else hoy
+    condominio.pagado_hasta = desde + datetime.timedelta(days=30)
+    condominio.plan = plan
+    condominio.save(update_fields=["pagado_hasta", "plan"])
+
+
+def _crear_pago_por_cobro(suscripcion, payment_id=""):
+    """Registra un cobro aprobado de esta suscripción como Pago. Se usa
+    tanto desde el webhook (payment_id real) como desde la sincronización
+    manual (sin payment_id -- ver sincronizar_estado_suscripcion)."""
+    pago = Pago.objects.create(
+        condominio=suscripcion.condominio, membresia=suscripcion.membresia,
+        suscripcion_recurrente=suscripcion, tipo=suscripcion.tipo,
+        plan="premium" if suscripcion.tipo == "suscripcion" else "",
+        monto=suscripcion.monto, estado="aprobado",
+        mercadopago_payment_id=str(payment_id), fecha_confirmacion=timezone.now(),
+    )
+    if pago.tipo == "suscripcion":
+        _extender_suscripcion(pago.condominio, pago.plan)
+    return pago
+
+
 def sincronizar_estado_suscripcion(suscripcion):
     """Re-consulta el estado real de esta SuscripcionRecurrente en Mercado
     Pago y lo actualiza -- mismo código que usa el webhook al recibir un
@@ -66,12 +93,25 @@ def sincronizar_estado_suscripcion(suscripcion):
     nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
     if not nuevo_estado or nuevo_estado == suscripcion.estado:
         return True
+
+    estado_anterior = suscripcion.estado
     suscripcion.estado = nuevo_estado
     if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
         suscripcion.fecha_cancelacion = timezone.now()
         suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
     else:
         suscripcion.save(update_fields=["estado"])
+
+    # Mercado Pago solo pasa una autorización a "authorized" después de
+    # cobrar la primera cuota con éxito (lo confirmamos nosotros mismos: la
+    # pantalla "Pagaste $X" aparece apenas se autoriza). Si el webhook nunca
+    # avisó ese primer cobro, el Pago correspondiente nunca se creó -- se
+    # genera acá para no dejar un cobro real sin registrar. Solo la primera
+    # vez (pendiente -> autorizada) y solo si de verdad no hay ningún Pago
+    # todavía, para no duplicar si esto se vuelve a sincronizar después.
+    if nuevo_estado == "autorizada" and estado_anterior == "pendiente" and not suscripcion.cobros.exists():
+        _crear_pago_por_cobro(suscripcion)
+
     return True
 
 
@@ -279,23 +319,4 @@ class WebhookMercadoPagoView(View):
             )
             return
 
-        pago = Pago.objects.create(
-            condominio=suscripcion.condominio, membresia=suscripcion.membresia,
-            suscripcion_recurrente=suscripcion, tipo=suscripcion.tipo,
-            plan="premium" if suscripcion.tipo == "suscripcion" else "",
-            monto=suscripcion.monto, estado="aprobado",
-            mercadopago_payment_id=str(payment_id), fecha_confirmacion=timezone.now(),
-        )
-        if pago.tipo == "suscripcion":
-            self._extender_suscripcion(pago)
-
-    def _extender_suscripcion(self, pago):
-        """Una donación aprobada NUNCA debe pasar por acá -- no regala días
-        de servicio ni cambia el plan, eso es exclusivo de un pago de tipo
-        'suscripcion' (ver tests de WebhookMercadoPagoTests)."""
-        condominio = pago.condominio
-        hoy = timezone.localdate()
-        desde = condominio.pagado_hasta if condominio.pagado_hasta and condominio.pagado_hasta > hoy else hoy
-        condominio.pagado_hasta = desde + datetime.timedelta(days=30)
-        condominio.plan = pago.plan
-        condominio.save(update_fields=["pagado_hasta", "plan"])
+        _crear_pago_por_cobro(suscripcion, payment_id)
