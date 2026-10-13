@@ -171,9 +171,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="form-label" id="panico-tipo-label">Tipo de emergencia</div>
+                <fieldset class="mb-3" style="border: 0; margin: 0; padding: 0;">
+                <legend class="form-label h6" style="float: none; width: auto; font-size: inherit;">Tipo de emergencia</legend>
                 <input type="hidden" id="panico-tipo" value="otro">
-                <div id="panico-tipo-grid" class="row row-cols-3 row-cols-sm-4 g-2 mb-3" role="group" aria-labelledby="panico-tipo-label">
+                <div id="panico-tipo-grid" class="row row-cols-3 row-cols-sm-4 g-2">
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="robo"><i class="bi bi-shield-exclamation d-block fs-4 mb-1"></i><span class="small">Robo</span></button></div>
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="incendio"><i class="bi bi-fire d-block fs-4 mb-1"></i><span class="small">Incendio</span></button></div>
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn" data-tipo="accidente"><i class="bi bi-bandaid d-block fs-4 mb-1"></i><span class="small">Accidente</span></button></div>
@@ -187,6 +188,7 @@
                     <div class="col"><button type="button" class="btn btn-outline-danger w-100 h-100 py-2 panico-tipo-btn active" data-tipo="otro"><i class="bi bi-three-dots d-block fs-4 mb-1"></i><span class="small">Otro</span></button></div>
                     <div class="col"><button type="button" class="btn btn-outline-secondary w-100 h-100 py-2 panico-tipo-btn" data-tipo="prueba"><i class="bi bi-bug d-block fs-4 mb-1"></i><span class="small">Prueba</span></button></div>
                 </div>
+                </fieldset>
                 <label class="form-label" for="panico-mensaje">Mensaje (opcional)</label>
                 <textarea id="panico-mensaje" class="form-control" rows="2" placeholder="Cuéntanos qué está pasando"></textarea>
             </div>
