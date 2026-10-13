@@ -328,6 +328,33 @@ class UnidadTorreDeOtroCondominioTests(TestCase):
         self.assertFalse(Unidad.objects.filter(condominio=self.condominio_a, numero="101").exists())
 
 
+class UnidadTorreDisplayTests(TestCase):
+    """Antes mostraba "-" para una unidad sin torre -- ambiguo (¿no tiene,
+    o nadie la cargó?). Ahora muestra la etiqueta_unidad del condominio
+    (ej. "Casa"), igual que ya se usa en el resto del panel."""
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser(username="torre_display_staff", password="x")
+        self.client.force_login(self.staff)
+
+    def test_sin_torre_muestra_la_etiqueta_unidad_del_condominio(self):
+        from .models import Torre
+
+        condominio = Condominio.objects.create(nombre="Test Torre Display Casa", plan="premium", etiqueta_unidad="Casa")
+        Unidad.objects.create(condominio=condominio, numero="668", calle="Teniente Uribe")
+        r = self.client.get("/admin/core/unidad/")
+        self.assertContains(r, ">Casa<")
+
+    def test_con_torre_muestra_el_nombre_de_la_torre(self):
+        from .models import Torre
+
+        condominio = Condominio.objects.create(nombre="Test Torre Display Depto", plan="premium")
+        torre = Torre.objects.create(condominio=condominio, nombre="9")
+        Unidad.objects.create(condominio=condominio, torre=torre, numero="302")
+        r = self.client.get("/admin/core/unidad/")
+        self.assertContains(r, ">9<")
+
+
 class MembresiaAdminFiltroBlockYDeptoTests(TestCase):
     """Filtros nuevos por block (unidad__torre) y depto (unidad) en el
     admin de Membresías, mismo patrón AutocompleteSelectFilter."""

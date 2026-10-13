@@ -252,7 +252,7 @@ class CrearUnidadesEnLoteForm(BaseDialogForm):
 
 @admin.register(Unidad)
 class UnidadAdmin(ModelAdmin):
-    list_display = ["numero", "calle", "condominio", "torre", "alicuota"]
+    list_display = ["numero", "calle", "condominio", "torre_display", "alicuota"]
     list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter)]
     list_filter_submit = True
     search_fields = ["numero", "calle", "torre__nombre", "condominio__nombre"]
@@ -265,6 +265,17 @@ class UnidadAdmin(ModelAdmin):
     # desplazarse por cientos de opciones. El guardado también queda
     # protegido aunque se elija mal (ver Unidad.clean()).
     autocomplete_fields = ["condominio", "torre"]
+
+    @admin.display(description="Torre", ordering="torre__nombre")
+    def torre_display(self, obj):
+        # Antes mostraba "-" para una unidad sin torre -- ambiguo (¿no tiene
+        # torre, o nadie la cargó?). Mostrar la etiqueta_unidad del propio
+        # condominio (ej. "Casa") deja claro que es así a propósito, sin
+        # inventar un texto fijo que no calce con cómo le dice cada cliente
+        # a sus unidades.
+        if obj.torre_id:
+            return obj.torre.nombre
+        return obj.condominio.etiqueta_unidad
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(
