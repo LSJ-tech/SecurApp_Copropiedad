@@ -287,18 +287,18 @@ class NumeroEmergenciaListViewTests(TestCase):
         self.residente = crear_membresia(self.condominio, "residente", username="num_emerg_residente")
         self.directiva = crear_membresia(self.condominio, "directiva", username="num_emerg_directiva")
 
-    def test_precarga_los_4_numeros_nacionales(self):
-        from .models import NumeroEmergencia
+    def test_precarga_los_numeros_nacionales(self):
+        from .models import NUMEROS_NACIONALES, NumeroEmergencia
 
         self.client.force_login(self.residente.user)
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), 4)
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), len(NUMEROS_NACIONALES))
         self.assertContains(r, "133")
         self.assertContains(r, "132")
 
     def test_no_resucita_un_numero_que_directiva_borro(self):
-        from .models import NumeroEmergencia
+        from .models import NUMEROS_NACIONALES, NumeroEmergencia
 
         self.client.force_login(self.residente.user)
         self.client.get(reverse("numeros-emergencia"))
@@ -306,7 +306,7 @@ class NumeroEmergenciaListViewTests(TestCase):
         bomberos.delete()
 
         self.client.get(reverse("numeros-emergencia"))
-        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), 3)
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), len(NUMEROS_NACIONALES) - 1)
         self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio, nombre="Bomberos").exists())
 
     def test_sugerencias_segun_la_region_del_condominio(self):
