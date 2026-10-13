@@ -423,7 +423,7 @@ class AutoregistroCasasLibresTests(TestCase):
     def test_registrarse_con_numero_libre_crea_la_unidad_sin_block(self):
         r = self.client.post(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
-            self._datos_base(numero_unidad_libre="123"),
+            self._datos_base(calle_unidad_libre="Los Aromos", numero_unidad_libre="123"),
         )
         self.assertEqual(r.status_code, 302)
         unidad = Unidad.objects.get(condominio=self.condominio, numero="123")
@@ -434,11 +434,14 @@ class AutoregistroCasasLibresTests(TestCase):
     def test_dos_personas_con_el_mismo_numero_comparten_la_unidad(self):
         self.client.post(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
-            self._datos_base(numero_unidad_libre="123"),
+            self._datos_base(calle_unidad_libre="Los Aromos", numero_unidad_libre="123"),
         )
         self.client.post(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
-            self._datos_base(nombre="Juan", apellido="Mena", email="juan_casas@example.com", numero_unidad_libre="123"),
+            self._datos_base(
+                nombre="Juan", apellido="Mena", email="juan_casas@example.com",
+                calle_unidad_libre="Los Aromos", numero_unidad_libre="123",
+            ),
         )
         self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="123").count(), 1)
         unidad = Unidad.objects.get(condominio=self.condominio, numero="123")
@@ -447,9 +450,19 @@ class AutoregistroCasasLibresTests(TestCase):
     def test_sin_numero_no_se_puede_registrar(self):
         r = self.client.post(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
-            self._datos_base(numero_unidad_libre=""),
+            self._datos_base(calle_unidad_libre="Los Aromos", numero_unidad_libre=""),
         )
         self.assertEqual(r.status_code, 200)
+        self.assertFalse(User.objects.filter(email="rosa_casas@example.com").exists())
+
+    def test_sin_calle_no_se_puede_crear_una_casa_nueva(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="88", calle_unidad_libre=""),
+        )
+        self.assertEqual(r.status_code, 200)  # se queda en el form con el error, no redirige
+        self.assertContains(r, "Escribe el nombre de tu calle")
+        self.assertFalse(Unidad.objects.filter(condominio=self.condominio, numero="88").exists())
         self.assertFalse(User.objects.filter(email="rosa_casas@example.com").exists())
 
     def test_registrarse_con_calle_y_numero_guarda_la_calle(self):
@@ -481,14 +494,16 @@ class AutoregistroCasasLibresTests(TestCase):
         self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="45", calle="Los Aromos").exists())
         self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="45", calle="Los Pinos").exists())
 
-    def test_calle_es_opcional(self):
+    def test_elegir_unidad_existente_de_la_lista_no_exige_calle(self):
+        """calle solo es obligatoria para crear una casa nueva por texto
+        libre -- elegir una ya existente del desplegable no debería
+        pedirla de nuevo (ya quedó guardada cuando se creó)."""
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="123", calle="Los Aromos")
         r = self.client.post(
             reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
-            self._datos_base(numero_unidad_libre="77"),
+            self._datos_base(unidad=unidad.pk),
         )
         self.assertEqual(r.status_code, 302)
-        unidad = Unidad.objects.get(condominio=self.condominio, numero="77")
-        self.assertEqual(unidad.calle, "")
 
 
 class CorreoBienvenidaTests(TestCase):

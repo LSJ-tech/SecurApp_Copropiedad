@@ -182,8 +182,7 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
     )
     unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), required=False, label="Tu departamento", widget=forms.Select(attrs={"class": "form-select"}))
     calle_unidad_libre = forms.CharField(
-        max_length=150, required=False, label="Nombre de tu calle (opcional)",
-        help_text="Solo hace falta si la junta de vecinos tiene más de una calle.",
+        max_length=150, required=False, label="Nombre de tu calle",
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     numero_unidad_libre = forms.CharField(
@@ -239,12 +238,16 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         if self.modo_casas and not cleaned.get("unidad"):
             numero = (cleaned.get("numero_unidad_libre") or "").strip()
             calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
-            if numero:
-                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
-                cleaned["unidad"] = unidad
-            else:
-                etiqueta = self.condominio.etiqueta_unidad.lower()
+            etiqueta = self.condominio.etiqueta_unidad.lower()
+            if not numero:
                 raise ValidationError(f"Elige tu {etiqueta} de la lista, o escribe el número si todavía no aparece.")
+            # calle no es required=False a nivel de campo porque elegir una
+            # unidad ya existente de la lista no debería exigirla -- pero
+            # para crear una casa nueva por texto libre, sí o sí hace falta.
+            if not calle:
+                raise ValidationError("Escribe el nombre de tu calle.")
+            unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
+            cleaned["unidad"] = unidad
         return cleaned
 
     def clean_email(self):
