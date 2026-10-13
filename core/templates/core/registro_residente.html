@@ -52,6 +52,11 @@
                             {% for calle in calles_existentes %}<option value="{{ calle }}">{% endfor %}
                         </datalist>
                         {% endif %}
+                        {% if field.name == "torre_unidad_libre" and torres_existentes %}
+                        <datalist id="torres-existentes">
+                            {% for torre in torres_existentes %}<option value="{{ torre }}">{% endfor %}
+                        </datalist>
+                        {% endif %}
                         {% if field.name == "numero_unidad_libre" and numeros_unidad_existentes %}
                         <datalist id="numeros-unidad-existentes">
                             {% for numero in numeros_unidad_existentes %}<option value="{{ numero }}">{% endfor %}

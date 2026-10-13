@@ -191,9 +191,9 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         max_length=150, required=False, label="Nombre de tu calle",
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
-    torre_unidad_libre = forms.ModelChoiceField(
-        queryset=Torre.objects.none(), required=False, label="Torre", empty_label="---------",
-        widget=forms.Select(attrs={"class": "form-select"}),
+    torre_unidad_libre = forms.CharField(
+        max_length=100, required=False, label="Torre",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     numero_unidad_libre = forms.CharField(
         max_length=100, required=False, label="Número de tu casa",
@@ -248,14 +248,8 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
             etiqueta_torre = condominio.etiqueta_torre
-            self.fields["torre_unidad_libre"].label = f"O elige tu {etiqueta_torre.lower()} si tu {etiqueta} no está en la lista"
-            self.fields["torre_unidad_libre"].queryset = (
-                Torre.objects.filter(condominio=condominio).annotate(_len=Length("nombre")).order_by("_len", "nombre")
-            )
-            # Sin esto, cada opción mostraba Torre.__str__() completo --
-            # "1 (Nombre del condominio)" -- redundante, ya se sabe en qué
-            # condominio está parado quien se registra.
-            self.fields["torre_unidad_libre"].label_from_instance = lambda torre: torre.nombre
+            self.fields["torre_unidad_libre"].label = f"O escribe tu {etiqueta_torre.lower()} si tu {etiqueta} no está en la lista"
+            self.fields["torre_unidad_libre"].widget.attrs["list"] = "torres-existentes"
             self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
 
@@ -276,9 +270,16 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
                 raise ValidationError("Escribe el nombre de tu calle.")
             unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
         else:
-            torre = cleaned.get("torre_unidad_libre")
-            if not torre:
-                raise ValidationError(f"Elige tu {self.condominio.etiqueta_torre.lower()}.")
+            etiqueta_torre = self.condominio.etiqueta_torre.lower()
+            torre_texto = (cleaned.get("torre_unidad_libre") or "").strip()
+            if not torre_texto:
+                raise ValidationError(f"Escribe tu {etiqueta_torre}.")
+            # A diferencia de calle, acá SÍ hay que existir de antes -- la
+            # torre la crea administración/DevQuad (ver SoloStaffMixin), un
+            # residente no puede inventar una nueva por typo.
+            torre = Torre.objects.filter(condominio=self.condominio, nombre__iexact=torre_texto).first()
+            if torre is None:
+                raise ValidationError(f"No encontramos esa {etiqueta_torre} -- revisa que esté escrita igual que en la lista.")
             unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
         cleaned["unidad"] = unidad
         return cleaned
