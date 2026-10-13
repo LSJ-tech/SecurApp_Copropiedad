@@ -180,15 +180,20 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         widget=forms.EmailInput(attrs={"class": "form-control"}),
         help_text="Te mandamos un correo de bienvenida.",
     )
-    unidad = forms.ModelChoiceField(queryset=Unidad.objects.none(), required=False, label="Tu departamento", widget=forms.Select(attrs={"class": "form-select"}))
+    # empty_label explícito en español -- el default de Django 6.1
+    # ("- Select an option -") no está traducido todavía en el catálogo de
+    # "es-cl" instalado.
+    unidad = forms.ModelChoiceField(
+        queryset=Unidad.objects.none(), required=False, label="Tu departamento", empty_label="---------",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
     calle_unidad_libre = forms.CharField(
         max_length=150, required=False, label="Nombre de tu calle",
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     torre_unidad_libre = forms.ModelChoiceField(
-        queryset=Torre.objects.none(), required=False, label="Torre",
+        queryset=Torre.objects.none(), required=False, label="Torre", empty_label="---------",
         widget=forms.Select(attrs={"class": "form-select"}),
-        help_text="Elige esto solo si tu depto no apareció en la lista de arriba.",
     )
     numero_unidad_libre = forms.CharField(
         max_length=100, required=False, label="Número de tu casa",
@@ -243,10 +248,14 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
                 .order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             )
             etiqueta_torre = condominio.etiqueta_torre
-            self.fields["torre_unidad_libre"].label = etiqueta_torre
+            self.fields["torre_unidad_libre"].label = f"O elige tu {etiqueta_torre.lower()} si tu {etiqueta} no está en la lista"
             self.fields["torre_unidad_libre"].queryset = (
                 Torre.objects.filter(condominio=condominio).annotate(_len=Length("nombre")).order_by("_len", "nombre")
             )
+            # Sin esto, cada opción mostraba Torre.__str__() completo --
+            # "1 (Nombre del condominio)" -- redundante, ya se sabe en qué
+            # condominio está parado quien se registra.
+            self.fields["torre_unidad_libre"].label_from_instance = lambda torre: torre.nombre
             self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
 

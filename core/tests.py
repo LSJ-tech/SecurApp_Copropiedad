@@ -623,7 +623,15 @@ class AutoregistroDeptoLibreConTorresTests(TestCase):
     def test_pagina_de_registro_ofrece_el_depto_libre(self):
         r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "no apareció en la lista de arriba")
+        self.assertContains(r, "si tu unidad no está en la lista")
+
+    def test_las_opciones_de_torre_no_repiten_el_nombre_del_condominio(self):
+        """Antes mostraban Torre.__str__() completo -- "1 (nombre del
+        condominio)" -- redundante en un formulario que ya está parado
+        dentro de ese condominio."""
+        r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+        self.assertContains(r, f'<option value="{self.torre1.pk}">1</option>', html=True)
+        self.assertNotContains(r, f"({self.condominio.nombre})")
 
 
 class CorreoBienvenidaTests(TestCase):
