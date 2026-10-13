@@ -1,0 +1,42 @@
+{% extends "core/base.html" %}
+{% block titulo %}Mis donaciones{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-3">Mis donaciones</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        {% if not donacion_actual %}
+        <p class="text-muted small mb-0">No tienes ninguna donación automática activa. Puedes activarla desde el inicio.</p>
+        {% else %}
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="mb-0">${{ donacion_actual.monto|floatformat:0 }}/mes con Mercado Pago</p>
+            <span class="badge {% if donacion_actual.estado == 'autorizada' %}bg-success{% elif donacion_actual.estado == 'cancelada' %}bg-danger{% elif donacion_actual.estado == 'pausada' %}bg-info{% else %}bg-warning{% endif %}">{{ donacion_actual.get_estado_display }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h2 class="h6 mb-2">Historial de cobros</h2>
+        {% if not pagos_donacion %}
+        <p class="text-muted small mb-0">Todavía no se registra ningún cobro.</p>
+        {% else %}
+        <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead>
+            <tbody>
+                {% for p in pagos_donacion %}
+                <tr>
+                    <td>{{ p.fecha_confirmacion|date:"d-m-Y H:i"|default:p.fecha_creacion|date:"d-m-Y H:i" }}</td>
+                    <td>${{ p.monto|floatformat:0 }}</td>
+                    <td><span class="badge {% if p.estado == 'aprobado' %}bg-success{% elif p.estado == 'rechazado' %}bg-danger{% else %}bg-warning{% endif %}">{{ p.get_estado_display }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

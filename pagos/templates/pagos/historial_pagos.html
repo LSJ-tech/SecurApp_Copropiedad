@@ -1,9 +1,9 @@
 {% extends "core/base.html" %}
-{% block titulo %}Pagos y donaciones{% endblock %}
+{% block titulo %}Pagos de la suscripción{% endblock %}
 {% block contenido %}
-<h1 class="h4 mb-3">Pagos y donaciones</h1>
+<h1 class="h4 mb-3">Pagos de la suscripción</h1>
 
-<div class="card mb-4">
+<div class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h2 class="h6 mb-0"><i class="bi bi-credit-card text-primary"></i> Suscripción de {{ PLATFORM_NAME }}</h2>
@@ -30,49 +30,6 @@
             </tbody>
         </table>
         </div>
-        {% endif %}
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        <h2 class="h6 mb-2"><i class="bi bi-heart text-danger"></i> Donaciones de residentes</h2>
-        {% if not donaciones_activas %}
-        <p class="text-muted small mb-3">Ningún residente tiene una donación automática activa por ahora.</p>
-        {% else %}
-        <p class="small fw-semibold mb-1">Donaciones activas</p>
-        <ul class="list-group list-group-flush mb-3">
-            {% for d in donaciones_activas %}
-            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                <span>{% if d.membresia %}{{ d.membresia.user.get_full_name|default:d.membresia.user.username }}{% else %}-{% endif %}</span>
-                <span>
-                    <span class="badge {% if d.estado == 'autorizada' %}bg-success{% else %}bg-warning{% endif %}">{{ d.get_estado_display }}</span>
-                    ${{ d.monto|floatformat:0 }}/mes
-                </span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-
-        {% if pagos_donacion %}
-        <p class="small fw-semibold mb-1">Historial de cobros</p>
-        <div class="table-responsive">
-        <table class="table table-sm table-striped mb-0">
-            <thead><tr><th>Fecha</th><th>Donante</th><th>Monto</th><th>Estado</th></tr></thead>
-            <tbody>
-                {% for p in pagos_donacion %}
-                <tr>
-                    <td>{{ p.fecha_confirmacion|date:"d-m-Y H:i"|default:p.fecha_creacion|date:"d-m-Y H:i" }}</td>
-                    <td>{% if p.membresia %}{{ p.membresia.user.get_full_name|default:p.membresia.user.username }}{% else %}-{% endif %}</td>
-                    <td>${{ p.monto|floatformat:0 }}</td>
-                    <td><span class="badge {% if p.estado == 'aprobado' %}bg-success{% elif p.estado == 'rechazado' %}bg-danger{% else %}bg-warning{% endif %}">{{ p.get_estado_display }}</span></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
-        {% else %}
-        <p class="text-muted small mb-0">Todavía no se registra ningún cobro de donación.</p>
         {% endif %}
     </div>
 </div>

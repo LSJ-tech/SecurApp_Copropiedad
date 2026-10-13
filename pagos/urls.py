@@ -9,5 +9,6 @@ urlpatterns = [
     path("suscripcion/cancelar/", views.CancelarSuscripcionRecurrenteView.as_view(), name="cancelar-suscripcion"),
     path("pago/resultado/", views.PagoResultadoView.as_view(), name="pago-resultado"),
     path("historial/", views.HistorialPagosView.as_view(), name="historial-pagos"),
+    path("mis-donaciones/", views.MisDonacionesView.as_view(), name="mis-donaciones"),
     path("pago/webhook/", views.WebhookMercadoPagoView.as_view(), name="pago-webhook"),
 ]

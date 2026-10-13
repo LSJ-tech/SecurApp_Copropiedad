@@ -256,10 +256,13 @@ class PagoResultadoView(LoginRequiredMixin, TemplateView):
 
 
 class HistorialPagosView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, TemplateView):
-    """Para directiva/administración: historial de pagos del condominio
-    como cliente de la plataforma (suscripción) y de las donaciones que
-    hacen sus residentes -- hasta ahora solo se podía ver en el admin de
-    Django."""
+    """Para directiva/administración: historial de pagos de la suscripción
+    del condominio como cliente de la plataforma -- hasta ahora solo se
+    podía ver en el admin de Django.
+
+    NO incluye donaciones: son un aporte voluntario y personal de cada
+    residente, no un dato de gestión del condominio -- cada quien ve solo
+    las suyas (ver MisDonacionesView)."""
 
     template_name = "pagos/historial_pagos.html"
 
@@ -271,12 +274,24 @@ class HistorialPagosView(EsDirectivaOAdministracionMixin, CondominioRequiredMixi
         context["pagos_suscripcion"] = Pago.objects.filter(
             condominio=self.condominio, tipo="suscripcion",
         ).order_by("-fecha_creacion")
-        context["donaciones_activas"] = SuscripcionRecurrente.objects.filter(
-            condominio=self.condominio, tipo="donacion",
-        ).exclude(estado="cancelada").select_related("membresia__user").order_by("-fecha_creacion")
+        return context
+
+
+class MisDonacionesView(CondominioRequiredMixin, TemplateView):
+    """Las donaciones son voluntarias y personales -- cada miembro ve
+    únicamente su propio historial, nadie más (ni directiva ni
+    administración, ver HistorialPagosView)."""
+
+    template_name = "pagos/mis_donaciones.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["donacion_actual"] = SuscripcionRecurrente.objects.filter(
+            membresia=self.membresia, tipo="donacion",
+        ).order_by("-fecha_creacion").first()
         context["pagos_donacion"] = Pago.objects.filter(
-            condominio=self.condominio, tipo="donacion",
-        ).select_related("membresia__user").order_by("-fecha_creacion")
+            membresia=self.membresia, tipo="donacion",
+        ).order_by("-fecha_creacion")
         return context
 
 

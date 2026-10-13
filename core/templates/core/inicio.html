@@ -262,10 +262,13 @@
         <h2 class="h6 mb-1"><i class="bi bi-heart text-danger"></i> Apoya el proyecto</h2>
         {% if donacion_recurrente_activa %}
         <p class="text-muted small mb-2"><i class="bi bi-arrow-repeat"></i> Donación automática activa: ${{ donacion_recurrente_activa.monto|floatformat:0 }}/mes con Mercado Pago. ¡Gracias por tu apoyo!</p>
-        <form method="post" action="{% url 'cancelar-donacion' %}" onsubmit="return confirm('¿Cancelar tu donación automática? No se harán más cobros.');">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar donación automática</button>
-        </form>
+        <div class="d-flex gap-2">
+            <a href="{% url 'mis-donaciones' %}" class="btn btn-outline-secondary btn-sm">Ver mi historial</a>
+            <form method="post" action="{% url 'cancelar-donacion' %}" onsubmit="return confirm('¿Cancelar tu donación automática? No se harán más cobros.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar donación automática</button>
+            </form>
+        </div>
         {% else %}
         <p class="text-muted small mb-2">¿{{ PLATFORM_NAME }} te ha sido útil? Puedes activar una donación automática de $2.000/mes para apoyar el desarrollo de la plataforma.</p>
         <form method="post" action="{% url 'donar' %}">

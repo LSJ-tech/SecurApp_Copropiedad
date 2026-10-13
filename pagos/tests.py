@@ -732,7 +732,8 @@ class PagoResultadoViewTests(TestCase):
 
 class HistorialPagosViewTests(TestCase):
     """Página para directiva/administración con el historial de pagos del
-    condominio como cliente (suscripción) y las donaciones de sus residentes."""
+    condominio como cliente (suscripción) -- las donaciones NO aparecen acá:
+    son un aporte voluntario y personal de cada residente, ver MisDonacionesViewTests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -747,15 +748,14 @@ class HistorialPagosViewTests(TestCase):
         r = self.client.get(reverse("historial-pagos"))
         self.assertEqual(r.status_code, 302)
 
-    def test_sin_suscripcion_ni_donaciones_muestra_mensajes_vacios(self):
+    def test_sin_suscripcion_muestra_mensaje_vacio(self):
         self.client.force_login(self.administracion.user)
         r = self.client.get(reverse("historial-pagos"))
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.context["suscripcion_actual"])
         self.assertContains(r, "Todavía no se ha activado el cobro automático")
-        self.assertContains(r, "Ningún residente tiene una donación automática activa")
 
-    def test_muestra_el_historial_de_suscripcion_y_donaciones(self):
+    def test_muestra_el_historial_de_la_suscripcion(self):
         suscripcion = SuscripcionRecurrente.objects.create(
             condominio=self.condominio, membresia=self.administracion, tipo="suscripcion",
             monto=Decimal("19990"), mercadopago_preapproval_id="pre-hist-susc", estado="autorizada",
@@ -765,25 +765,13 @@ class HistorialPagosViewTests(TestCase):
             tipo="suscripcion", plan="premium", monto=Decimal("19990"), estado="aprobado",
             mercadopago_payment_id="pay-hist-susc",
         )
-        donacion = SuscripcionRecurrente.objects.create(
-            condominio=self.condominio, membresia=self.residente, tipo="donacion",
-            monto=Decimal("2000"), mercadopago_preapproval_id="pre-hist-don", estado="autorizada",
-        )
-        Pago.objects.create(
-            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=donacion,
-            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-hist-don",
-        )
 
         self.client.force_login(self.administracion.user)
         r = self.client.get(reverse("historial-pagos"))
 
         self.assertEqual(r.context["suscripcion_actual"], suscripcion)
         self.assertEqual(list(r.context["pagos_suscripcion"]), [Pago.objects.get(mercadopago_payment_id="pay-hist-susc")])
-        self.assertEqual(list(r.context["donaciones_activas"]), [donacion])
-        self.assertEqual(list(r.context["pagos_donacion"]), [Pago.objects.get(mercadopago_payment_id="pay-hist-don")])
-        self.assertContains(r, "Vecino Uno")
         self.assertContains(r, "$19990")
-        self.assertContains(r, "$2000")
 
     def test_no_mezcla_pagos_de_otro_condominio(self):
         otro_condominio = Condominio.objects.create(nombre="Otro Condominio Historial", plan="premium")
@@ -801,14 +789,63 @@ class HistorialPagosViewTests(TestCase):
         self.assertIsNone(r.context["suscripcion_actual"])
         self.assertEqual(list(r.context["pagos_suscripcion"]), [])
 
-    def test_donacion_cancelada_no_aparece_como_activa(self):
+    def test_no_expone_donaciones_de_residentes(self):
+        """Las donaciones son voluntarias y personales -- ni siquiera
+        directiva/administración debe poder verlas acá."""
         SuscripcionRecurrente.objects.create(
             condominio=self.condominio, membresia=self.residente, tipo="donacion",
-            monto=Decimal("2000"), mercadopago_preapproval_id="pre-hist-cancelada", estado="cancelada",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-hist-don", estado="autorizada",
         )
         self.client.force_login(self.administracion.user)
         r = self.client.get(reverse("historial-pagos"))
-        self.assertEqual(list(r.context["donaciones_activas"]), [])
+        self.assertNotIn("donaciones_activas", r.context)
+        self.assertNotIn("pagos_donacion", r.context)
+        self.assertNotContains(r, "Vecino Uno")
+
+
+class MisDonacionesViewTests(TestCase):
+    """Cada miembro ve únicamente su propio historial de donaciones -- ni
+    otros residentes ni directiva/administración pueden verlo (ver
+    HistorialPagosViewTests.test_no_expone_donaciones_de_residentes)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Mis Donaciones", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="misdon_residente")
+        self.otro_residente = crear_membresia(self.condominio, "residente", username="misdon_otro")
+
+    def test_sin_donacion_muestra_mensaje_vacio(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("mis-donaciones"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.context["donacion_actual"])
+        self.assertContains(r, "No tienes ninguna donación automática activa")
+
+    def test_muestra_solo_las_propias(self):
+        propia = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-propia", estado="autorizada",
+        )
+        Pago.objects.create(
+            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=propia,
+            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-propia",
+        )
+        ajena = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.otro_residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-ajena", estado="autorizada",
+        )
+        Pago.objects.create(
+            condominio=self.condominio, membresia=self.otro_residente, suscripcion_recurrente=ajena,
+            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-ajena",
+        )
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("mis-donaciones"))
+
+        self.assertEqual(r.context["donacion_actual"], propia)
+        self.assertEqual(list(r.context["pagos_donacion"]), [Pago.objects.get(mercadopago_payment_id="pay-propia")])
 
 
 @override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
