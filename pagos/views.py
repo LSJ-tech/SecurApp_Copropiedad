@@ -268,9 +268,12 @@ class HistorialPagosView(EsDirectivaOAdministracionMixin, CondominioRequiredMixi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["suscripcion_actual"] = SuscripcionRecurrente.objects.filter(
+        suscripcion_actual = SuscripcionRecurrente.objects.filter(
             condominio=self.condominio, tipo="suscripcion",
         ).order_by("-fecha_creacion").first()
+        context["suscripcion_actual"] = suscripcion_actual
+        context["suscripcion_recurrente_activa"] = bool(suscripcion_actual and suscripcion_actual.estado in ("pendiente", "autorizada"))
+        context["suscripcion_al_dia"] = bool(self.condominio.pagado_hasta and self.condominio.pagado_hasta >= timezone.localdate())
         context["pagos_suscripcion"] = Pago.objects.filter(
             condominio=self.condominio, tipo="suscripcion",
         ).order_by("-fecha_creacion")

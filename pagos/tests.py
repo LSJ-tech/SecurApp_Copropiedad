@@ -748,12 +748,25 @@ class HistorialPagosViewTests(TestCase):
         r = self.client.get(reverse("historial-pagos"))
         self.assertEqual(r.status_code, 302)
 
-    def test_sin_suscripcion_muestra_mensaje_vacio(self):
+    def test_sin_suscripcion_muestra_boton_para_activarla(self):
         self.client.force_login(self.administracion.user)
         r = self.client.get(reverse("historial-pagos"))
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.context["suscripcion_actual"])
-        self.assertContains(r, "Todavía no se ha activado el cobro automático")
+        self.assertFalse(r.context["suscripcion_recurrente_activa"])
+        self.assertContains(r, "Activa el cobro automático")
+        self.assertContains(r, reverse("pagar-suscripcion"))
+
+    def test_con_suscripcion_activa_muestra_boton_para_cancelar(self):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=Decimal("19990"),
+            mercadopago_preapproval_id="pre-hist-activa", estado="autorizada",
+        )
+        self.client.force_login(self.administracion.user)
+        r = self.client.get(reverse("historial-pagos"))
+        self.assertTrue(r.context["suscripcion_recurrente_activa"])
+        self.assertContains(r, "Cobro automático mensual activo")
+        self.assertContains(r, reverse("cancelar-suscripcion"))
 
     def test_muestra_el_historial_de_la_suscripcion(self):
         suscripcion = SuscripcionRecurrente.objects.create(

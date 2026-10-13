@@ -1,20 +1,116 @@
 {% extends "core/base.html" %}
 {% block titulo %}Pagos de la suscripción{% endblock %}
-{% block contenido %}
-<h1 class="h4 mb-3">Pagos de la suscripción</h1>
 
-<div class="card">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h2 class="h6 mb-0"><i class="bi bi-credit-card text-primary"></i> Suscripción de {{ PLATFORM_NAME }}</h2>
-            {% if suscripcion_actual %}
-            <span class="badge {% if suscripcion_actual.estado == 'autorizada' %}bg-success{% elif suscripcion_actual.estado == 'cancelada' %}bg-danger{% elif suscripcion_actual.estado == 'pausada' %}bg-info{% else %}bg-warning{% endif %}">{{ suscripcion_actual.get_estado_display }}</span>
+{% block extra_head %}
+<style>
+    .suscripcion-hero {
+        background: linear-gradient(135deg, #1A2E40 0%, #24405A 55%, #2e9e6e 150%);
+        border-radius: 1rem;
+        color: #fff;
+        padding: 2.5rem 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .suscripcion-hero i.bi-credit-card-2-front-fill {
+        font-size: 2.75rem;
+        color: #fff;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
+    }
+    .suscripcion-hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 85% 20%, rgba(255,255,255,0.16), transparent 55%);
+        pointer-events: none;
+    }
+    .suscripcion-stat {
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 2px 10px rgba(26,46,64,0.06);
+    }
+    .suscripcion-stat .valor {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1A2E40;
+    }
+    .suscripcion-stat .etiqueta {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="suscripcion-hero mb-4">
+    <div class="d-flex align-items-start gap-3">
+        <i class="bi bi-credit-card-2-front-fill"></i>
+        <div>
+            <h1 class="h4 mb-1">Suscripción de {{ PLATFORM_NAME }}</h1>
+            <p class="mb-0" style="max-width: 48rem; opacity: 0.95;">
+                Plan fijo de $19.990 al mes, sin importar la cantidad de unidades de {{ condominio.nombre }}.
+                Acá ves el estado de la suscripción y cada cobro que se ha hecho.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-6">
+        <div class="suscripcion-stat">
+            {% if suscripcion_al_dia %}
+            <div class="valor text-success"><i class="bi bi-check-circle-fill"></i> Al día</div>
+            <div class="etiqueta">Pagada hasta el {{ condominio.pagado_hasta|date:"d-m-Y" }}</div>
+            {% else %}
+            <div class="valor text-danger"><i class="bi bi-exclamation-circle-fill"></i> Vencida</div>
+            <div class="etiqueta">{% if condominio.pagado_hasta %}Venció el {{ condominio.pagado_hasta|date:"d-m-Y" }}{% else %}Sin pagos registrados{% endif %}</div>
             {% endif %}
         </div>
-        {% if not suscripcion_actual %}
-        <p class="text-muted small mb-0">Todavía no se ha activado el cobro automático de la suscripción. Puedes hacerlo desde el inicio.</p>
-        {% elif not pagos_suscripcion %}
-        <p class="text-muted small mb-0">La autorización está activa, pero todavía no se registra ningún cobro.</p>
+    </div>
+    <div class="col-6 col-md-6">
+        <div class="suscripcion-stat">
+            {% if suscripcion_recurrente_activa %}
+            <div class="valor text-success"><i class="bi bi-arrow-repeat"></i> Automática</div>
+            <div class="etiqueta">Cobro mensual activo con Mercado Pago</div>
+            {% else %}
+            <div class="valor text-muted"><i class="bi bi-credit-card"></i> Manual</div>
+            <div class="etiqueta">Sin cobro automático activado</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 border-0" style="box-shadow: 0 2px 10px rgba(26,46,64,0.06);">
+    <div class="card-body">
+        {% if suscripcion_recurrente_activa %}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-success mb-1"><i class="bi bi-arrow-repeat"></i> Cobro automático mensual activo</span>
+                <p class="text-muted small mb-0">$19.990/mes con Mercado Pago, hasta que lo canceles.</p>
+            </div>
+            <form method="post" action="{% url 'cancelar-suscripcion' %}" onsubmit="return confirm('¿Cancelar el cobro automático? No se harán más cobros -- el acceso sigue activo hasta la fecha ya pagada.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar cobro automático</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <p class="text-muted small mb-0">Activa el cobro automático para que la suscripción se pague sola cada mes.</p>
+            <form method="post" action="{% url 'pagar-suscripcion' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-credit-card"></i> Activar cobro automático mensual</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card border-0" style="box-shadow: 0 2px 10px rgba(26,46,64,0.06);">
+    <div class="card-body">
+        <h2 class="h6 mb-3"><i class="bi bi-clock-history text-primary"></i> Historial de cobros</h2>
+        {% if not pagos_suscripcion %}
+        <p class="text-muted small mb-0">Todavía no se registra ningún cobro.</p>
         {% else %}
         <div class="table-responsive">
         <table class="table table-sm table-striped mb-0">
