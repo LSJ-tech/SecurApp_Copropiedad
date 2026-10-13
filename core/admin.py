@@ -437,10 +437,19 @@ class MembresiaInlineParaUsuario(TabularInline):
     verbose_name_plural = "Membresía (condominio asignado)"
 
 
+class UserCreationFormConMedidor(UserCreationForm):
+    """Agrega el medidor de seguridad en vivo (Baja/Media/Alta) bajo el
+    campo de contraseña al crear un usuario -- carga el JS vía Media, sin
+    tocar el template de Unfold."""
+
+    class Media:
+        js = ["core/js/medidor_contrasena.js", "core/js/admin_password_medidor.js"]
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     form = UserChangeForm
-    add_form = UserCreationForm
+    add_form = UserCreationFormConMedidor
     change_password_form = AdminPasswordChangeForm
     list_filter = (*BaseUserAdmin.list_filter, SinCondominioFilter)
     inlines = [MembresiaInlineParaUsuario]

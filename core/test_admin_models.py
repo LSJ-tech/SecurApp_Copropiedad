@@ -416,6 +416,13 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
         # que el formulario quedó enganchado con unfold.forms.UserCreationForm.
         self.assertIn("max-w-2xl", contenido)
 
+    def test_el_formulario_de_alta_carga_el_medidor_de_contrasena(self):
+        r = self.client.get("/admin/auth/user/add/")
+        self.assertEqual(r.status_code, 200)
+        contenido = r.content.decode()
+        self.assertIn("medidor_contrasena.js", contenido)
+        self.assertIn("admin_password_medidor.js", contenido)
+
     def _datos_inline_membresia_vacio(self):
         # El formulario de alta ahora incluye el inline de Membresía (ver
         # MembresiaInlineParaUsuario) -- aunque no se use, su management
