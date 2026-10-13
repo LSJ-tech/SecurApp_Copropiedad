@@ -19,14 +19,16 @@
                 {% for n in grupo.list %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="fw-semibold">{{ n.nombre }}</div>
+                        <div class="fw-semibold">{{ n.nombre }}{% if n.es_nacional %} <span class="badge bg-secondary">Nacional</span>{% endif %}</div>
                         <a href="tel:{{ n.telefono }}" class="text-decoration-none">{{ n.telefono }}</a>
                     </div>
-                    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
-                    <form method="post" action="{% url 'numero-emergencia-eliminar' n.pk %}" onsubmit="return confirm('¿Eliminar este número?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                    </form>
+                    {% if not n.es_nacional %}
+                        {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+                        <form method="post" action="{% url 'numero-emergencia-eliminar' n.pk %}" onsubmit="return confirm('¿Eliminar este número?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                        {% endif %}
                     {% endif %}
                 </li>
                 {% endfor %}

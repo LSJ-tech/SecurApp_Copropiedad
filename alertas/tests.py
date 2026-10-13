@@ -297,17 +297,36 @@ class NumeroEmergenciaListViewTests(TestCase):
         self.assertContains(r, "133")
         self.assertContains(r, "132")
 
-    def test_no_resucita_un_numero_que_directiva_borro(self):
+    def test_no_duplica_al_visitar_dos_veces(self):
         from .models import NUMEROS_NACIONALES, NumeroEmergencia
 
         self.client.force_login(self.residente.user)
         self.client.get(reverse("numeros-emergencia"))
-        bomberos = NumeroEmergencia.objects.get(condominio=self.condominio, nombre="Bomberos")
-        bomberos.delete()
+        self.client.get(reverse("numeros-emergencia"))
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), len(NUMEROS_NACIONALES))
+
+    def test_se_resincroniza_solo_si_un_nacional_se_borra_por_fuera_de_la_app(self):
+        """Los nacionales no se pueden borrar desde la app (ver
+        EliminarNumeroEmergenciaView), así que si uno desaparece fue por
+        fuera (ej. admin de Django) -- en ese caso sí conviene recrearlo
+        solo, no hay ninguna intención de directiva que respetar."""
+        from .models import NUMEROS_NACIONALES, NumeroEmergencia
+
+        self.client.force_login(self.residente.user)
+        self.client.get(reverse("numeros-emergencia"))
+        NumeroEmergencia.objects.get(condominio=self.condominio, nombre="Bomberos").delete()
 
         self.client.get(reverse("numeros-emergencia"))
-        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), len(NUMEROS_NACIONALES) - 1)
-        self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio, nombre="Bomberos").exists())
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), len(NUMEROS_NACIONALES))
+        self.assertTrue(NumeroEmergencia.objects.filter(condominio=self.condominio, nombre="Bomberos").exists())
+
+    def test_los_numeros_nacionales_quedan_marcados_como_tales(self):
+        from .models import NumeroEmergencia
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numeros-emergencia"))
+        self.assertTrue(NumeroEmergencia.objects.get(condominio=self.condominio, nombre="Bomberos").es_nacional)
+        self.assertContains(r, "Nacional")
 
     def test_sugerencias_segun_la_region_del_condominio(self):
         self.client.force_login(self.directiva.user)
@@ -347,11 +366,14 @@ class NumeroEmergenciaCreateViewTests(TestCase):
     def test_directiva_puede_agregar(self):
         self.client.force_login(self.directiva.user)
         r = self.client.post(reverse("numero-emergencia-crear"), {"categoria": "electricidad", "nombre": "Chilquinta", "telefono": "600 600 5000"})
+        # assertRedirects sigue el redirect y confirma que responde 200 --
+        # eso de paso dispara la sincronización de nacionales de
+        # NumeroEmergenciaListView, así que puede haber más de un registro.
         self.assertRedirects(r, reverse("numeros-emergencia"))
         from .models import NumeroEmergencia
-        numero = NumeroEmergencia.objects.get(condominio=self.condominio)
-        self.assertEqual(numero.nombre, "Chilquinta")
+        numero = NumeroEmergencia.objects.get(condominio=self.condominio, nombre="Chilquinta")
         self.assertEqual(numero.telefono, "600 600 5000")
+        self.assertFalse(numero.es_nacional)
 
     def test_prellena_desde_una_sugerencia_pero_nunca_el_telefono(self):
         self.client.force_login(self.directiva.user)
@@ -396,4 +418,13 @@ class EliminarNumeroEmergenciaViewTests(TestCase):
         r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
         self.assertEqual(r.status_code, 404)
         from .models import NumeroEmergencia
+        self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
+
+    def test_ni_siquiera_directiva_puede_borrar_un_nacional(self):
+        from .models import NumeroEmergencia
+
+        numero = NumeroEmergencia.objects.create(condominio=self.condominio, categoria="policia", nombre="Carabineros", telefono="133")
+        self.client.force_login(self.directiva.user)
+        r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]), follow=True)
+        self.assertContains(r, "no se pueden eliminar")
         self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())

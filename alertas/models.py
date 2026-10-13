@@ -81,6 +81,11 @@ NUMEROS_NACIONALES = [
     ("apoyo", "SENAPRED (emergencias y desastres)", "600 586 7700"),
 ]
 
+# Para saber si un NumeroEmergencia es nacional sin un campo de BD aparte
+# (y sin necesitar backfill cuando se amplía NUMEROS_NACIONALES más
+# adelante -- ver NumeroEmergencia.es_nacional).
+_NOMBRES_NACIONALES = {nombre for _categoria, nombre, _telefono in NUMEROS_NACIONALES}
+
 
 class NumeroEmergencia(models.Model):
     """Directorio de teléfonos de emergencia del condominio."""
@@ -96,3 +101,12 @@ class NumeroEmergencia(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.telefono})"
+
+    @property
+    def es_nacional(self):
+        """Los nacionales (Carabineros, Bomberos, etc.) no se pueden borrar
+        -- ver EliminarNumeroEmergenciaView. Calculado por nombre, no por un
+        campo de BD aparte, así que no hace falta backfill cuando se agregan
+        más nacionales (NumeroEmergenciaListView los vuelve a sincronizar
+        solo en cada visita, ver su get_queryset)."""
+        return self.nombre in _NOMBRES_NACIONALES

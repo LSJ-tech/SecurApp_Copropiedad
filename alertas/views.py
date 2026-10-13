@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
@@ -37,23 +38,25 @@ class AlertaHistorialView(CondominioRequiredMixin, ListView):
 
 
 class NumeroEmergenciaListView(CondominioRequiredMixin, ListView):
-    """Abierto a cualquier rol -- agregar/borrar sí queda restringido a
-    directiva/administración (ver NumeroEmergenciaCreateView/EliminarNumeroEmergenciaView).
+    """Abierto a cualquier rol -- agregar sí queda restringido a directiva/
+    administración (ver NumeroEmergenciaCreateView) y borrar queda
+    restringido además a los que no son nacionales (ver
+    EliminarNumeroEmergenciaView y NumeroEmergencia.es_nacional).
 
-    Precarga los 4 números nacionales (estables, no dependen de la comuna)
-    la primera vez que alguien entra -- si el condominio ya tiene números
-    cargados no se toca nada, para no resucitar uno que directiva haya
-    borrado a propósito."""
+    Sincroniza los números nacionales en cada visita (get_or_create, no
+    pisa lo que ya existe) -- como nadie puede borrarlos, no hay riesgo de
+    "resucitar" algo borrado a propósito, así que si más adelante se
+    amplía NUMEROS_NACIONALES, todos los condominios quedan al día solos,
+    sin backfill."""
 
     template_name = "alertas/numero_emergencia_list.html"
     context_object_name = "numeros"
 
     def get_queryset(self):
-        if not NumeroEmergencia.objects.filter(condominio=self.condominio).exists():
-            NumeroEmergencia.objects.bulk_create([
-                NumeroEmergencia(condominio=self.condominio, categoria=categoria, nombre=nombre, telefono=telefono)
-                for categoria, nombre, telefono in NUMEROS_NACIONALES
-            ])
+        for categoria, nombre, telefono in NUMEROS_NACIONALES:
+            NumeroEmergencia.objects.get_or_create(
+                condominio=self.condominio, nombre=nombre, defaults={"categoria": categoria, "telefono": telefono},
+            )
         return NumeroEmergencia.objects.filter(condominio=self.condominio)
 
     def get_context_data(self, **kwargs):
@@ -89,5 +92,8 @@ class NumeroEmergenciaCreateView(EsDirectivaOAdministracionMixin, CondominioForm
 class EliminarNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
     def post(self, request, pk):
         numero = get_object_or_404(NumeroEmergencia, pk=pk, condominio=self.condominio)
+        if numero.es_nacional:
+            messages.error(request, "Los números nacionales (Carabineros, Bomberos, etc.) no se pueden eliminar.")
+            return redirect("numeros-emergencia")
         numero.delete()
         return redirect("numeros-emergencia")
