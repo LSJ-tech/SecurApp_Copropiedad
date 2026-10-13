@@ -1,9 +1,11 @@
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from core.permissions import CondominioQuerysetMixin, EsDirectivaOAdministracion, TieneMembresia
 
-from .models import Aviso
+from .models import Aviso, AvisoLectura
 from .serializers import AvisoSerializer
 
 
@@ -14,10 +16,16 @@ class AvisoViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_permissions(self):
-        if self.request.method in ("POST", "DELETE"):
+        if self.action in ("create", "destroy"):
             return [IsAuthenticated(), EsDirectivaOAdministracion()]
         return super().get_permissions()
 
     def perform_create(self, serializer):
         membresia = self.request.user.membresia
         serializer.save(condominio=membresia.condominio, autor=membresia)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, TieneMembresia])
+    def marcar_leido(self, request, pk=None):
+        aviso = self.get_object()
+        AvisoLectura.objects.get_or_create(aviso=aviso, membresia=request.user.membresia)
+        return Response(AvisoSerializer(aviso, context={"request": request}).data)

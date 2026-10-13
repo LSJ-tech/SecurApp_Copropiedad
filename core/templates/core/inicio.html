@@ -539,8 +539,14 @@ function cargarAvisos() {
                     <strong>${a.titulo}</strong>
                     <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre || ""}</div>
                     <div>${a.cuerpo}</div>
+                    ${a.leido_por_count !== null && a.leido_por_count !== undefined ? `<div class="small text-muted mt-1"><i class="bi bi-eye"></i> Visto por ${a.leido_por_count} de ${a.total_destinatarios} vecinos</div>` : ""}
                 </li>
             `).join("");
+            avisos.forEach(a => {
+                fetch(`/api/v1/avisos/${a.id}/marcar_leido/`, {
+                    method: "POST", credentials: "same-origin", headers: { "X-CSRFToken": csrfToken() },
+                });
+            });
         });
 }
 cargarAvisos();

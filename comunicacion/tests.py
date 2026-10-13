@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from core.models import Condominio, Membresia
 
-from .models import Aviso
+from .models import Aviso, AvisoLectura
 
 
 def crear_membresia(condominio, rol, **user_kwargs):
@@ -72,6 +72,58 @@ class AvisoApiTests(TestCase):
     def test_sin_autenticar_no_puede_listar(self):
         r = self.client.get(reverse("aviso-list"))
         self.assertEqual(r.status_code, 401)
+
+
+class AvisoLecturaTests(TestCase):
+    """Confirmación de lectura: cualquier miembro puede marcar un aviso como
+    visto, pero las estadísticas ("Visto por X de Y vecinos") solo las ve
+    directiva/administración -- a un residente no le aporta nada."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Lectura Avisos", plan="premium")
+        cls.otro_condominio = Condominio.objects.create(nombre="Test Lectura Avisos B", plan="premium")
+
+    def setUp(self):
+        self.directiva = crear_membresia(self.condominio, "directiva", username="lectura_directiva")
+        self.residente = crear_membresia(self.condominio, "residente", username="lectura_residente")
+        self.otro_residente = crear_membresia(self.condominio, "residente", username="lectura_residente_2")
+        self.aviso = Aviso.objects.create(condominio=self.condominio, autor=self.directiva, titulo="Corte de agua", cuerpo="Mañana de 9 a 12.")
+
+    def test_marcar_leido_crea_el_registro(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("aviso-marcar-leido", args=[self.aviso.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(AvisoLectura.objects.filter(aviso=self.aviso, membresia=self.residente).exists())
+
+    def test_marcar_leido_es_idempotente(self):
+        self.client.force_login(self.residente.user)
+        self.client.post(reverse("aviso-marcar-leido", args=[self.aviso.pk]))
+        r = self.client.post(reverse("aviso-marcar-leido", args=[self.aviso.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(AvisoLectura.objects.filter(aviso=self.aviso, membresia=self.residente).count(), 1)
+
+    def test_no_puede_marcar_leido_un_aviso_de_otro_condominio(self):
+        autor_ajeno = crear_membresia(self.otro_condominio, "directiva", username="lectura_directiva_ajena")
+        aviso_ajeno = Aviso.objects.create(condominio=self.otro_condominio, autor=autor_ajeno, titulo="Ajeno", cuerpo="...")
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("aviso-marcar-leido", args=[aviso_ajeno.pk]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_residente_no_ve_las_estadisticas_de_lectura(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("aviso-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertIsNone(resultados[0]["leido_por_count"])
+        self.assertIsNone(resultados[0]["total_destinatarios"])
+
+    def test_directiva_ve_cuantos_vecinos_lo_han_visto(self):
+        AvisoLectura.objects.create(aviso=self.aviso, membresia=self.residente)
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("aviso-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual(resultados[0]["leido_por_count"], 1)
+        self.assertEqual(resultados[0]["total_destinatarios"], 3)
 
 
 class AvisoAdminTests(TestCase):
