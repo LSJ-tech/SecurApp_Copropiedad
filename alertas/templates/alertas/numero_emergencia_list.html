@@ -1,0 +1,56 @@
+{% extends "core/base.html" %}
+{% block titulo %}Números de emergencia{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <h1 class="h4 mb-0">Números de emergencia</h1>
+    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+    <a href="{% url 'numero-emergencia-crear' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Agregar número</a>
+    {% endif %}
+</div>
+<p class="text-muted small mb-3">Carabineros, Bomberos y Ambulancia son los mismos en todo Chile. Plan Cuadrante, la eléctrica y la sanitaria varían según la comuna -- directiva/administración los agrega con el número real de {{ condominio.nombre }}.</p>
+
+{% regroup numeros by get_categoria_display as numeros_por_categoria %}
+<div class="row g-3 mb-4">
+    {% for grupo in numeros_por_categoria %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">{{ grupo.grouper }}</div>
+            <ul class="list-group list-group-flush">
+                {% for n in grupo.list %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold">{{ n.nombre }}</div>
+                        <a href="tel:{{ n.telefono }}" class="text-decoration-none">{{ n.telefono }}</a>
+                    </div>
+                    {% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+                    <form method="post" action="{% url 'numero-emergencia-eliminar' n.pk %}" onsubmit="return confirm('¿Eliminar este número?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if membresia.rol == "directiva" or membresia.rol == "administracion" %}
+{% if sugerencias %}
+<div class="card border-info-subtle">
+    <div class="card-body">
+        <h2 class="h6 mb-1"><i class="bi bi-lightbulb text-info"></i> Sugerencias para {{ region_nombre }}</h2>
+        <p class="text-muted small mb-2">Según tu región, estas empresas suelen operar acá -- confirma el teléfono real (en tu boleta o el sitio oficial de la empresa) antes de agregarlo, nunca lo adivinamos nosotros.</p>
+        <div class="d-flex flex-wrap gap-2">
+            {% for categoria, empresas in sugerencias.items %}
+                {% for empresa in empresas %}
+                <a href="{% url 'numero-emergencia-crear' %}?nombre={{ empresa|urlencode }}&categoria={{ categoria }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-plus"></i> {{ empresa }}</a>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

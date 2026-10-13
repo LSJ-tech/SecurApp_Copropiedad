@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import AutocompleteSelectFilter
 from unfold.decorators import display
 
-from .models import Alerta
+from .models import Alerta, NumeroEmergencia
 
 
 @admin.register(Alerta)
@@ -19,3 +19,11 @@ class AlertaAdmin(ModelAdmin):
     @display(description="Estado", ordering="estado", label={"activa": "danger", "resuelta": "success", "falsa_alarma": "warning", "auto_cerrada": "info"})
     def estado_badge(self, obj):
         return obj.estado, obj.get_estado_display()
+
+
+@admin.register(NumeroEmergencia)
+class NumeroEmergenciaAdmin(ModelAdmin):
+    list_display = ["nombre", "telefono", "categoria", "condominio"]
+    list_filter = [("condominio", AutocompleteSelectFilter), "categoria"]
+    list_filter_submit = True
+    list_select_related = ["condominio"]

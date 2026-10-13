@@ -273,3 +273,127 @@ class AlertaAdminTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Robo")
         self.assertContains(r, "Activa")
+
+
+class NumeroEmergenciaListViewTests(TestCase):
+    """Abierto a cualquier rol -- precarga los 4 nacionales solo la primera
+    vez (ver NumeroEmergenciaListView.get_queryset)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Numeros Emergencia", plan="premium", region="valparaiso")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="num_emerg_residente")
+        self.directiva = crear_membresia(self.condominio, "directiva", username="num_emerg_directiva")
+
+    def test_precarga_los_4_numeros_nacionales(self):
+        from .models import NumeroEmergencia
+
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numeros-emergencia"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), 4)
+        self.assertContains(r, "133")
+        self.assertContains(r, "132")
+
+    def test_no_resucita_un_numero_que_directiva_borro(self):
+        from .models import NumeroEmergencia
+
+        self.client.force_login(self.residente.user)
+        self.client.get(reverse("numeros-emergencia"))
+        bomberos = NumeroEmergencia.objects.get(condominio=self.condominio, nombre="Bomberos")
+        bomberos.delete()
+
+        self.client.get(reverse("numeros-emergencia"))
+        self.assertEqual(NumeroEmergencia.objects.filter(condominio=self.condominio).count(), 3)
+        self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio, nombre="Bomberos").exists())
+
+    def test_sugerencias_segun_la_region_del_condominio(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("numeros-emergencia"))
+        self.assertIn("Chilquinta", r.context["sugerencias"]["electricidad"])
+        self.assertContains(r, "Chilquinta")
+
+    def test_residente_no_ve_las_sugerencias(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numeros-emergencia"))
+        self.assertNotContains(r, "Chilquinta")
+
+    def test_sin_sugerencias_para_una_region_sin_cobertura(self):
+        condominio = Condominio.objects.create(nombre="Test Sin Sugerencias", plan="premium", region="aysen")
+        directiva = crear_membresia(condominio, "directiva", username="num_emerg_aysen")
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("numeros-emergencia"))
+        self.assertEqual(r.context["sugerencias"], {})
+
+
+class NumeroEmergenciaCreateViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Crear Numero", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="crear_num_residente")
+        self.directiva = crear_membresia(self.condominio, "directiva", username="crear_num_directiva")
+
+    def test_residente_no_puede_agregar(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("numero-emergencia-crear"), {"categoria": "otro", "nombre": "Conserjería", "telefono": "123"})
+        self.assertEqual(r.status_code, 302)
+        from .models import NumeroEmergencia
+        self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio).exists())
+
+    def test_directiva_puede_agregar(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.post(reverse("numero-emergencia-crear"), {"categoria": "electricidad", "nombre": "Chilquinta", "telefono": "600 600 5000"})
+        self.assertRedirects(r, reverse("numeros-emergencia"))
+        from .models import NumeroEmergencia
+        numero = NumeroEmergencia.objects.get(condominio=self.condominio)
+        self.assertEqual(numero.nombre, "Chilquinta")
+        self.assertEqual(numero.telefono, "600 600 5000")
+
+    def test_prellena_desde_una_sugerencia_pero_nunca_el_telefono(self):
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("numero-emergencia-crear") + "?nombre=Chilquinta&categoria=electricidad")
+        self.assertContains(r, 'value="Chilquinta"')
+        self.assertNotIn("telefono", r.context["form"].initial)
+
+
+class EliminarNumeroEmergenciaViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Borrar Numero", plan="premium")
+        cls.otro_condominio = Condominio.objects.create(nombre="Test Borrar Numero B", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="borrar_num_residente")
+        self.directiva = crear_membresia(self.condominio, "directiva", username="borrar_num_directiva")
+
+    def _numero(self, condominio=None):
+        from .models import NumeroEmergencia
+        return NumeroEmergencia.objects.create(condominio=condominio or self.condominio, categoria="otro", nombre="Conserjería", telefono="123")
+
+    def test_residente_no_puede_borrar(self):
+        numero = self._numero()
+        self.client.force_login(self.residente.user)
+        r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
+        self.assertEqual(r.status_code, 302)
+        from .models import NumeroEmergencia
+        self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
+
+    def test_directiva_puede_borrar(self):
+        numero = self._numero()
+        self.client.force_login(self.directiva.user)
+        r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
+        self.assertRedirects(r, reverse("numeros-emergencia"))
+        from .models import NumeroEmergencia
+        self.assertFalse(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
+
+    def test_no_puede_borrar_uno_de_otro_condominio(self):
+        numero = self._numero(condominio=self.otro_condominio)
+        self.client.force_login(self.directiva.user)
+        r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
+        self.assertEqual(r.status_code, 404)
+        from .models import NumeroEmergencia
+        self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
