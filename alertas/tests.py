@@ -103,6 +103,16 @@ class NotificarAlertaTests(TestCase):
         self.assertEqual(mock_expo.call_args.kwargs["excluir_user_id"], membresia.user_id)
         self.assertEqual(mock_web.call_args.kwargs["excluir_user_id"], membresia.user_id)
 
+    def test_emergencia_medica_y_persona_extrana_tienen_su_propio_titulo(self):
+        membresia = crear_membresia(self.condominio, "residente", username="notif_tipos")
+        self.client.force_login(membresia.user)
+        for tipo, fragmento_titulo in [("emergencia_medica", "emergencia médica"), ("persona_extrana", "Persona extraña")]:
+            with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
+                 patch("alertas.services.enviar_web_push_a_condominio"):
+                r = self.client.post(reverse("alerta-list"), {"tipo": tipo}, content_type="application/json")
+            self.assertEqual(r.status_code, 201)
+            self.assertIn(fragmento_titulo, mock_expo.call_args.args[1])
+
 
 class AlertaHistorialViewTests(TestCase):
     """Página web del historial (`alertas/views.py`) -- distinta del endpoint

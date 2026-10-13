@@ -4,6 +4,8 @@ TITULOS_POR_TIPO = {
     "robo": "🚨 Alerta de robo",
     "incendio": "🔥 Alerta de incendio",
     "accidente": "🚑 Alerta de accidente",
+    "emergencia_medica": "🚑 Alerta de emergencia médica",
+    "persona_extrana": "⚠️ Persona extraña en el sector",
     "otro": "🚨 Alerta de emergencia",
     "prueba": "🧪 Prueba del botón de pánico (no es una emergencia real)",
 }

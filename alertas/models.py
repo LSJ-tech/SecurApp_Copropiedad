@@ -6,6 +6,8 @@ TIPO_CHOICES = [
     ("robo", "Robo"),
     ("incendio", "Incendio"),
     ("accidente", "Accidente"),
+    ("emergencia_medica", "Emergencia médica"),
+    ("persona_extrana", "Persona extraña en el sector"),
     ("otro", "Otro"),
     ("prueba", "Prueba"),
 ]
@@ -23,7 +25,7 @@ MINUTOS_AUTO_CIERRE = 30
 class Alerta(models.Model):
     condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="alertas")
     autor = models.ForeignKey(Membresia, on_delete=models.CASCADE, related_name="alertas_creadas")
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default="otro")
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="otro")
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="activa")
     mensaje = models.CharField(max_length=255, blank=True)
     latitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
