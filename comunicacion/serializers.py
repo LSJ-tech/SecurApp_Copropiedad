@@ -40,12 +40,17 @@ class PublicacionSerializer(serializers.ModelSerializer):
     autor_torre = serializers.CharField(source="autor.unidad.torre.nombre", read_only=True, default=None)
     categoria_display = serializers.CharField(source="get_categoria_display", read_only=True)
     puede_eliminar = serializers.SerializerMethodField()
+    torre_nombre = serializers.CharField(source="torre.nombre", read_only=True, default=None)
+    # Nunca se expone "torre" en sí (elegir una ajena a la propia no tendría
+    # sentido) -- solo este booleano; PublicacionViewSet.perform_create
+    # resuelve la torre real a partir de la del autor.
+    solo_mi_torre = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Publicacion
         fields = [
             "id", "categoria", "categoria_display", "titulo", "cuerpo", "fecha_creacion",
-            "autor_nombre", "autor_unidad", "autor_torre", "puede_eliminar",
+            "autor_nombre", "autor_unidad", "autor_torre", "puede_eliminar", "torre_nombre", "solo_mi_torre",
         ]
 
     def get_puede_eliminar(self, obj) -> bool:

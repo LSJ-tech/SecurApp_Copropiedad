@@ -231,6 +231,94 @@ class PublicacionApiTests(TestCase):
         self.assertTrue(resultados[0]["puede_eliminar"])
 
 
+class PublicacionSoloTorreTests(TestCase):
+    """Un residente puede acotar su publicación a su propia torre en vez de
+    todo el condominio -- directiva/administración/conserjería siguen
+    viendo todo, porque gestionan/moderan el condominio completo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from core.models import Torre, Unidad
+
+        cls.condominio = Condominio.objects.create(nombre="Test Muro Torre", plan="premium")
+        cls.torre1 = Torre.objects.create(condominio=cls.condominio, nombre="1")
+        cls.torre2 = Torre.objects.create(condominio=cls.condominio, nombre="2")
+        cls.unidad_t1 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre1, numero="101")
+        cls.unidad_t2 = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre2, numero="201")
+
+    def setUp(self):
+        self.residente_t1 = crear_membresia(self.condominio, "residente", username="muro_torre_r1")
+        self.residente_t1.unidad = self.unidad_t1
+        self.residente_t1.save(update_fields=["unidad"])
+
+        self.residente_t2 = crear_membresia(self.condominio, "residente", username="muro_torre_r2")
+        self.residente_t2.unidad = self.unidad_t2
+        self.residente_t2.save(update_fields=["unidad"])
+
+        self.residente_sin_unidad = crear_membresia(self.condominio, "residente", username="muro_torre_sin_unidad")
+        self.directiva = crear_membresia(self.condominio, "directiva", username="muro_torre_directiva")
+
+    def test_solo_mi_torre_usa_la_torre_del_autor(self):
+        self.client.force_login(self.residente_t1.user)
+        r = self.client.post(reverse("publicacion-list"), {
+            "categoria": "otro", "titulo": "Fuga de agua", "cuerpo": "En el pasillo del 3er piso", "solo_mi_torre": True,
+        })
+        self.assertEqual(r.status_code, 201)
+        publicacion = Publicacion.objects.get(titulo="Fuga de agua")
+        self.assertEqual(publicacion.torre, self.torre1)
+
+    def test_sin_marcar_queda_para_todo_el_condominio(self):
+        self.client.force_login(self.residente_t1.user)
+        self.client.post(reverse("publicacion-list"), {"categoria": "otro", "titulo": "General", "cuerpo": "..."})
+        self.assertIsNone(Publicacion.objects.get(titulo="General").torre)
+
+    def test_residente_de_otra_torre_no_ve_la_publicacion_acotada(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        self.client.force_login(self.residente_t2.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([p["titulo"] for p in resultados], [])
+
+    def test_residente_de_la_misma_torre_si_la_ve(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        self.client.force_login(self.residente_t1.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([p["titulo"] for p in resultados], ["Solo T1"])
+
+    def test_publicacion_del_condominio_completo_la_ven_todos(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente_t1, titulo="General", cuerpo="...")
+        self.client.force_login(self.residente_t2.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual([p["titulo"] for p in resultados], ["General"])
+
+    def test_directiva_ve_las_de_cualquier_torre(self):
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente_t1, torre=self.torre1, titulo="Solo T1", cuerpo="...")
+        Publicacion.objects.create(condominio=self.condominio, autor=self.residente_t2, torre=self.torre2, titulo="Solo T2", cuerpo="...")
+        self.client.force_login(self.directiva.user)
+        r = self.client.get(reverse("publicacion-list"))
+        resultados = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        self.assertEqual({p["titulo"] for p in resultados}, {"Solo T1", "Solo T2"})
+
+    def test_residente_sin_unidad_no_puede_acotar(self):
+        self.client.force_login(self.residente_sin_unidad.user)
+        r = self.client.post(reverse("publicacion-list"), {
+            "categoria": "otro", "titulo": "Sin unidad", "cuerpo": "...", "solo_mi_torre": True,
+        })
+        self.assertEqual(r.status_code, 201)
+        self.assertIsNone(Publicacion.objects.get(titulo="Sin unidad").torre)
+
+    def test_la_pagina_ofrece_la_opcion_solo_a_quien_tiene_torre(self):
+        self.client.force_login(self.residente_t1.user)
+        r = self.client.get(reverse("muro-vecinos"))
+        self.assertContains(r, "Publicar solo para")
+
+        self.client.force_login(self.residente_sin_unidad.user)
+        r = self.client.get(reverse("muro-vecinos"))
+        self.assertNotContains(r, "Publicar solo para")
+
+
 class MuroVecinosViewTests(TestCase):
     def test_cualquier_rol_puede_entrar(self):
         condominio = Condominio.objects.create(nombre="Test Muro Pagina", plan="premium")

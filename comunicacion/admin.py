@@ -20,7 +20,7 @@ class PublicacionAdmin(ModelAdmin):
     """Para moderar el muro de vecinos desde el admin si hace falta borrar
     algo que no se sacó a tiempo desde la app."""
 
-    list_display = ["titulo", "categoria", "condominio", "autor", "fecha_creacion"]
-    list_filter = [("condominio", AutocompleteSelectFilter), "categoria"]
+    list_display = ["titulo", "categoria", "condominio", "torre", "autor", "fecha_creacion"]
+    list_filter = [("condominio", AutocompleteSelectFilter), ("torre", AutocompleteSelectFilter), "categoria"]
     list_filter_submit = True
-    list_select_related = ["condominio", "autor__user", "autor__condominio"]
+    list_select_related = ["condominio", "torre", "autor__user", "autor__condominio"]

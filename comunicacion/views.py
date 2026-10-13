@@ -10,3 +10,11 @@ class MuroVecinosView(CondominioRequiredMixin, TemplateView):
     así que acá no hay queryset."""
 
     template_name = "comunicacion/muro.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # La opción "solo mi torre" solo tiene sentido para quien de verdad
+        # tiene una torre (residente de un condominio con torres) -- en
+        # modo casas, o sin unidad asignada todavía, no se muestra.
+        context["torre_propia"] = self.membresia.unidad.torre if self.membresia.unidad_id else None
+        return context

@@ -1,6 +1,6 @@
 from django.db import models
 
-from core.models import Condominio, Membresia
+from core.models import Condominio, Membresia, Torre
 
 
 class Aviso(models.Model):
@@ -50,6 +50,10 @@ class Publicacion(models.Model):
 
     condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="publicaciones")
     autor = models.ForeignKey(Membresia, on_delete=models.CASCADE, related_name="publicaciones")
+    torre = models.ForeignKey(
+        Torre, on_delete=models.CASCADE, null=True, blank=True, related_name="publicaciones",
+        help_text="Vacío = visible para todo el condominio. Con torre, solo la ven sus residentes (directiva/administración/conserjería siguen viendo todo).",
+    )
     categoria = models.CharField(max_length=20, choices=CATEGORIA_PUBLICACION_CHOICES, default="otro")
     titulo = models.CharField(max_length=150)
     cuerpo = models.TextField()
