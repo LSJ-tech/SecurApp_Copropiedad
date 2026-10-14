@@ -30,7 +30,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;0,800;0,900;1,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -65,12 +65,16 @@
             --securapp-primary-darker: #0F1D29;
             --securapp-secondary: #708090;
             --securapp-accent: #E07A5F;
+            --securapp-slate: #5B7A8C;
             --securapp-ink: #1A2E40;
         }
         body {
-            background: #F8F9FA;
-            font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+            background: #F7F8F9;
+            font-family: "Work Sans", system-ui, -apple-system, sans-serif;
             color: var(--securapp-ink);
+        }
+        h1, h2, .section-title, .font-display {
+            font-family: "Fraunces", Georgia, serif;
         }
         .btn-primary {
             --bs-btn-bg: var(--securapp-primary);
@@ -110,54 +114,54 @@
         .eyebrow {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            background: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.25);
-            padding: 0.35rem 0.9rem;
-            border-radius: 50rem;
+            gap: 0.5rem;
+            font-family: "Fraunces", Georgia, serif;
+            font-style: italic;
+            font-weight: 500;
+            font-size: 1.05rem;
+            color: var(--securapp-accent);
         }
-        .hero h1 { font-weight: 800; letter-spacing: -0.02em; }
+        .hero h1 { font-weight: 800; letter-spacing: -0.01em; }
         .stat-strip-item { border-left: 1px solid rgba(255,255,255,0.25); padding-left: 1.25rem; }
         .stat-strip-item:first-child { border-left: none; padding-left: 0; }
         .stat-numero { font-size: 1.1rem; font-weight: 700; }
 
-        .numero-grande {
-            font-size: 3rem;
-            font-weight: 800;
-            color: rgba(26, 46, 64, 0.15);
-            line-height: 1;
-        }
         .icono-feature {
             width: 3.25rem;
             height: 3.25rem;
             border-radius: 1rem;
-            background: rgba(26, 46, 64, 0.1);
-            color: var(--securapp-primary);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
+            flex-shrink: 0;
         }
-        .icono-rose { background: #FEECEF; color: #BE123C; }
-        .icono-amber { background: #FEF3E2; color: #92400E; }
-        .icono-emerald { background: #E7F8F2; color: #047857; }
-        .numero-rose { color: rgba(244, 63, 94, 0.18); }
-        .numero-amber { color: rgba(245, 158, 11, 0.2); }
-        .numero-emerald { color: rgba(16, 185, 129, 0.18); }
+        .icono-emergencia { background: rgba(224, 122, 95, 0.14); color: var(--securapp-accent); }
+        .icono-admin { background: rgba(91, 122, 140, 0.12); color: var(--securapp-slate); }
+
+        .grupo-caracteristicas-label {
+            font-family: "Fraunces", Georgia, serif;
+            font-style: italic;
+            font-size: 1.15rem;
+            color: var(--securapp-ink);
+            margin-bottom: 1.25rem;
+        }
         .card-feature {
             background: #fff;
-            border-radius: 1rem;
-            padding: 1.75rem;
+            border-radius: 0.75rem;
+            padding: 1.5rem 1.75rem;
             height: 100%;
-            box-shadow: 0 1px 2px rgba(30, 27, 75, 0.04);
-            border: 1px solid rgba(30, 27, 75, 0.06);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            border: 1px solid rgba(30, 27, 75, 0.08);
+            border-left: 3px solid transparent;
         }
-        .card-feature:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(30, 27, 75, 0.08); }
+        .card-feature--emergencia {
+            border-left-color: var(--securapp-accent);
+            background: linear-gradient(180deg, rgba(224, 122, 95, 0.05) 0%, #fff 140px);
+            box-shadow: 0 8px 24px rgba(224, 122, 95, 0.1);
+        }
+        .card-feature--admin {
+            border-left-color: var(--securapp-slate);
+        }
 
         .paso-numero {
             width: 2.5rem;
@@ -231,7 +235,25 @@
             max-width: 260px;
             animation: flotar 4s ease-in-out infinite;
         }
-        .hero-badge .bi { font-size: 1.4rem; color: #16a34a; }
+        .hero-badge-pulso {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.4rem;
+            height: 1.4rem;
+            flex-shrink: 0;
+        }
+        .hero-badge-pulso::before {
+            content: "";
+            position: absolute;
+            inset: -7px;
+            border-radius: 50%;
+            background: rgba(22, 163, 74, 0.25);
+            animation: pulso-anillo 2.2s ease-out infinite;
+        }
+        .hero-badge-pulso .bi { position: relative; font-size: 1.4rem; color: #16a34a; }
+        @keyframes pulso-anillo { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.9); opacity: 0; } }
         @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         @media (max-width: 991px) { .hero-badge { display: none; } }
 
@@ -366,10 +388,10 @@
             </div>
         </div>
         <div class="hero-badge">
-            <i class="bi bi-check-circle-fill"></i>
+            <span class="hero-badge-pulso"><i class="bi bi-check-circle-fill"></i></span>
             <div>
                 <div class="fw-bold small">Alerta resuelta</div>
-                <div class="text-muted" style="font-size: 0.72rem;">Depto 302 · hace 12 seg</div>
+                <div class="text-muted" style="font-size: 0.72rem;">Depto 302, hace 12 segundos</div>
             </div>
         </div>
     </header>
@@ -389,7 +411,7 @@
         <div class="container">
             <div class="row g-5 align-items-center">
                 <div class="col-lg-5">
-                    <span class="eyebrow mb-3" style="background: rgba(26,46,64,0.1); border-color: rgba(26,46,64,0.2); color: var(--securapp-primary);"><i class="bi bi-chat-dots"></i> Hablemos de tu comunidad</span>
+                    <span class="eyebrow mb-3"><i class="bi bi-chat-dots"></i> Hablemos de tu comunidad</span>
                     <h2 class="fw-bold mt-3 mb-3 section-title">Cuéntanos de tu condominio</h2>
                     <p class="text-muted mb-4">Llena el formulario y te contactamos para coordinar el acceso con tu directiva. Sin compromiso.</p>
                     <div class="dato-real mb-3">
@@ -447,7 +469,7 @@
     <section class="seccion-producto py-5 reveal">
         <div class="container py-4">
             <div class="text-center mb-5">
-                <span class="eyebrow mb-3" style="color: #fff;"><i class="bi bi-display"></i> El producto real, no una maqueta</span>
+                <span class="eyebrow mb-3"><i class="bi bi-display"></i> El producto real, no una maqueta</span>
                 <h2 class="fw-bold mt-3 mb-2" style="color: #fff;">Así se ve tu panel</h2>
                 <p class="mx-auto" style="max-width: 520px; color: rgba(255,255,255,0.75);">El mismo panel que usan directiva, administración y conserjería hoy — contenido de ejemplo, para que veas cómo se organiza.</p>
             </div>
@@ -488,7 +510,7 @@
     {% if stat_organizaciones %}
     <section class="py-5 bg-white reveal">
         <div class="container">
-            <p class="text-center text-muted small text-uppercase fw-semibold mb-4" style="letter-spacing: 0.06em;">Números reales, no de marketing</p>
+            <p class="text-center text-muted mb-4" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 1.05rem;">Números reales, no de marketing</p>
             {% if stat_alertas_resueltas %}
             <p class="text-center fw-bold mb-4" style="font-size: 1.35rem; color: #BE123C;"><i class="bi bi-check-circle-fill"></i> {{ stat_alertas_resueltas }} alertas de pánico resueltas hasta ahora</p>
             {% endif %}
@@ -512,45 +534,45 @@
 
     <section id="caracteristicas" class="py-5 reveal" style="margin-top: 2rem; scroll-margin-top: 5rem;">
         <div class="container">
-            <h2 class="text-center fw-bold mb-2 section-title">Seguridad primero, administración también</h2>
-            <p class="text-center text-muted mb-5 mx-auto" style="max-width: 560px;">Botón de pánico y números de emergencia a la mano de todos; y en el mismo panel, lo que directiva, administración y conserjería necesitan para el día a día.</p>
-            <div class="row g-4">
-                <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande numero-rose mb-2">01</div>
-                        <div class="icono-feature icono-rose mb-3"><i class="bi bi-exclamation-triangle"></i></div>
+            <h2 class="text-center fw-bold mb-5 section-title">Seguridad primero, administración también</h2>
+
+            <p class="grupo-caracteristicas-label">Para una emergencia</p>
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card-feature card-feature--emergencia">
+                        <div class="icono-feature icono-emergencia mb-3"><i class="bi bi-exclamation-triangle"></i></div>
                         <h3 class="h5 fw-semibold">Botón de pánico</h3>
                         <p class="text-muted mb-0">Un residente dispara la alerta y todo el condominio la recibe al instante con notificación push, sin depender de que alguien vea el WhatsApp a tiempo.</p>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande numero-rose mb-2">02</div>
-                        <div class="icono-feature icono-rose mb-3"><i class="bi bi-telephone"></i></div>
+                <div class="col-md-6">
+                    <div class="card-feature card-feature--emergencia">
+                        <div class="icono-feature icono-emergencia mb-3"><i class="bi bi-telephone"></i></div>
                         <h3 class="h5 fw-semibold">Números de emergencia</h3>
                         <p class="text-muted mb-0">Carabineros, Bomberos y Ambulancia ya vienen cargados; Plan Cuadrante, la eléctrica o la sanitaria de tu comuna las agrega directiva/administración, o cualquier vecino las propone.</p>
                     </div>
                 </div>
+            </div>
+
+            <p class="grupo-caracteristicas-label">Para el día a día, con tu comunidad</p>
+            <div class="row g-4">
                 <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande numero-amber mb-2">03</div>
-                        <div class="icono-feature icono-amber mb-3"><i class="bi bi-megaphone"></i></div>
+                    <div class="card-feature card-feature--admin">
+                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-megaphone"></i></div>
                         <h3 class="h5 fw-semibold">Avisos a todos los vecinos</h3>
                         <p class="text-muted mb-0">Directiva o administración publica un aviso para todo el condominio; un delegado de torre también puede publicar, acotado solo a su propia torre. Todos los destinatarios lo ven en su panel, sin reenviar mensajes grupo por grupo.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande mb-2">04</div>
-                        <div class="icono-feature mb-3"><i class="bi bi-door-open"></i></div>
+                    <div class="card-feature card-feature--admin">
+                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-door-open"></i></div>
                         <h3 class="h5 fw-semibold">Registro de accesos</h3>
                         <p class="text-muted mb-0">Conserjería deja registrado quién entra y sale, con historial ordenado por unidad en vez de un cuaderno en portería.</p>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4">
-                    <div class="card-feature">
-                        <div class="numero-grande numero-emerald mb-2">05</div>
-                        <div class="icono-feature icono-emerald mb-3"><i class="bi bi-cash-coin"></i></div>
+                    <div class="card-feature card-feature--admin">
+                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-cash-coin"></i></div>
                         <h3 class="h5 fw-semibold">Gastos comunes claros</h3>
                         <p class="text-muted mb-0">El cargo se prorratea solo por unidad, cada residente ve su cuota pendiente y los datos para transferir, y directiva marca los pagos recibidos.</p>
                     </div>
