@@ -305,8 +305,6 @@ function csrfToken() {
     return document.cookie.split("; ").find(r => r.startsWith("csrftoken="))?.split("=")[1] || "";
 }
 
-const ETIQUETA_TORRE = "{{ condominio.etiqueta_torre|default:"Torre"|escapejs }}";
-
 // Compartir una alerta por WhatsApp -- lo manda el propio residente a quien
 // quiera (su grupo del edificio, un vecino puntual), sin ninguna API ni
 // integración de por medio: solo un link wa.me con el mensaje ya armado.
