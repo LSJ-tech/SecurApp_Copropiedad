@@ -1,4 +1,3 @@
-import pygeohash as pgh
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -8,8 +7,9 @@ from django.views.generic import FormView, TemplateView
 
 from core.usuarios import generar_username
 
-from .forms import RegistroVecinoForm
-from .models import PRECISION_GEOHASH, PerfilGeografico
+from .forms import ActualizarPerfilGeograficoForm, RegistroVecinoForm
+from .models import PerfilGeografico
+from .services import calcular_geohash
 
 
 class RegistroVecinoView(FormView):
@@ -25,7 +25,7 @@ class RegistroVecinoView(FormView):
     def form_valid(self, form):
         datos = form.cleaned_data
         username = generar_username(datos["nombre"], datos["apellido"])
-        geohash = pgh.encode(float(datos["lat"]), float(datos["lng"]), precision=PRECISION_GEOHASH)
+        geohash = calcular_geohash(datos["lat"], datos["lng"])
 
         user = User.objects.create_user(
             username=username, password=datos["password1"], email=datos.get("email", ""),
@@ -64,3 +64,37 @@ class MiBarrioView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context["perfil"] = self.request.user.perfil_geografico
         return context
+
+
+class ActualizarPerfilGeograficoView(LoginRequiredMixin, FormView):
+    """Actualizar dirección/ubicación y teléfono de un PerfilGeografico ya
+    existente -- quien se mudó, escribió mal su dirección la primera vez, o
+    ahora sí quiere dar permiso de GPS. Misma validación que el registro
+    (ResolverUbicacionMixin), pero no crea cuenta nueva ni pide contraseña."""
+
+    template_name = "vecindario/actualizar_ubicacion.html"
+    form_class = ActualizarPerfilGeograficoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and getattr(request.user, "perfil_geografico", None) is None:
+            messages.error(request, "Tu cuenta todavía no está registrada en la red vecinal.")
+            return redirect("vecindario-registro")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        perfil = self.request.user.perfil_geografico
+        return {"direccion_texto": perfil.direccion_texto, "telefono": perfil.telefono}
+
+    def form_valid(self, form):
+        datos = form.cleaned_data
+        perfil = self.request.user.perfil_geografico
+        perfil.direccion_texto = datos["direccion_texto"]
+        perfil.lat = datos["lat"]
+        perfil.lng = datos["lng"]
+        perfil.region = datos["region"]
+        perfil.comuna = datos["comuna"]
+        perfil.geohash = calcular_geohash(datos["lat"], datos["lng"])
+        perfil.telefono = datos.get("telefono", "")
+        perfil.save()
+        messages.success(self.request, f"Listo, actualizamos tu ubicación a {datos['comuna']}.")
+        return redirect("mi-barrio")

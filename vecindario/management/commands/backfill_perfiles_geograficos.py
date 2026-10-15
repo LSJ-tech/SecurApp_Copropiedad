@@ -1,9 +1,8 @@
-import pygeohash as pgh
 from django.core.management.base import BaseCommand
 
 from core.models import Condominio
-from vecindario.models import PRECISION_GEOHASH, PerfilGeografico
-from vecindario.services import geocodificar_direccion, region_de_comuna
+from vecindario.models import PerfilGeografico
+from vecindario.services import calcular_geohash, geocodificar_direccion, region_de_comuna
 
 
 class Command(BaseCommand):
@@ -50,7 +49,7 @@ class Command(BaseCommand):
                 condominios_sin_geocodificar.append((condominio, f"comuna {resultado['comuna']!r} no está en nuestros datos oficiales"))
                 continue
 
-            geohash = pgh.encode(resultado["lat"], resultado["lng"], precision=PRECISION_GEOHASH)
+            geohash = calcular_geohash(resultado["lat"], resultado["lng"])
             condominios_procesados += 1
 
             for membresia in membresias_sin_perfil:

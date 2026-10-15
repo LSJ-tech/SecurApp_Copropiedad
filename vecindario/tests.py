@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AlertaCiudadana, PerfilGeografico
-from .services import geocodificar_direccion, geocodificar_inverso, notificar_alerta_ciudadana, region_de_comuna, vecinos_geohash
+from .services import calcular_geohash, geocodificar_direccion, geocodificar_inverso, notificar_alerta_ciudadana, region_de_comuna, vecinos_geohash
 
 
 def crear_perfil(username, lat, lng, geohash, comuna="Valparaíso", region="valparaiso"):
@@ -56,6 +56,19 @@ class VecinosGeohashTests(TestCase):
             # chica (un par de celdas de ancho/alto en esta precisión)
             self.assertLess(abs(lat - lat_centro), 1.0)
             self.assertLess(abs(lng - lng_centro), 1.0)
+
+
+class CalcularGeohashTests(TestCase):
+    def test_devuelve_un_geohash_de_la_precision_configurada(self):
+        from .models import PRECISION_GEOHASH
+
+        self.assertEqual(len(calcular_geohash(-33.0472, -71.6127)), PRECISION_GEOHASH)
+
+    def test_acepta_decimales_de_django(self):
+        """lat/lng suelen venir como Decimal (DecimalField) -- confirma que no explota con eso."""
+        from decimal import Decimal
+
+        self.assertTrue(calcular_geohash(Decimal("-33.0472"), Decimal("-71.6127")))
 
 
 class GeocodificarInversoTests(TestCase):
@@ -438,3 +451,55 @@ class MiBarrioViewTests(TestCase):
         self.client.force_login(perfil.user)
         r = self.client.get(reverse("mi-barrio"))
         self.assertEqual(r.status_code, 200)
+
+
+class ActualizarPerfilGeograficoViewTests(TestCase):
+    def test_sin_perfil_geografico_redirige_a_registro(self):
+        user = User.objects.create_user(username="sin_perfil_actualizar")
+        self.client.force_login(user)
+        r = self.client.get(reverse("vecindario-actualizar-ubicacion"))
+        self.assertRedirects(r, reverse("vecindario-registro"))
+
+    def test_sin_login_redirige_a_login(self):
+        r = self.client.get(reverse("vecindario-actualizar-ubicacion"))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse("login"), r.url)
+
+    def test_get_precarga_la_direccion_y_telefono_actuales(self):
+        perfil = crear_perfil("precarga_actualizar", -33.0, -71.6, "66j5f")
+        perfil.direccion_texto = "Calle Vieja 123"
+        perfil.telefono = "+56911112222"
+        perfil.save()
+        self.client.force_login(perfil.user)
+        r = self.client.get(reverse("vecindario-actualizar-ubicacion"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Calle Vieja 123")
+        self.assertContains(r, "+56911112222")
+
+    def test_post_con_gps_en_comuna_piloto_actualiza_el_perfil(self):
+        perfil = crear_perfil("actualizar_gps_ok", -33.0, -71.6, "66j5f")
+        geohash_anterior = perfil.geohash
+        self.client.force_login(perfil.user)
+        resultado_mock = {"comuna": "Viña del Mar", "region": "Región de Valparaíso"}
+        with patch("vecindario.forms.geocodificar_inverso", return_value=resultado_mock):
+            r = self.client.post(reverse("vecindario-actualizar-ubicacion"), {
+                "direccion_texto": "", "lat": "-33.024500", "lng": "-71.551600", "telefono": "+56933334444",
+            })
+        self.assertRedirects(r, reverse("mi-barrio"))
+        perfil.refresh_from_db()
+        self.assertEqual(perfil.comuna, "Viña del Mar")
+        self.assertEqual(perfil.telefono, "+56933334444")
+        self.assertNotEqual(perfil.geohash, geohash_anterior)
+
+    def test_post_fuera_de_comunas_piloto_rechaza_y_no_modifica_el_perfil(self):
+        perfil = crear_perfil("actualizar_fuera_piloto", -33.0, -71.6, "66j5f", comuna="Valparaíso")
+        comuna_original = perfil.comuna
+        self.client.force_login(perfil.user)
+        resultado_mock = {"comuna": "Iquique", "region": "Región de Tarapacá"}
+        with patch("vecindario.forms.geocodificar_inverso", return_value=resultado_mock):
+            r = self.client.post(reverse("vecindario-actualizar-ubicacion"), {
+                "direccion_texto": "", "lat": "-20.21", "lng": "-70.15", "telefono": "",
+            })
+        self.assertEqual(r.status_code, 200)
+        perfil.refresh_from_db()
+        self.assertEqual(perfil.comuna, comuna_original)

@@ -44,6 +44,15 @@ def _adyacente_seguro(geohash, direccion):
         return None
 
 
+def calcular_geohash(lat, lng):
+    """Codifica lat/lng a la precisión de "barrio" usada en todo el proyecto
+    -- pequeño helper para no repetir `pgh.encode(..., precision=...)` en
+    cada lugar que crea o actualiza un PerfilGeografico/AlertaCiudadana."""
+    from .models import PRECISION_GEOHASH
+
+    return pgh.encode(float(lat), float(lng), precision=PRECISION_GEOHASH)
+
+
 def vecinos_geohash(geohash):
     """La celda propia + sus 8 vecinas (geohash no es perfectamente
     circular -- un punto justo al otro lado del borde de una celda puede

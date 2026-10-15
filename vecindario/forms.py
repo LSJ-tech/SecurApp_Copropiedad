@@ -7,16 +7,12 @@ from .models import COMUNAS_PILOTO
 from .services import geocodificar_direccion, geocodificar_inverso, region_de_comuna
 
 
-class RegistroVecinoForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
-    """Autoregistro público a la red vecinal geográfica -- sin condominio,
-    sin código de invitación. Siempre se prefiere la ubicación GPS del
-    navegador (campos lat/lng ocultos, llenados por JS); si no hay permiso
-    de ubicación, se geocodifica la dirección escrita."""
+class ResolverUbicacionMixin(forms.Form):
+    """Resuelve lat/lng/comuna/region a partir de GPS (preferido) o
+    dirección escrita, validando contra COMUNAS_PILOTO -- compartido entre
+    el registro y la actualización de perfil, para no duplicar la lógica
+    de geocodificación/whitelist en dos lados."""
 
-    nombre = forms.CharField(max_length=150, label=LABEL_TU_NOMBRE, widget=forms.TextInput(attrs={"class": "form-control"}))
-    apellido = forms.CharField(max_length=150, label="Tu apellido", widget=forms.TextInput(attrs={"class": "form-control"}))
-    email = forms.EmailField(required=False, label=LABEL_EMAIL_OPCIONAL, widget=forms.EmailInput(attrs={"class": "form-control"}))
-    telefono = forms.CharField(max_length=20, label="Tu teléfono", widget=forms.TextInput(attrs={"class": "form-control"}))
     direccion_texto = forms.CharField(
         max_length=255, required=False, label="Tu dirección",
         help_text="O usa el botón de ubicación de arriba -- no hace falta escribir la dirección si ya la usaste.",
@@ -24,15 +20,6 @@ class RegistroVecinoForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMi
     )
     lat = forms.DecimalField(required=False, widget=forms.HiddenInput())
     lng = forms.DecimalField(required=False, widget=forms.HiddenInput())
-    acepto_terminos = forms.BooleanField(
-        required=True, label="Acepto los Términos de Uso y la Política de Privacidad",
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        error_messages={"required": "Tienes que aceptar los Términos de Uso y la Política de Privacidad para continuar."},
-    )
-
-    def clean_email(self):
-        email = self.cleaned_data.get("email")
-        return _validar_email_unico(email) if email else email
 
     def clean(self):
         cleaned = super().clean()
@@ -68,3 +55,30 @@ class RegistroVecinoForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMi
             raise ValidationError("No pudimos confirmar la región de esa comuna. Intenta con el botón de ubicación.")
         cleaned["region"] = region
         return cleaned
+
+
+class RegistroVecinoForm(NormalizarNombreApellidoMixin, ResolverUbicacionMixin, ConfirmacionContrasenaMixin):
+    """Autoregistro público a la red vecinal geográfica -- sin condominio,
+    sin código de invitación."""
+
+    nombre = forms.CharField(max_length=150, label=LABEL_TU_NOMBRE, widget=forms.TextInput(attrs={"class": "form-control"}))
+    apellido = forms.CharField(max_length=150, label="Tu apellido", widget=forms.TextInput(attrs={"class": "form-control"}))
+    email = forms.EmailField(required=False, label=LABEL_EMAIL_OPCIONAL, widget=forms.EmailInput(attrs={"class": "form-control"}))
+    telefono = forms.CharField(max_length=20, label="Tu teléfono", widget=forms.TextInput(attrs={"class": "form-control"}))
+    acepto_terminos = forms.BooleanField(
+        required=True, label="Acepto los Términos de Uso y la Política de Privacidad",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        error_messages={"required": "Tienes que aceptar los Términos de Uso y la Política de Privacidad para continuar."},
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        return _validar_email_unico(email) if email else email
+
+
+class ActualizarPerfilGeograficoForm(ResolverUbicacionMixin):
+    """Actualizar la dirección/ubicación y teléfono de un PerfilGeografico
+    ya existente -- misma validación de ubicación que el registro, pero sin
+    contraseña ni términos (eso ya se aceptó una vez)."""
+
+    telefono = forms.CharField(max_length=20, required=False, label="Tu teléfono", widget=forms.TextInput(attrs={"class": "form-control"}))

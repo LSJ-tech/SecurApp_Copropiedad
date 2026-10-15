@@ -2,7 +2,10 @@
 {% block titulo %}Mi barrio{% endblock %}
 {% block contenido %}
 <h1 class="h4 mb-3">Hola, {{ user.first_name|default:user.username }}</h1>
-<p class="text-muted small mb-4">Red vecinal de {{ perfil.comuna }}</p>
+<p class="text-muted small mb-4">
+    Red vecinal de {{ perfil.comuna }}
+    · <a href="{% url 'vecindario-actualizar-ubicacion' %}">Actualizar mi ubicación</a>
+</p>
 
 <div class="card mb-4 border-danger">
     <div class="card-body text-center py-4">

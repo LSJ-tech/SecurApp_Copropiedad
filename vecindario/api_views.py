@@ -1,14 +1,13 @@
-import pygeohash as pgh
 from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import PRECISION_GEOHASH, AlertaCiudadana
+from .models import AlertaCiudadana
 from .permissions import TienePerfilGeografico
 from .serializers import AlertaCiudadanaSerializer
-from .services import notificar_alerta_ciudadana, vecinos_geohash
+from .services import calcular_geohash, notificar_alerta_ciudadana, vecinos_geohash
 
 
 class AlertaCiudadanaViewSet(
@@ -40,7 +39,7 @@ class AlertaCiudadanaViewSet(
     def perform_create(self, serializer):
         perfil = self.request.user.perfil_geografico
         lat, lng = serializer.validated_data["lat"], serializer.validated_data["lng"]
-        geohash_momento = pgh.encode(float(lat), float(lng), precision=PRECISION_GEOHASH)
+        geohash_momento = calcular_geohash(lat, lng)
         alerta = serializer.save(autor=perfil, geohash_momento=geohash_momento)
         notificar_alerta_ciudadana(alerta)
 
