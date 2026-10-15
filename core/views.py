@@ -191,7 +191,8 @@ def listar_condominios(request):
     for condominio in condominios:
         lineas.append(
             f"id={condominio.pk} | nombre={condominio.nombre!r} | torres={condominio._torres} | "
-            f"unidades={condominio._unidades} | miembros={condominio._miembros}"
+            f"unidades={condominio._unidades} | miembros={condominio._miembros} | "
+            f"direccion={condominio.direccion!r} | comuna={condominio.comuna!r} | region={condominio.region!r}"
         )
     return HttpResponse("\n".join(lineas) or "No hay condominios.", content_type=CONTENT_TYPE_TEXTO_PLANO)
 
