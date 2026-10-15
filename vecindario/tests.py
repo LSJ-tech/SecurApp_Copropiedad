@@ -415,6 +415,17 @@ class MiBarrioViewTests(TestCase):
         r = self.client.get(reverse("mi-barrio"))
         self.assertRedirects(r, reverse("inicio"))
 
+    def test_inicio_redirige_a_mi_barrio_si_no_tiene_condominio(self):
+        """Regresión: Django manda a /login/ al éxito de login al default
+        LOGIN_REDIRECT_URL='inicio' -- si InicioView no supiera de
+        perfil_geografico, un vecino sin condominio que entra por /login/
+        directo (sin venir ya de /mi-barrio/) caía en el error falso
+        "tu cuenta no está vinculada a ningún condominio"."""
+        perfil = crear_perfil("inicio_redirige_barrio", -33.0, -71.6, "66j5f")
+        self.client.force_login(perfil.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertRedirects(r, reverse("mi-barrio"))
+
     def test_con_membresia_y_perfil_geografico_puede_ver_mi_barrio(self):
         """Alguien con los dos (ej. vecino de un condominio que también se
         unió a la red vecinal) sí puede ver /mi-barrio/, a diferencia de
