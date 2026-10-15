@@ -331,67 +331,6 @@ class RegistroVecinoViewTests(TestCase):
         self.assertFalse(User.objects.filter(first_name="Luis").exists())
 
 
-class BackfillPerfilesGeograficosTests(TestCase):
-    """Management command -- dry-run por defecto, --aplicar para crear de verdad."""
-
-    def setUp(self):
-        from core.models import Condominio, Membresia
-
-        self.condominio = Condominio.objects.create(
-            nombre="Backfill Test", plan="premium", direccion="Porvenir 1602", comuna="Playa Ancha",
-        )
-        user = User.objects.create_user(username="backfill_miembro", first_name="Vecino", last_name="Empart")
-        self.membresia = Membresia.objects.create(user=user, condominio=self.condominio, rol="residente", terminos_aceptados_en=timezone.now())
-
-    def _mock_geocodificar(self):
-        return patch("vecindario.management.commands.backfill_perfiles_geograficos.geocodificar_direccion", return_value={
-            "lat": -33.0472, "lng": -71.6127, "comuna": "Valparaíso", "region": "Región de Valparaíso",
-        })
-
-    def test_dry_run_no_crea_nada(self):
-        from io import StringIO
-
-        from django.core.management import call_command
-
-        with self._mock_geocodificar():
-            call_command("backfill_perfiles_geograficos", stdout=StringIO())
-        self.assertFalse(PerfilGeografico.objects.filter(user=self.membresia.user).exists())
-
-    def test_aplicar_crea_el_perfil_heredando_la_ubicacion_del_condominio(self):
-        from io import StringIO
-
-        from django.core.management import call_command
-
-        with self._mock_geocodificar():
-            call_command("backfill_perfiles_geograficos", "--aplicar", stdout=StringIO())
-        perfil = PerfilGeografico.objects.get(user=self.membresia.user)
-        self.assertEqual(perfil.comuna, "Valparaíso")
-        self.assertEqual(perfil.region, "valparaiso")
-
-    def test_es_idempotente_no_duplica_en_segunda_corrida(self):
-        from io import StringIO
-
-        from django.core.management import call_command
-
-        with self._mock_geocodificar():
-            call_command("backfill_perfiles_geograficos", "--aplicar", stdout=StringIO())
-            call_command("backfill_perfiles_geograficos", "--aplicar", stdout=StringIO())
-        self.assertEqual(PerfilGeografico.objects.filter(user=self.membresia.user).count(), 1)
-
-    def test_comuna_no_oficial_queda_reportada_sin_crear_perfil(self):
-        from io import StringIO
-
-        from django.core.management import call_command
-
-        with patch("vecindario.management.commands.backfill_perfiles_geograficos.geocodificar_direccion", return_value={
-            "lat": -33.0, "lng": -71.6, "comuna": "Comuna Inventada", "region": "Región X",
-        }):
-            salida = StringIO()
-            call_command("backfill_perfiles_geograficos", "--aplicar", stdout=salida)
-        self.assertFalse(PerfilGeografico.objects.filter(user=self.membresia.user).exists())
-        self.assertIn("Comuna Inventada", salida.getvalue())
-
-
 class MiBarrioViewTests(TestCase):
     def test_sin_perfil_geografico_redirige_a_registro(self):
         user = User.objects.create_user(username="sin_perfil_vista")
@@ -503,3 +442,60 @@ class ActualizarPerfilGeograficoViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         perfil.refresh_from_db()
         self.assertEqual(perfil.comuna, comuna_original)
+
+
+class UnirseVecindarioViewTests(TestCase):
+    """Reemplaza al viejo backfill_perfiles_geograficos: quien ya tiene
+    cuenta (típicamente con Membresia) se suma a la red vecinal con su
+    propia ubicación, no la del condominio."""
+
+    def test_sin_login_redirige_a_login(self):
+        r = self.client.get(reverse("vecindario-unirse"))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse("login"), r.url)
+
+    def test_con_membresia_y_sin_perfil_muestra_el_formulario(self):
+        from core.models import Condominio, Membresia
+
+        condominio = Condominio.objects.create(nombre="Test Unirse", plan="premium")
+        user = User.objects.create_user(username="unirse_con_membresia")
+        Membresia.objects.create(user=user, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
+        self.client.force_login(user)
+        r = self.client.get(reverse("vecindario-unirse"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Súmate a la red vecinal")
+
+    def test_ya_tiene_perfil_geografico_redirige_a_mi_barrio(self):
+        perfil = crear_perfil("unirse_ya_tiene_perfil", -33.0, -71.6, "66j5f")
+        self.client.force_login(perfil.user)
+        r = self.client.get(reverse("vecindario-unirse"))
+        self.assertRedirects(r, reverse("mi-barrio"))
+
+    def test_post_con_gps_en_comuna_piloto_crea_el_perfil_con_la_ubicacion_propia(self):
+        from core.models import Condominio, Membresia
+
+        condominio = Condominio.objects.create(nombre="Test Unirse Crea", plan="premium")
+        user = User.objects.create_user(username="unirse_crea_perfil")
+        Membresia.objects.create(user=user, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
+        self.client.force_login(user)
+        resultado_mock = {"comuna": "Valparaíso", "region": "Región de Valparaíso"}
+        with patch("vecindario.forms.geocodificar_inverso", return_value=resultado_mock):
+            r = self.client.post(reverse("vecindario-unirse"), {
+                "direccion_texto": "", "lat": "-33.047200", "lng": "-71.612700", "telefono": "+56977778888",
+            })
+        self.assertRedirects(r, reverse("mi-barrio"))
+        perfil = PerfilGeografico.objects.get(user=user)
+        self.assertEqual(perfil.comuna, "Valparaíso")
+        self.assertEqual(perfil.telefono, "+56977778888")
+        self.assertTrue(perfil.geohash)
+
+    def test_post_fuera_de_comunas_piloto_rechaza_y_no_crea_perfil(self):
+        user = User.objects.create_user(username="unirse_fuera_piloto")
+        self.client.force_login(user)
+        resultado_mock = {"comuna": "Iquique", "region": "Región de Tarapacá"}
+        with patch("vecindario.forms.geocodificar_inverso", return_value=resultado_mock):
+            r = self.client.post(reverse("vecindario-unirse"), {
+                "direccion_texto": "", "lat": "-20.21", "lng": "-70.15", "telefono": "",
+            })
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(PerfilGeografico.objects.filter(user=user).exists())

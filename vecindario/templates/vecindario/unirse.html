@@ -1,0 +1,72 @@
+{% extends "core/base.html" %}
+{% block titulo %}Súmate a la red vecinal{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <h1 class="h4 mb-0">Súmate a la red vecinal</h1>
+                    <p class="text-muted small mb-0">Avisa a tus vecinos reales, no solo a tu condominio -- usamos tu ubicación, no la del condominio.</p>
+                </div>
+
+                <div class="alert alert-info small">
+                    Por ahora cubrimos Valparaíso, Viña del Mar y Casablanca. Si tu comuna no está entre esas,
+                    igual puedes intentar -- te avisamos si todavía no llegamos.
+                </div>
+
+                <div class="mb-3 text-center">
+                    <button type="button" id="btn-usar-ubicacion" class="btn btn-outline-primary">
+                        <i class="bi bi-geo-alt"></i> Usar mi ubicación actual
+                    </button>
+                    <div id="ubicacion-estado" class="form-text"></div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    {% for field in form %}
+                    {% if field.name == "lat" or field.name == "lng" %}
+                    {{ field }}
+                    {% else %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                        {{ field.errors }}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary w-100">Sumarme</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById("btn-usar-ubicacion").addEventListener("click", function () {
+    const estado = document.getElementById("ubicacion-estado");
+    if (!navigator.geolocation) {
+        estado.textContent = "Tu navegador no soporta geolocalización -- escribe tu dirección abajo.";
+        return;
+    }
+    estado.textContent = "Buscando tu ubicación...";
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            document.getElementById("id_lat").value = pos.coords.latitude.toFixed(6);
+            document.getElementById("id_lng").value = pos.coords.longitude.toFixed(6);
+            estado.textContent = "Ubicación detectada ✓";
+        },
+        function () {
+            estado.textContent = "No pudimos obtener tu ubicación -- escribe tu dirección abajo.";
+        },
+        { timeout: 5000, maximumAge: 60000 }
+    );
+});
+</script>
+{% endblock %}

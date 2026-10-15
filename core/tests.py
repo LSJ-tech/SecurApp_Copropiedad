@@ -1055,6 +1055,24 @@ class InicioViewTests(TestCase):
         self.assertEqual(r.context["gasto_actual_cuotas_pagadas"], 1)
         self.assertEqual(r.context["gasto_actual_recaudado"], 10000)
 
+    def test_sin_perfil_geografico_ofrece_sumarse_a_la_red_vecinal(self):
+        residente = crear_membresia(self.condominio, "residente", username="inicio_sin_perfil_geo")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, reverse("vecindario-unirse"))
+
+    def test_con_perfil_geografico_no_ofrece_sumarse_de_nuevo(self):
+        from vecindario.models import PerfilGeografico
+
+        residente = crear_membresia(self.condominio, "residente", username="inicio_con_perfil_geo")
+        PerfilGeografico.objects.create(
+            user=residente.user, direccion_texto="Calle Falsa 123", lat=-33.0, lng=-71.6,
+            region="valparaiso", comuna="Valparaíso", geohash="66j5f",
+        )
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertNotContains(r, reverse("vecindario-unirse"))
+
 
 class EtiquetaOrganizacionTests(TestCase):
     """No todas las organizaciones son "condominio" (ej. juntas de vecinos) --

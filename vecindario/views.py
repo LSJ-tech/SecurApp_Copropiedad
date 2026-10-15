@@ -66,6 +66,33 @@ class MiBarrioView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class UnirseVecindarioView(LoginRequiredMixin, FormView):
+    """Para quien ya tiene cuenta (típicamente con Membresia de un
+    condominio) y quiere sumarse a la red vecinal con su ubicación real --
+    reemplaza al viejo backfill_perfiles_geograficos, que heredaba la
+    dirección del condominio entero (imprecisa, todos los miembros caían
+    en el mismo punto). Acá cada persona da su propio GPS/dirección, igual
+    que en el registro público, pero sin crear una cuenta nueva."""
+
+    template_name = "vecindario/unirse.html"
+    form_class = ActualizarPerfilGeograficoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and getattr(request.user, "perfil_geografico", None) is not None:
+            return redirect("mi-barrio")
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        datos = form.cleaned_data
+        PerfilGeografico.objects.create(
+            user=self.request.user, direccion_texto=datos["direccion_texto"], lat=datos["lat"], lng=datos["lng"],
+            region=datos["region"], comuna=datos["comuna"], geohash=calcular_geohash(datos["lat"], datos["lng"]),
+            telefono=datos.get("telefono", ""),
+        )
+        messages.success(self.request, f"¡Listo! Ahora también formas parte de la red vecinal de {datos['comuna']}.")
+        return redirect("mi-barrio")
+
+
 class ActualizarPerfilGeograficoView(LoginRequiredMixin, FormView):
     """Actualizar dirección/ubicación y teléfono de un PerfilGeografico ya
     existente -- quien se mudó, escribió mal su dirección la primera vez, o

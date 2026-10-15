@@ -155,6 +155,13 @@
 </div>
 <div id="error-panico" class="alert alert-danger d-none"></div>
 
+{% if not user.perfil_geografico %}
+<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <span><i class="bi bi-geo-alt"></i> Súmate también a la red vecinal de tu barrio -- avisa a tus vecinos reales, no solo al condominio.</span>
+    <a href="{% url 'vecindario-unirse' %}" class="btn btn-sm btn-outline-primary">Activar mi barrio</a>
+</div>
+{% endif %}
+
 <div class="card mb-4 border-danger">
     <div class="card-body text-center py-4">
         <h2 class="h5 mb-2"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Botón de pánico</h2>
