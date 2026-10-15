@@ -1055,6 +1055,17 @@ class InicioViewTests(TestCase):
         self.assertEqual(r.context["gasto_actual_cuotas_pagadas"], 1)
         self.assertEqual(r.context["gasto_actual_recaudado"], 10000)
 
+    def test_muestra_el_boton_de_panico_flotante(self):
+        """Regresión: el botón de pánico quedaba muy abajo en el dashboard
+        (sobre todo para directiva/administración, con varias tarjetas
+        arriba) -- se agregó un botón flotante fijo siempre visible, que
+        abre el mismo modal #modalPanico que el botón de la tarjeta."""
+        directiva = crear_membresia(self.condominio, "directiva", username="inicio_panico_flotante")
+        self.client.force_login(directiva.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, 'id="btn-panico-flotante"')
+        self.assertContains(r, 'data-bs-target="#modalPanico"')
+
     def test_sin_perfil_geografico_ofrece_sumarse_a_la_red_vecinal(self):
         residente = crear_membresia(self.condominio, "residente", username="inicio_sin_perfil_geo")
         self.client.force_login(residente.user)
