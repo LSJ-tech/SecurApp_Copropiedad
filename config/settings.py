@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'notificaciones',
     'pagos',
     'personal',
+    'vecindario',
 ]
 
 MIDDLEWARE = [
@@ -312,6 +313,14 @@ UNFOLD = {
                     {"title": "Gastos comunes", "icon": "payments", "link": reverse_lazy("admin:gastoscomunes_gastocomun_changelist")},
                     {"title": "Dispositivos push", "icon": "notifications", "link": reverse_lazy("admin:notificaciones_dispositivopush_changelist")},
                     {"title": "Pagos", "icon": "credit_card", "link": reverse_lazy("admin:pagos_pago_changelist")},
+                ],
+            },
+            {
+                "title": "Red vecinal",
+                "separator": True,
+                "items": [
+                    {"title": "Perfiles geográficos", "icon": "person_pin_circle", "link": reverse_lazy("admin:vecindario_perfilgeografico_changelist")},
+                    {"title": "Alertas ciudadanas", "icon": "emergency", "link": reverse_lazy("admin:vecindario_alertaciudadana_changelist")},
                 ],
             },
             {
