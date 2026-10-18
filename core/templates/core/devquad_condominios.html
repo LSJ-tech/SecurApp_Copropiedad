@@ -1,0 +1,30 @@
+{% extends "core/base.html" %}
+{% block titulo %}Condominios{% endblock %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Condominios</h1>
+    <a href="{% url 'devquad-crear-condominio' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo condominio</a>
+</div>
+
+{% if condominios %}
+<div class="row g-3">
+    {% for c in condominios %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6">{{ c.nombre }}</h2>
+                <p class="text-muted small mb-2">{{ c.comuna|default:"Sin comuna" }}{% if not c.activo %} · <span class="text-danger">Desactivado</span>{% endif %}</p>
+                <p class="small mb-3">
+                    {{ c.total_torres }} {{ c.etiqueta_torre|lower }}{{ c.total_torres|pluralize }} ·
+                    {{ c.total_unidades }} {{ c.etiqueta_unidad|lower }}{{ c.total_unidades|pluralize }}
+                </p>
+                <a href="{% url 'devquad-entrar-condominio' c.pk %}" class="btn btn-outline-primary btn-sm w-100">Entrar</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">Todavía no hay ningún condominio creado.</p>
+{% endif %}
+{% endblock %}

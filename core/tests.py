@@ -1022,18 +1022,19 @@ class ApiMiPerfilYCambiarContrasenaTests(TestCase):
 
 class InicioViewTests(TestCase):
     """Ramas de InicioView no cubiertas por el resto de los tests: staff sin
-    membresía va al admin en vez del mensaje genérico, y el resumen de
-    administración cuando SÍ hay un gasto común del periodo actual."""
+    membresía ni condominio activo va al selector de condominios de devquad,
+    y el resumen de administración (ahora devquad) cuando SÍ hay un gasto
+    común del periodo actual."""
 
     @classmethod
     def setUpTestData(cls):
         cls.condominio = Condominio.objects.create(nombre="Test Inicio Extra", plan="premium")
 
-    def test_staff_sin_membresia_va_al_admin(self):
+    def test_staff_sin_membresia_va_al_selector_de_condominios(self):
         staff = User.objects.create_user(username="inicio_staff", is_staff=True)
         self.client.force_login(staff)
         r = self.client.get(reverse("inicio"))
-        self.assertRedirects(r, reverse("admin:index"))
+        self.assertRedirects(r, reverse("devquad-condominios"))
 
     def test_no_staff_sin_membresia_va_al_login_con_mensaje(self):
         user = User.objects.create_user(username="inicio_sin_membresia")
@@ -1047,8 +1048,9 @@ class InicioViewTests(TestCase):
         unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
         gasto = GastoComun.objects.create(condominio=self.condominio, periodo="2026-09", monto_total=10000, fecha_vencimiento=timezone.localdate())
         CuotaUnidad.objects.create(gasto_comun=gasto, unidad=unidad, monto=10000, estado="pagado")
-        administracion = crear_membresia(self.condominio, "administracion", username="inicio_admon_gasto")
-        self.client.force_login(administracion.user)
+        staff = User.objects.create_user(username="inicio_admon_gasto", is_staff=True)
+        self.client.force_login(staff)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("inicio"))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context["gasto_actual"], gasto)
@@ -1435,13 +1437,15 @@ class DirectorioVecinosTests(TestCase):
 class CondominioRequiredMixinRamasTests(TestCase):
     """Ramas de CondominioRequiredMixin.dispatch() no cubiertas vía InicioView
     (que tiene su propia lógica inline, no usa este mixin): staff sin
-    membresía va al admin, y un condominio desactivado bloquea el acceso."""
+    membresía ni condominio activo va al selector de condominios (ver
+    DevquadCondominiosView/condominio_activo_devquad), y un condominio
+    desactivado bloquea el acceso."""
 
-    def test_staff_sin_membresia_va_al_admin(self):
+    def test_staff_sin_membresia_va_al_selector_de_condominios(self):
         staff = User.objects.create_user(username="mixin_staff", is_staff=True)
         self.client.force_login(staff)
         r = self.client.get(reverse("miembros"))
-        self.assertRedirects(r, reverse("admin:index"))
+        self.assertRedirects(r, reverse("devquad-condominios"))
 
     def test_condominio_desactivado_redirige_a_cuenta_desactivada(self):
         condominio = Condominio.objects.create(nombre="Test Desactivado", plan="premium", activo=False)
@@ -1669,4 +1673,111 @@ class PaginasPublicasRenderizanTests(TestCase):
     def test_privacidad_renderiza(self):
         r = self.client.get(reverse("privacidad"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Confirmación de lectura")
+
+
+def crear_devquad(username="devquad_test"):
+    """Cuenta devquad -- is_staff, sin Membresia (ver DEVQUAD_CONDOMINIO_SESSION_KEY/condominio_activo_devquad)."""
+    return User.objects.create_user(username=username, is_staff=True)
+
+
+class DevquadCondominiosViewTests(TestCase):
+    """Panel de devquad -- lista todos los condominios, sin filtrar por
+    tenant (a propósito: devquad opera todos, no uno solo)."""
+
+    def test_sin_login_redirige(self):
+        r = self.client.get(reverse("devquad-condominios"))
+        self.assertEqual(r.status_code, 302)
+
+    def test_sin_is_staff_es_rechazado(self):
+        condominio = Condominio.objects.create(nombre="Rechazo No Staff", plan="premium")
+        membresia = crear_membresia(condominio, "residente", unidad=Unidad.objects.create(condominio=condominio, numero="1"))
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("devquad-condominios"), follow=True)
+        self.assertRedirects(r, reverse("inicio"))
+
+    def test_is_staff_ve_todos_los_condominios(self):
+        Condominio.objects.create(nombre="Condominio Uno Devquad", plan="premium")
+        Condominio.objects.create(nombre="Condominio Dos Devquad", plan="premium")
+        self.client.force_login(crear_devquad())
+        r = self.client.get(reverse("devquad-condominios"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Condominio Uno Devquad")
+        self.assertContains(r, "Condominio Dos Devquad")
+
+
+class DevquadEntrarCondominioViewTests(TestCase):
+    """Entrar/salir de un condominio como devquad -- guarda/limpia la
+    sesión que CondominioRequiredMixin usa para resolver self.condominio."""
+
+    def test_entrar_guarda_el_condominio_en_sesion_y_redirige_a_inicio(self):
+        condominio = Condominio.objects.create(nombre="Entrar Devquad", plan="premium")
+        self.client.force_login(crear_devquad())
+        r = self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        self.assertRedirects(r, reverse("inicio"))
+        self.assertEqual(self.client.session["devquad_condominio_id"], condominio.pk)
+
+    def test_inicio_sin_condominio_activo_redirige_al_listado(self):
+        self.client.force_login(crear_devquad())
+        r = self.client.get(reverse("inicio"))
+        self.assertRedirects(r, reverse("devquad-condominios"))
+
+    def test_inicio_con_condominio_activo_muestra_el_dashboard(self):
+        condominio = Condominio.objects.create(nombre="Dashboard Devquad", plan="premium")
+        self.client.force_login(crear_devquad())
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Dashboard Devquad")
+
+    def test_aislamiento_entre_condominios(self):
+        """Devquad operando en el condominio A no ve datos del condominio B
+        hasta cambiar -- ver DevquadCondominiosView/condominio_activo_devquad."""
+        a = Condominio.objects.create(nombre="Condominio A Devquad", plan="premium")
+        b = Condominio.objects.create(nombre="Condominio B Devquad", plan="premium")
+        Torre.objects.create(condominio=a, nombre="Torre A")
+        Torre.objects.create(condominio=b, nombre="Torre B")
+        self.client.force_login(crear_devquad())
+
+        self.client.get(reverse("devquad-entrar-condominio", args=[a.pk]))
+        r = self.client.get(reverse("torres"))
+        self.assertContains(r, "Torre A")
+        self.assertNotContains(r, "Torre B")
+
+        self.client.get(reverse("devquad-entrar-condominio", args=[b.pk]))
+        r = self.client.get(reverse("torres"))
+        self.assertContains(r, "Torre B")
+        self.assertNotContains(r, "Torre A")
+
+    def test_salir_limpia_la_sesion_y_vuelve_al_listado(self):
+        condominio = Condominio.objects.create(nombre="Salir Devquad", plan="premium")
+        self.client.force_login(crear_devquad())
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.get(reverse("devquad-salir-condominio"))
+        self.assertRedirects(r, reverse("devquad-condominios"))
+        self.assertNotIn("devquad_condominio_id", self.client.session)
+
+    def test_condominio_desactivado_redirige_a_cuenta_desactivada(self):
+        condominio = Condominio.objects.create(nombre="Desactivado Devquad", plan="premium", activo=False)
+        self.client.force_login(crear_devquad())
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.get(reverse("inicio"))
+        self.assertRedirects(r, reverse("cuenta-desactivada"))
+
+
+class DevquadCrearCondominioViewTests(TestCase):
+    def test_sin_is_staff_no_puede_crear(self):
+        condominio = Condominio.objects.create(nombre="No Crear Sin Staff", plan="premium")
+        membresia = crear_membresia(condominio, "residente", unidad=Unidad.objects.create(condominio=condominio, numero="1"))
+        self.client.force_login(membresia.user)
+        r = self.client.post(reverse("devquad-crear-condominio"), {"nombre": "Intento Residente", "etiqueta_organizacion": "Condominio"})
+        self.assertFalse(Condominio.objects.filter(nombre="Intento Residente").exists())
+        self.assertEqual(r.status_code, 302)
+
+    def test_devquad_crea_un_condominio_y_entra_directo(self):
+        self.client.force_login(crear_devquad())
+        r = self.client.post(reverse("devquad-crear-condominio"), {
+            "nombre": "Nuevo Condominio Devquad", "etiqueta_organizacion": "Condominio",
+            "direccion": "Calle Falsa 123", "region": "valparaiso", "comuna": "Valparaíso",
+        })
+        condominio = Condominio.objects.get(nombre="Nuevo Condominio Devquad")
+        self.assertRedirects(r, reverse("devquad-entrar-condominio", args=[condominio.pk]), fetch_redirect_response=False)

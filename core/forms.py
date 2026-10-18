@@ -126,6 +126,40 @@ class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrase
         return cleaned
 
 
+class CrearCondominioForm(forms.ModelForm):
+    """Alta de un condominio/junta de vecinos nuevo desde el panel de
+    devquad (DevquadCondominiosView) -- reemplaza al viejo
+    RegistroCondominioView (público, con código de invitación): acá quien
+    lo crea ya está logueado como devquad, no hace falta crear una cuenta
+    nueva ni gatekeeping por código."""
+
+    comuna = forms.ChoiceField(
+        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    region = forms.ChoiceField(
+        choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    class Meta:
+        model = Condominio
+        fields = ["nombre", "etiqueta_organizacion", "direccion", "comuna", "region"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control"}),
+            "etiqueta_organizacion": forms.TextInput(attrs={"class": "form-control"}),
+            "direccion": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        region = cleaned.get("region")
+        comuna = cleaned.get("comuna")
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise ValidationError("Esa comuna no pertenece a la región elegida.")
+        return cleaned
+
+
 class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
     """Directiva/administración crea la cuenta de otro miembro del condominio.
 

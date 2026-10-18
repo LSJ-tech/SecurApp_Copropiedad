@@ -1,6 +1,9 @@
 <ul class="navbar-nav me-auto">
-    {% if user.membresia %}
+    {% if user.membresia or user.is_staff %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'inicio' %}active{% endif %}" href="{% url 'inicio' %}"><i class="bi bi-house"></i> Inicio</a></li>
+    {% if not user.membresia and user.is_staff %}
+    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'devquad-condominios' %}active{% endif %}" href="{% url 'devquad-salir-condominio' %}"><i class="bi bi-arrow-left-right"></i> Cambiar de condominio</a></li>
+    {% endif %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'directorio' %}active{% endif %}" href="{% url 'directorio' %}"><i class="bi bi-person-lines-fill"></i> Directorio</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'compartir-invitacion' %}active{% endif %}" href="{% url 'compartir-invitacion' %}"><i class="bi bi-share"></i> Invitar vecinos</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'numeros-emergencia' %}active{% endif %}" href="{% url 'numeros-emergencia' %}"><i class="bi bi-telephone"></i> Números de emergencia</a></li>

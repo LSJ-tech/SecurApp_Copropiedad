@@ -31,8 +31,9 @@ from django.views.generic import CreateView, FormView, ListView, TemplateView, U
 from django.views.generic.base import View
 
 from .comunas_chile import COMUNAS_POR_REGION
-from .forms import CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
-from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin, SoloDirectivaMixin, SoloStaffMixin
+from .forms import CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
+from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin, SoloDirectivaMixin, SoloStaffMixin, condominio_activo_devquad
+from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
 from .models import CodigoInvitacion, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
 from .usuarios import generar_password_temporal, generar_username
 
@@ -529,7 +530,15 @@ class InicioView(TemplateView):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
             if request.user.is_staff:
-                return redirect("admin:index")
+                condominio = condominio_activo_devquad(request)
+                if condominio is None:
+                    return redirect("devquad-condominios")
+                if not condominio.puede_operar:
+                    return redirect("cuenta-desactivada")
+                self.membresia = None
+                self.condominio = condominio
+                self.template_name = "core/inicio.html"
+                return super().get(request, *args, **kwargs)
             # Red vecinal geográfica (app vecindario): no se importa el
             # modelo acá a propósito (ver perfil_geografico como related_name
             # en vecindario.models.PerfilGeografico) -- mismo patrón que
@@ -553,12 +562,12 @@ class InicioView(TemplateView):
         if hasattr(self, "membresia"):
             context["membresia"] = self.membresia
             context["condominio"] = self.condominio
-            if self.membresia.rol == "residente" and self.membresia.unidad_id:
+            if self.membresia and self.membresia.rol == "residente" and self.membresia.unidad_id:
                 from gastoscomunes.models import CuotaUnidad
                 pendientes = CuotaUnidad.objects.filter(unidad=self.membresia.unidad).exclude(estado="pagado")
                 context["deuda_pendiente"] = sum((c.monto for c in pendientes), Decimal("0"))
                 context["cuotas_pendientes_count"] = pendientes.count()
-            if self.membresia.rol == "residente":
+            if self.membresia and self.membresia.rol == "residente":
                 from pagos.models import SuscripcionRecurrente
                 context["total_torres"] = self.condominio.total_torres
                 context["total_unidades"] = self.condominio.total_unidades
@@ -566,7 +575,7 @@ class InicioView(TemplateView):
                 context["donacion_recurrente_activa"] = SuscripcionRecurrente.objects.filter(
                     membresia=self.membresia, tipo="donacion", estado__in=["pendiente", "autorizada"],
                 ).first()
-            if self.membresia.rol in ("directiva", "administracion"):
+            if self.membresia is None:
                 context.update(self._resumen_administracion())
         else:
             context.update(self._estadisticas_landing())
@@ -629,6 +638,63 @@ class InicioView(TemplateView):
         resumen["morosos_count"] = morosos_qs.count()
         resumen["morosos_total_adeudado"] = totales["total"] or 0
         return resumen
+
+
+class DevquadCondominiosView(LoginRequiredMixin, SoloStaffMixin, ListView):
+    """Panel de devquad: lista todos los condominios/juntas de vecinos para
+    elegir en cuál operar (ver condominio_activo_devquad en
+    core/mixins.py). Reemplaza el redirect directo a /admin/ que tenía
+    antes un is_staff sin Membresia propia -- panel con la misma estética
+    del resto del sitio, no el admin de Django crudo."""
+
+    model = Condominio
+    template_name = "core/devquad_condominios.html"
+    context_object_name = "condominios"
+
+    def get_queryset(self):
+        return super().get_queryset().order_by("nombre")
+
+
+class DevquadCrearCondominioView(LoginRequiredMixin, SoloStaffMixin, CreateView):
+    """Alta de un condominio nuevo desde el panel de devquad -- reemplaza
+    al viejo RegistroCondominioView (público, con código de invitación):
+    acá quien lo crea ya está logueado como devquad, no hace falta crear
+    una cuenta nueva ni un código."""
+
+    model = Condominio
+    form_class = CrearCondominioForm
+    template_name = "core/devquad_crear_condominio.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["comunas_por_region"] = COMUNAS_POR_REGION
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Condominio «{self.object.nombre}» creado.")
+        return response
+
+    def get_success_url(self):
+        return reverse("devquad-entrar-condominio", args=[self.object.pk])
+
+
+class DevquadEntrarCondominioView(LoginRequiredMixin, SoloStaffMixin, View):
+    """Marca este condominio como el activo para la sesión de devquad --
+    ver condominio_activo_devquad en core/mixins.py."""
+
+    def get(self, request, *args, **kwargs):
+        condominio = get_object_or_404(Condominio, pk=kwargs["pk"])
+        request.session[DEVQUAD_CONDOMINIO_SESSION_KEY] = condominio.pk
+        return redirect("inicio")
+
+
+class DevquadSalirCondominioView(LoginRequiredMixin, SoloStaffMixin, View):
+    """Limpia el condominio activo de la sesión de devquad y vuelve al listado."""
+
+    def get(self, request, *args, **kwargs):
+        request.session.pop(DEVQUAD_CONDOMINIO_SESSION_KEY, None)
+        return redirect("devquad-condominios")
 
 
 class CuentaDesactivadaView(TemplateView):

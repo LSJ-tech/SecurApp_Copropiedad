@@ -7,6 +7,10 @@ from .views import EMAIL_CONTACTO_DEVQUAD
 
 urlpatterns = [
     path("", views.InicioView.as_view(), name="inicio"),
+    path("devquad/condominios/", views.DevquadCondominiosView.as_view(), name="devquad-condominios"),
+    path("devquad/condominios/nuevo/", views.DevquadCrearCondominioView.as_view(), name="devquad-crear-condominio"),
+    path("devquad/condominios/<int:pk>/entrar/", views.DevquadEntrarCondominioView.as_view(), name="devquad-entrar-condominio"),
+    path("devquad/condominios/salir/", views.DevquadSalirCondominioView.as_view(), name="devquad-salir-condominio"),
     path("registro/", views.RegistroCondominioView.as_view(), name="registro-condominio"),
     path("solicitar-acceso/", views.SolicitarAccesoView.as_view(), name="solicitar-acceso"),
     path("unirme/<uuid:token>/", views.RegistroResidenteView.as_view(), name="registro-residente"),

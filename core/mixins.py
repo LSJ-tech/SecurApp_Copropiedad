@@ -4,14 +4,35 @@ from django.shortcuts import redirect
 from django.utils import timezone
 
 MENSAJE_SIN_CONDOMINIO = "Tu cuenta no está vinculada a ningún condominio."
+DEVQUAD_CONDOMINIO_SESSION_KEY = "devquad_condominio_id"
+
+
+def condominio_activo_devquad(request):
+    """Condominio que un devquad (is_staff, sin Membresia propia) eligió
+    operar en esta sesión -- ver DevquadCondominiosView/
+    DevquadEntrarCondominioView en core/views.py. None si todavía no
+    eligió ninguno, o si el que tenía guardado ya no existe (se borró,
+    o la sesión quedó con un id viejo)."""
+    from .models import Condominio
+
+    condominio_id = request.session.get(DEVQUAD_CONDOMINIO_SESSION_KEY)
+    if not condominio_id:
+        return None
+    return Condominio.objects.filter(pk=condominio_id).first()
 
 
 class CondominioRequiredMixin(LoginRequiredMixin):
     """Exige login y restringe las consultas al condominio del usuario logueado.
 
     A diferencia de NegocioRequiredMixin en PataAgenda, acá no hace falta
-    resolver una "sucursal activa" -- un usuario pertenece a un solo
-    condominio (no hay selector).
+    resolver una "sucursal activa" por Membresia -- un residente/delegado
+    pertenece a un solo condominio. La excepción es devquad (is_staff, sin
+    Membresia propia): opera sobre CUALQUIER condominio, uno a la vez,
+    elegido en `DevquadCondominiosView` y guardado en la sesión (ver
+    condominio_activo_devquad arriba) -- en ese caso self.membresia queda
+    en None, así que cualquier código que dependa de self.membresia.rol/
+    .unidad debe tolerar ese caso (ver SoloStaffMixin, que resuelve el
+    permiso por is_staff y nunca llega a tocar self.membresia).
     """
 
     def dispatch(self, request, *args, **kwargs):
@@ -19,7 +40,14 @@ class CondominioRequiredMixin(LoginRequiredMixin):
             membresia = getattr(request.user, "membresia", None)
             if membresia is None:
                 if request.user.is_staff:
-                    return redirect("admin:index")
+                    condominio = condominio_activo_devquad(request)
+                    if condominio is None:
+                        return redirect("devquad-condominios")
+                    if not condominio.puede_operar:
+                        return redirect("cuenta-desactivada")
+                    self.membresia = None
+                    self.condominio = condominio
+                    return super().dispatch(request, *args, **kwargs)
                 messages.error(request, MENSAJE_SIN_CONDOMINIO)
                 return redirect("login")
             if not membresia.condominio.puede_operar:
