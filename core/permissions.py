@@ -20,6 +20,25 @@ class EsDirectivaAdministracionODelegado(BasePermission):
         return _rol(request) in ("directiva", "administracion", "delegado")
 
 
+class EsDevquad(BasePermission):
+    """Reemplaza a EsDirectivaOAdministracion -- devquad ya no es un rol de
+    Membresia (ver ROL_CHOICES), es quien opera la plataforma entera
+    (User.is_staff), igual que SoloStaffMixin del lado de las vistas
+    normales."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_staff)
+
+
+class EsDevquadODelegado(BasePermission):
+    """Reemplaza a EsDirectivaAdministracionODelegado: devquad publica a
+    todo el condominio, un delegado solo a su propia torre (ver
+    AvisoViewSet.perform_create)."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_staff) or _rol(request) == "delegado"
+
+
 class TieneMembresia(BasePermission):
     """Cualquier rol, siempre que tenga una Membresia asociada (aislamiento básico de tenant)."""
 
