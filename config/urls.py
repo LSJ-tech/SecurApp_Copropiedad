@@ -8,11 +8,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('', include('core.urls')),
-    path('', include('accesos.urls')),
-    path('', include('gastoscomunes.urls')),
     path('', include('pagos.urls')),
     path('', include('alertas.urls')),
-    path('', include('personal.urls')),
     path('', include('comunicacion.urls')),
     path('', include('vecindario.urls')),
 
@@ -20,7 +17,6 @@ urlpatterns = [
     path(API_V1_PREFIX, include('notificaciones.api_urls')),
     path(API_V1_PREFIX, include('alertas.api_urls')),
     path(API_V1_PREFIX, include('comunicacion.api_urls')),
-    path(API_V1_PREFIX, include('gastoscomunes.api_urls')),
     path(API_V1_PREFIX, include('vecindario.api_urls')),
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

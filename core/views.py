@@ -1,6 +1,5 @@
 import logging
 import uuid
-from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
 import qrcode
@@ -18,7 +17,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q
 from django.db.models.functions import Length
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -520,11 +519,6 @@ class InicioView(TemplateView):
         if hasattr(self, "membresia"):
             context["membresia"] = self.membresia
             context["condominio"] = self.condominio
-            if self.membresia and self.membresia.rol == "residente" and self.membresia.unidad_id:
-                from gastoscomunes.models import CuotaUnidad
-                pendientes = CuotaUnidad.objects.filter(unidad=self.membresia.unidad).exclude(estado="pagado")
-                context["deuda_pendiente"] = sum((c.monto for c in pendientes), Decimal("0"))
-                context["cuotas_pendientes_count"] = pendientes.count()
             if self.membresia and self.membresia.rol == "residente":
                 from pagos.models import SuscripcionRecurrente
                 context["total_torres"] = self.condominio.total_torres
@@ -555,47 +549,13 @@ class InicioView(TemplateView):
 
     def _resumen_administracion(self):
         from alertas.models import Alerta
-        from gastoscomunes.models import CuotaUnidad, GastoComun
-        from pagos.models import SuscripcionRecurrente
 
         condominio = self.condominio
-        resumen = {
+        return {
             "total_unidades": condominio.total_unidades,
             "total_miembros": Membresia.objects.filter(condominio=condominio).count(),
             "alertas_activas_count": Alerta.objects.filter(condominio=condominio, estado="activa").count(),
-            "suscripcion_al_dia": bool(condominio.pagado_hasta and condominio.pagado_hasta >= timezone.localdate()),
-            "suscripcion_recurrente_activa": SuscripcionRecurrente.objects.filter(
-                condominio=condominio, tipo="suscripcion", estado__in=["pendiente", "autorizada"],
-            ).first(),
         }
-
-        gasto_actual = GastoComun.objects.filter(condominio=condominio).order_by("-periodo").first()
-        if gasto_actual:
-            cuotas = CuotaUnidad.objects.filter(gasto_comun=gasto_actual)
-            agregados = cuotas.aggregate(
-                pagadas=Count("id", filter=Q(estado="pagado")),
-                total=Count("id"),
-                recaudado=Sum("monto", filter=Q(estado="pagado")),
-                pendiente=Sum("monto", filter=~Q(estado="pagado")),
-            )
-            resumen["gasto_actual"] = gasto_actual
-            resumen["gasto_actual_cuotas_pagadas"] = agregados["pagadas"]
-            resumen["gasto_actual_cuotas_total"] = agregados["total"]
-            resumen["gasto_actual_recaudado"] = agregados["recaudado"] or 0
-            resumen["gasto_actual_pendiente"] = agregados["pendiente"] or 0
-
-        hoy = timezone.localdate()
-        cuotas_atrasadas = CuotaUnidad.objects.filter(gasto_comun__condominio=condominio, estado="pendiente", gasto_comun__fecha_vencimiento__lt=hoy)
-        morosos_qs = (
-            cuotas_atrasadas.values("unidad_id", "unidad__numero", "unidad__torre__nombre")
-            .annotate(total_adeudado=Sum("monto"), cuotas_atrasadas=Count("id"))
-            .order_by("-total_adeudado")
-        )
-        totales = cuotas_atrasadas.aggregate(total=Sum("monto"))
-        resumen["morosos"] = list(morosos_qs[:10])
-        resumen["morosos_count"] = morosos_qs.count()
-        resumen["morosos_total_adeudado"] = totales["total"] or 0
-        return resumen
 
 
 class DevquadCondominiosView(LoginRequiredMixin, SoloStaffMixin, ListView):
@@ -849,9 +809,7 @@ class CrearMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
 
 
 class CondominioUpdateView(SoloStaffMixin, CondominioRequiredMixin, TemplateView):
-    """Ya no edita nada acá -- los datos de transferencia de gastos comunes
-    se movieron a DatosTransferenciaUpdateView (exclusivo de administración).
-    Esta página le queda a la directiva solo para el autoregistro de
+    """No edita nada acá -- es la página de devquad para el autoregistro de
     residentes (QR/link)."""
 
     template_name = "core/condominio_form.html"

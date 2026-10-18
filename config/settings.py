@@ -54,11 +54,8 @@ INSTALLED_APPS = [
 
     'alertas',
     'comunicacion',
-    'accesos',
-    'gastoscomunes',
     'notificaciones',
     'pagos',
-    'personal',
     'vecindario',
 ]
 
@@ -173,12 +170,10 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@securapp.loc
 
 
 # Cobro automático recurrente vía Mercado Pago (API Preapproval, no
-# Checkout Pro) de la suscripción mensual ($19.990, ver README) y de
-# donaciones voluntarias, ambos condominio/residente -> DevQuad, hasta que
-# se cancelen (ver pagos/models.py SuscripcionRecurrente). Solo un cobro de
-# tipo "suscripcion" extiende pagado_hasta/plan de Condominio -- una
-# donación nunca los toca. Distinto del pago de gastos comunes (manual, ver
-# gastoscomunes/models.py).
+# Checkout Pro) de donaciones voluntarias (residente -> DevQuad), hasta
+# que se cancelen (ver pagos/models.py SuscripcionRecurrente). El tipo
+# "suscripcion" (condominio -> DevQuad) queda como histórico -- ver tarea
+# de retiro del cobro de suscripción en la memoria del proyecto.
 MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
 
 
@@ -308,8 +303,6 @@ UNFOLD = {
                 "items": [
                     {"title": "Alertas", "icon": "emergency", "link": reverse_lazy("admin:alertas_alerta_changelist")},
                     {"title": "Avisos", "icon": "campaign", "link": reverse_lazy("admin:comunicacion_aviso_changelist")},
-                    {"title": "Accesos", "icon": "meeting_room", "link": reverse_lazy("admin:accesos_registroingreso_changelist")},
-                    {"title": "Gastos comunes", "icon": "payments", "link": reverse_lazy("admin:gastoscomunes_gastocomun_changelist")},
                     {"title": "Dispositivos push", "icon": "notifications", "link": reverse_lazy("admin:notificaciones_dispositivopush_changelist")},
                     {"title": "Pagos", "icon": "credit_card", "link": reverse_lazy("admin:pagos_pago_changelist")},
                 ],
@@ -320,17 +313,6 @@ UNFOLD = {
                 "items": [
                     {"title": "Perfiles geográficos", "icon": "person_pin_circle", "link": reverse_lazy("admin:vecindario_perfilgeografico_changelist")},
                     {"title": "Alertas ciudadanas", "icon": "emergency", "link": reverse_lazy("admin:vecindario_alertaciudadana_changelist")},
-                ],
-            },
-            {
-                "title": "Personal",
-                "separator": True,
-                "items": [
-                    {"title": "Empleados", "icon": "badge", "link": reverse_lazy("admin:personal_empleado_changelist")},
-                    {"title": "Liquidaciones", "icon": "receipt_long", "link": reverse_lazy("admin:personal_liquidacion_changelist")},
-                    {"title": "AFPs", "icon": "account_balance", "link": reverse_lazy("admin:personal_afp_changelist")},
-                    {"title": "Tramos impuesto único", "icon": "calculate", "link": reverse_lazy("admin:personal_tramoimpuestounico_changelist")},
-                    {"title": "Parámetros del periodo", "icon": "tune", "link": reverse_lazy("admin:personal_parametrosperiodo_changelist")},
                 ],
             },
             {

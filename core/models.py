@@ -44,11 +44,11 @@ DIAS_PRUEBA_GRATIS = 20
 
 
 def _pagado_hasta_prueba_gratis():
-    """20 días de prueba gratis del sistema de gestión (gastos comunes y
-    personal/liquidaciones) para cualquier condominio nuevo -- mismo campo
-    que ya usa SuscripcionActivaMixin, sin lógica de trial aparte. Se aplica
-    tanto al registro self-service como a un alta manual (Django admin,
-    management command) que no fije pagado_hasta explícito."""
+    """Legado: 20 días de prueba gratis del sistema de gestión -- gastos
+    comunes/personal (apps retiradas) y la suscripción de condominio (en
+    retiro) eran lo único que leía este campo. Se deja el campo y este
+    default tal cual (dato histórico, sin impacto real en nada hoy) en vez
+    de borrarlo -- ver memoria del proyecto."""
     return timezone.localdate() + datetime.timedelta(days=DIAS_PRUEBA_GRATIS)
 
 

@@ -50,27 +50,17 @@ class RolesPermisosTests(TestCase):
 
     def test_dia_a_dia_devquad_permitido(self):
         self._login_devquad()
-        for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
+        for url_name in ("miembros", "torres", "unidades"):
             r = self.client.get(reverse(url_name))
             self.assertEqual(r.status_code, 200, f"devquad debería poder ver {url_name}")
 
     def test_dia_a_dia_bloqueado_para_residente_y_delegado(self):
         for membresia in (self.residente, self.delegado):
             self.client.force_login(membresia.user)
-            for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
+            for url_name in ("miembros", "torres", "unidades"):
                 r = self.client.get(reverse(url_name))
                 self.assertEqual(r.status_code, 302, f"{membresia.rol} NO debería poder ver {url_name}")
             self.client.logout()
-
-    def test_accesos_permitido_para_devquad(self):
-        self._login_devquad()
-        r = self.client.get(reverse("registro-ingreso-list"))
-        self.assertEqual(r.status_code, 200)
-
-    def test_accesos_bloqueado_para_residente(self):
-        self.client.force_login(self.residente.user)
-        r = self.client.get(reverse("registro-ingreso-list"))
-        self.assertEqual(r.status_code, 302)
 
     def test_mi_condominio_exclusivo_devquad(self):
         self._login_devquad()
@@ -978,20 +968,20 @@ class InicioViewTests(TestCase):
         r = self.client.get(reverse("inicio"), follow=True)
         self.assertContains(r, "no está vinculada a ningún condominio")
 
-    def test_resumen_administracion_con_gasto_comun_del_periodo(self):
-        from gastoscomunes.models import CuotaUnidad, GastoComun
+    def test_resumen_administracion_para_devquad(self):
+        from alertas.models import Alerta
 
         unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
-        gasto = GastoComun.objects.create(condominio=self.condominio, periodo="2026-09", monto_total=10000, fecha_vencimiento=timezone.localdate())
-        CuotaUnidad.objects.create(gasto_comun=gasto, unidad=unidad, monto=10000, estado="pagado")
-        staff = User.objects.create_user(username="inicio_admon_gasto", is_staff=True)
+        residente = crear_membresia(self.condominio, "residente", unidad=unidad, username="inicio_resumen_residente")
+        Alerta.objects.create(condominio=self.condominio, autor=residente, tipo="otro", estado="activa")
+        staff = User.objects.create_user(username="inicio_admon_resumen", is_staff=True)
         self.client.force_login(staff)
         self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("inicio"))
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.context["gasto_actual"], gasto)
-        self.assertEqual(r.context["gasto_actual_cuotas_pagadas"], 1)
-        self.assertEqual(r.context["gasto_actual_recaudado"], 10000)
+        self.assertEqual(r.context["total_unidades"], 1)
+        self.assertEqual(r.context["total_miembros"], 1)
+        self.assertEqual(r.context["alertas_activas_count"], 1)
 
     def test_muestra_el_boton_de_panico_flotante(self):
         """Regresión: el botón de pánico quedaba muy abajo en el dashboard
