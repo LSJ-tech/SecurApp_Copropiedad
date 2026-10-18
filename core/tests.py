@@ -145,7 +145,7 @@ class TerminosAceptacionTests(TestCase):
         cls.condominio = Condominio.objects.create(nombre="Test Terminos", plan="premium")
 
     def setUp(self):
-        self.membresia = crear_membresia(self.condominio, "directiva", terminos=False, username="pendiente_terminos")
+        self.membresia = crear_membresia(self.condominio, "residente", terminos=False, username="pendiente_terminos")
         self.client.force_login(self.membresia.user)
 
     def test_inicio_redirige_a_aceptar_terminos(self):
@@ -985,11 +985,10 @@ class InicioViewTests(TestCase):
 
     def test_muestra_el_boton_de_panico_flotante(self):
         """Regresión: el botón de pánico quedaba muy abajo en el dashboard
-        (sobre todo para directiva/administración, con varias tarjetas
-        arriba) -- se agregó un botón flotante fijo siempre visible, que
-        abre el mismo modal #modalPanico que el botón de la tarjeta."""
-        directiva = crear_membresia(self.condominio, "directiva", username="inicio_panico_flotante")
-        self.client.force_login(directiva.user)
+        -- se agregó un botón flotante fijo siempre visible, que abre el
+        mismo modal #modalPanico."""
+        residente = crear_membresia(self.condominio, "residente", username="inicio_panico_flotante")
+        self.client.force_login(residente.user)
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, 'id="btn-panico-flotante"')
         self.assertContains(r, 'data-bs-target="#modalPanico"')
@@ -1168,8 +1167,8 @@ class QRYRegenerarTokenResidentesTests(TestCase):
         cls.condominio = Condominio.objects.create(nombre="Test QR Token", plan="premium")
 
     def setUp(self):
-        self.directiva = crear_membresia(self.condominio, "directiva", username="qr_directiva")
-        self.client.force_login(self.directiva.user)
+        self.residente = crear_membresia(self.condominio, "residente", username="qr_residente_setup")
+        self.client.force_login(self.residente.user)
 
     def test_qr_devuelve_una_imagen_png(self):
         r = self.client.get(reverse("qr-registro-residentes"))
@@ -1295,7 +1294,7 @@ class CompartirInvitacionTests(TestCase):
         self.assertEqual(r.status_code, 302)
 
     def test_cualquier_rol_puede_entrar_y_ve_el_link_y_el_boton_de_whatsapp(self):
-        for rol in ("residente", "conserje", "administracion", "directiva"):
+        for rol in ("residente", "delegado"):
             membresia = crear_membresia(self.condominio, rol, username=f"invitar_{rol}")
             self.client.force_login(membresia.user)
             r = self.client.get(reverse("compartir-invitacion"))
@@ -1306,7 +1305,7 @@ class CompartirInvitacionTests(TestCase):
 
     def test_el_mensaje_de_whatsapp_usa_la_etiqueta_de_la_organizacion(self):
         junta = Condominio.objects.create(nombre="Junta Los Aromos Wsp", plan="premium", etiqueta_organizacion="Junta de vecinos")
-        membresia = crear_membresia(junta, "directiva", username="invitar_wsp_junta")
+        membresia = crear_membresia(junta, "residente", username="invitar_wsp_junta")
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("compartir-invitacion"))
         # el mensaje va urlencoded dentro del href de wa.me -- los espacios

@@ -205,7 +205,7 @@ class SinUnidadFilterTests(TestCase):
         user_con_depto = User.objects.create_user(username="miembro_con_depto_xyz")
         cls.membresia_con_depto = Membresia.objects.create(user=user_con_depto, condominio=condominio, rol="residente", unidad=unidad, terminos_aceptados_en=timezone.now())
         user_sin_depto = User.objects.create_user(username="miembro_sin_depto_xyz")
-        cls.membresia_sin_depto = Membresia.objects.create(user=user_sin_depto, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+        cls.membresia_sin_depto = Membresia.objects.create(user=user_sin_depto, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
 
     def setUp(self):
         self.staff = User.objects.create_superuser(username="sinunidad_staff", password="x", email="sinunidad_staff@example.com")
@@ -537,7 +537,7 @@ class SinCondominioFilterTests(TestCase):
         # username que la contenga da falsos positivos en assertContains.
         condominio = Condominio.objects.create(nombre="Test Sin Condominio", plan="premium")
         cls.usuario_asignado = User.objects.create_user(username="usuario_asignado_xyz")
-        Membresia.objects.create(user=cls.usuario_asignado, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=cls.usuario_asignado, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
         cls.usuario_huerfano = User.objects.create_user(username="usuario_huerfano_xyz")
 
     def setUp(self):

@@ -15,9 +15,6 @@
         <label for="miembros-rol" class="visually-hidden">Filtrar por rol</label>
         <select id="miembros-rol" name="rol" class="form-select" onchange="this.form.submit()">
             <option value="">Todos los roles</option>
-            <option value="directiva" {% if rol_seleccionado == "directiva" %}selected{% endif %}>Directiva</option>
-            <option value="administracion" {% if rol_seleccionado == "administracion" %}selected{% endif %}>Administración</option>
-            <option value="conserje" {% if rol_seleccionado == "conserje" %}selected{% endif %}>Conserjería</option>
             <option value="residente" {% if rol_seleccionado == "residente" %}selected{% endif %}>Residente</option>
             <option value="delegado" {% if rol_seleccionado == "delegado" %}selected{% endif %}>Delegado</option>
         </select>

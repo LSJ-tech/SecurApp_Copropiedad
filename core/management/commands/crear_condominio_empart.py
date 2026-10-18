@@ -69,17 +69,18 @@ class Command(BaseCommand):
         ))
 
     def _crear_directiva(self, condominio):
-        if Membresia.objects.filter(condominio=condominio, rol="directiva").exists():
-            self.stdout.write("Ya existe una cuenta directiva para EMPART — no se crea otra.")
+        """Nombre del método histórico -- ya no crea una cuenta "directiva"
+        (rol retirado), ahora es is_staff=True (devquad), sin Membresia."""
+        if User.objects.filter(first_name="Administración", last_name="EMPART", is_staff=True).exists():
+            self.stdout.write("Ya existe una cuenta devquad para EMPART — no se crea otra.")
             return
 
         username = generar_username("Administración", "EMPART")
         password = generar_password_temporal()
-        user = User.objects.create_user(
-            username=username, password=password,
+        User.objects.create_user(
+            username=username, password=password, is_staff=True,
             first_name="Administración", last_name="EMPART",
         )
-        Membresia.objects.create(user=user, condominio=condominio, rol="directiva")
         self.stdout.write(self.style.SUCCESS(
-            f"Usuario directiva (administración) creado — usuario «{username}», contraseña temporal «{password}»."
+            f"Usuario devquad (administración) creado — usuario «{username}», contraseña temporal «{password}»."
         ))

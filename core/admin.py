@@ -367,7 +367,7 @@ class MembresiaAdmin(ModelAdmin):
     autocomplete_fields = ["user", "unidad"]
     list_select_related = ["user", "condominio", "unidad", "unidad__torre", "unidad__condominio"]
 
-    @display(description="Rol", ordering="rol", label={"directiva": "primary", "administracion": "info", "conserje": "warning", "residente": "success", "delegado": "secondary"})
+    @display(description="Rol", ordering="rol", label={"residente": "success", "delegado": "secondary"})
     def rol_badge(self, obj):
         return obj.rol, obj.get_rol_display()
 

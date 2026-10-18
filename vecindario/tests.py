@@ -362,7 +362,7 @@ class MiBarrioViewTests(TestCase):
 
         condominio = Condominio.objects.create(nombre="Test Mi Barrio", plan="premium")
         user = User.objects.create_user(username="con_membresia_barrio")
-        Membresia.objects.create(user=user, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=user, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
         self.client.force_login(user)
         r = self.client.get(reverse("mi-barrio"))
         self.assertRedirects(r, reverse("inicio"))
@@ -386,7 +386,7 @@ class MiBarrioViewTests(TestCase):
 
         condominio = Condominio.objects.create(nombre="Test Mi Barrio Doble", plan="premium")
         perfil = crear_perfil("con_ambos_perfiles", -33.0, -71.6, "66j5f")
-        Membresia.objects.create(user=perfil.user, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
+        Membresia.objects.create(user=perfil.user, condominio=condominio, rol="residente", terminos_aceptados_en=timezone.now())
         self.client.force_login(perfil.user)
         r = self.client.get(reverse("mi-barrio"))
         self.assertEqual(r.status_code, 200)
