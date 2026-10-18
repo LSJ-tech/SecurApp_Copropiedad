@@ -84,7 +84,7 @@ def dashboard_callback(_request, context):
         "datasets": [{
             "label": "Condominios nuevos",
             "data": [conteo_por_mes.get(par, 0) for par in meses],
-            "backgroundColor": "#1A2E40",
+            "backgroundColor": "#102D46",
             "borderRadius": 4,
         }],
     })

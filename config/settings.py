@@ -141,7 +141,7 @@ STORAGES = {
     },
 }
 
-PLATFORM_NAME = os.environ.get('PLATFORM_NAME', 'SecurApp Copropiedad')
+PLATFORM_NAME = os.environ.get('PLATFORM_NAME', 'Mi Barrio+')
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'inicio'
@@ -165,7 +165,7 @@ if os.environ.get('RESEND_API_KEY'):
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@securapp.local')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@mibarrioplus.local')
 
 
 # Cobro automático recurrente vía Mercado Pago (API Preapproval, no
@@ -211,8 +211,8 @@ SIMPLE_JWT = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'SecurApp Copropiedad API',
-    'DESCRIPTION': 'API para la app móvil de residentes (alertas, avisos, gastos comunes, dispositivos push).',
+    'TITLE': 'Mi Barrio+ API',
+    'DESCRIPTION': 'API para la app móvil de residentes (alertas, avisos, directorio de vecinos, dispositivos push).',
     'VERSION': '1.0.0',
 }
 
@@ -254,25 +254,25 @@ def _logo_admin(request):
 
 
 UNFOLD = {
-    "SITE_TITLE": "SecurApp Copropiedad · Admin",
-    "SITE_HEADER": "SecurApp Copropiedad",
+    "SITE_TITLE": "Mi Barrio+ · Admin",
+    "SITE_HEADER": "Mi Barrio+",
     "SITE_SYMBOL": "shield",
     "SITE_LOGO": _logo_admin,
     "DASHBOARD_CALLBACK": "core.dashboard.dashboard_callback",
     "SHOW_HISTORY": True,
     "COLORS": {
         "primary": {
-            "50": "238 242 245",
-            "100": "220 228 234",
-            "200": "185 201 214",
-            "300": "143 167 187",
-            "400": "92 122 149",
-            "500": "60 90 116",
-            "600": "26 46 64",
-            "700": "20 37 52",
-            "800": "15 29 41",
-            "900": "10 20 28",
-            "950": "5 10 14",
+            "50": "236 241 244",
+            "100": "214 224 231",
+            "200": "173 192 205",
+            "300": "124 152 172",
+            "400": "76 112 140",
+            "500": "40 78 107",
+            "600": "16 45 70",
+            "700": "13 36 56",
+            "800": "10 27 42",
+            "900": "7 18 28",
+            "950": "4 10 15",
         },
     },
     "SIDEBAR": {

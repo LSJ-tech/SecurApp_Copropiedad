@@ -1,4 +1,4 @@
-const CACHE_NAME = "securapp-copropiedad-v1";
+const CACHE_NAME = "mibarrio-plus-v1";
 const OFFLINE_URL = "/offline/";
 
 self.addEventListener("install", (event) => {
@@ -18,8 +18,8 @@ self.addEventListener("activate", (event) => {
 });
 
 // Red primero, con una página de respaldo si no hay conexión -- el contenido
-// (alertas, gastos comunes) cambia seguido, así que nunca conviene mostrar
-// una versión vieja desde el cache en vez de intentar la red.
+// (alertas, avisos) cambia seguido, así que nunca conviene mostrar una
+// versión vieja desde el cache en vez de intentar la red.
 self.addEventListener("fetch", (event) => {
     if (event.request.mode === "navigate") {
         event.respondWith(
@@ -33,7 +33,7 @@ self.addEventListener("push", (event) => {
     try {
         datos = event.data ? event.data.json() : {};
     } catch (error) {
-        datos = { title: "SecurApp Copropiedad", body: event.data ? event.data.text() : "" };
+        datos = { title: "Mi Barrio+", body: event.data ? event.data.text() : "" };
     }
     const opciones = {
         body: datos.body || "",
@@ -42,7 +42,7 @@ self.addEventListener("push", (event) => {
         data: datos.data || {},
         requireInteraction: datos.data?.tipo === "alerta",
     };
-    event.waitUntil(self.registration.showNotification(datos.title || "SecurApp Copropiedad", opciones));
+    event.waitUntil(self.registration.showNotification(datos.title || "Mi Barrio+", opciones));
 });
 
 self.addEventListener("notificationclick", (event) => {
