@@ -14,7 +14,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
-from core.mixins import MENSAJE_SIN_CONDOMINIO, CondominioRequiredMixin, EsDirectivaOAdministracionMixin
+from core.mixins import MENSAJE_SIN_CONDOMINIO, CondominioRequiredMixin
 
 from .mercadopago_client import (
     cancelar_suscripcion_recurrente,
@@ -26,7 +26,6 @@ from .models import Pago, SuscripcionRecurrente
 
 logger = logging.getLogger(__name__)
 
-MONTO_SUSCRIPCION = Decimal("19990")
 MONTO_DONACION = Decimal("2000")
 
 # Mercado Pago manda el tipo de notificación como "type" (cuerpo) o "topic"
@@ -50,8 +49,8 @@ ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION = {
 
 def _email_del_pagador(request):
     """payer_email es obligatorio para crear una autorización recurrente en
-    Mercado Pago -- el autorregistro de directiva no pide email (ver
-    RegistroCondominioForm), así que puede venir vacío."""
+    Mercado Pago -- el email es opcional al crear una cuenta, así que puede
+    venir vacío."""
     return (request.user.email or "").strip()
 
 
@@ -118,10 +117,9 @@ def sincronizar_estado_suscripcion(suscripcion):
 
 
 class DonarView(LoginRequiredMixin, View):
-    """Cualquier miembro (directiva, administración, conserjería o residente)
-    puede activar una donación mensual automática para apoyar el desarrollo
-    de la plataforma -- cobro recurrente vía Mercado Pago (API Preapproval)
-    hasta que la cancele, sin relación con la suscripción del condominio.
+    """Cualquier miembro (residente o delegado) puede activar una donación
+    mensual automática para apoyar el desarrollo de la plataforma -- cobro
+    recurrente vía Mercado Pago (API Preapproval) hasta que la cancele.
     Monto fijo (MONTO_DONACION), no lo elige quien dona."""
 
     def post(self, request, *args, **kwargs):
@@ -176,73 +174,6 @@ class CancelarDonacionRecurrenteView(LoginRequiredMixin, View):
         return redirect("inicio")
 
 
-class SuscripcionPagarView(LoginRequiredMixin, View):
-    """Solo directiva o administración pueden activar el cobro automático
-    mensual de la suscripción del condominio -- monto fijo. Cobro recurrente
-    vía Mercado Pago (API Preapproval) hasta que se cancele: cada cobro
-    aprobado extiende Condominio.pagado_hasta 30 días (ver WebhookMercadoPagoView)."""
-
-    def post(self, request, *args, **kwargs):
-        membresia = getattr(request.user, "membresia", None)
-        if membresia is None:
-            messages.error(request, MENSAJE_SIN_CONDOMINIO)
-            return redirect("login")
-        if membresia.rol not in ("administracion", "directiva"):
-            messages.error(request, "Activar el pago de la suscripción es exclusivo de directiva/administración.")
-            return redirect("inicio")
-
-        if not settings.MERCADOPAGO_ACCESS_TOKEN:
-            messages.error(request, "El pago en línea todavía no está disponible. Escríbenos para coordinar el pago.")
-            return redirect("inicio")
-
-        email = _email_del_pagador(request)
-        if not email:
-            messages.error(request, "Agrega tu email en «Mi perfil» antes de activar el cobro automático.")
-            return redirect("inicio")
-
-        condominio = membresia.condominio
-        if SuscripcionRecurrente.objects.filter(condominio=condominio, tipo="suscripcion", estado__in=["pendiente", "autorizada"]).exists():
-            messages.error(request, "Ya existe una suscripción automática activa para este condominio.")
-            return redirect("inicio")
-
-        suscripcion = SuscripcionRecurrente.objects.create(
-            condominio=condominio, membresia=membresia, tipo="suscripcion", monto=MONTO_SUSCRIPCION,
-        )
-        url_autorizacion = crear_suscripcion_recurrente(suscripcion, email, request)
-        if not url_autorizacion:
-            suscripcion.delete()
-            messages.error(request, "No pudimos iniciar el pago. Intenta de nuevo en un momento.")
-            return redirect("inicio")
-        return redirect(url_autorizacion)
-
-
-class CancelarSuscripcionRecurrenteView(LoginRequiredMixin, View):
-    def post(self, request, *args, **kwargs):
-        membresia = getattr(request.user, "membresia", None)
-        if membresia is None:
-            messages.error(request, MENSAJE_SIN_CONDOMINIO)
-            return redirect("login")
-        if membresia.rol not in ("administracion", "directiva"):
-            messages.error(request, "Cancelar la suscripción es exclusivo de directiva/administración.")
-            return redirect("inicio")
-
-        suscripcion = SuscripcionRecurrente.objects.filter(
-            condominio=membresia.condominio, tipo="suscripcion", estado__in=["pendiente", "autorizada"],
-        ).first()
-        if not suscripcion:
-            messages.error(request, "No hay ninguna suscripción automática activa para cancelar.")
-            return redirect("inicio")
-
-        if cancelar_suscripcion_recurrente(suscripcion):
-            suscripcion.estado = "cancelada"
-            suscripcion.fecha_cancelacion = timezone.now()
-            suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
-            messages.success(request, "Listo, cancelamos el cobro automático. No se harán más cobros -- el acceso sigue activo hasta la fecha ya pagada.")
-        else:
-            messages.error(request, "No pudimos cancelar la suscripción en Mercado Pago. Intenta de nuevo o escríbenos.")
-        return redirect("inicio")
-
-
 class PagoResultadoView(LoginRequiredMixin, TemplateView):
     """A donde vuelve el navegador tras autorizar el cobro (o cancelar). Solo
     informativa -- la confirmación real llega por separado a WebhookMercadoPagoView."""
@@ -255,35 +186,9 @@ class PagoResultadoView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class HistorialPagosView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, TemplateView):
-    """Para directiva/administración: historial de pagos de la suscripción
-    del condominio como cliente de la plataforma -- hasta ahora solo se
-    podía ver en el admin de Django.
-
-    NO incluye donaciones: son un aporte voluntario y personal de cada
-    residente, no un dato de gestión del condominio -- cada quien ve solo
-    las suyas (ver MisDonacionesView)."""
-
-    template_name = "pagos/historial_pagos.html"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        suscripcion_actual = SuscripcionRecurrente.objects.filter(
-            condominio=self.condominio, tipo="suscripcion",
-        ).order_by("-fecha_creacion").first()
-        context["suscripcion_actual"] = suscripcion_actual
-        context["suscripcion_recurrente_activa"] = bool(suscripcion_actual and suscripcion_actual.estado in ("pendiente", "autorizada"))
-        context["suscripcion_al_dia"] = bool(self.condominio.pagado_hasta and self.condominio.pagado_hasta >= timezone.localdate())
-        context["pagos_suscripcion"] = Pago.objects.filter(
-            condominio=self.condominio, tipo="suscripcion",
-        ).order_by("-fecha_creacion")
-        return context
-
-
 class MisDonacionesView(CondominioRequiredMixin, TemplateView):
     """Las donaciones son voluntarias y personales -- cada miembro ve
-    únicamente su propio historial, nadie más (ni directiva ni
-    administración, ver HistorialPagosView)."""
+    únicamente su propio historial, nadie más."""
 
     template_name = "pagos/mis_donaciones.html"
 
