@@ -752,3 +752,69 @@ class SincronizarSuscripcionesCommandTests(TestCase):
         out = StringIO()
         call_command("sincronizar_suscripciones", stdout=out)
         self.assertIn("no está configurado", out.getvalue())
+
+
+class CancelarSuscripcionesCondominiosCommandTests(TestCase):
+    """Comando cancelar_suscripciones_condominios -- parte del retiro del
+    cobro de suscripción del condominio (ver memoria del proyecto). Nunca
+    se ejecuta solo: dry-run por defecto, --aplicar para cancelar de verdad."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Cancelar Suscripciones", plan="premium")
+
+    def _suscripcion(self, **kwargs):
+        kwargs.setdefault("condominio", self.condominio)
+        kwargs.setdefault("tipo", "suscripcion")
+        kwargs.setdefault("monto", Decimal("19990"))
+        kwargs.setdefault("estado", "autorizada")
+        return SuscripcionRecurrente.objects.create(**kwargs)
+
+    def test_sin_aplicar_no_llama_a_mercado_pago_ni_cambia_nada(self):
+        suscripcion = self._suscripcion(mercadopago_preapproval_id="pre-cancel-dry")
+        with patch("pagos.management.commands.cancelar_suscripciones_condominios.cancelar_suscripcion_recurrente") as mock_cancelar:
+            out = StringIO()
+            call_command("cancelar_suscripciones_condominios", stdout=out)
+        mock_cancelar.assert_not_called()
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "autorizada")
+        self.assertIn("Dry-run", out.getvalue())
+        self.assertIn(self.condominio.nombre, out.getvalue())
+
+    @patch("pagos.management.commands.cancelar_suscripciones_condominios.cancelar_suscripcion_recurrente", return_value=True)
+    def test_aplicar_cancela_cada_suscripcion_de_condominio_activa(self, mock_cancelar):
+        pendiente = self._suscripcion(mercadopago_preapproval_id="pre-cancel-1", estado="pendiente")
+        autorizada = self._suscripcion(mercadopago_preapproval_id="pre-cancel-2", estado="autorizada")
+
+        call_command("cancelar_suscripciones_condominios", "--aplicar")
+
+        self.assertEqual(mock_cancelar.call_count, 2)
+        pendiente.refresh_from_db()
+        autorizada.refresh_from_db()
+        self.assertEqual(pendiente.estado, "cancelada")
+        self.assertEqual(autorizada.estado, "cancelada")
+        self.assertIsNotNone(pendiente.fecha_cancelacion)
+
+    @patch("pagos.management.commands.cancelar_suscripciones_condominios.cancelar_suscripcion_recurrente", return_value=False)
+    def test_informa_las_que_fallan_sin_frenar_el_resto(self, mock_cancelar):
+        self._suscripcion(mercadopago_preapproval_id="pre-cancel-falla")
+        out = StringIO()
+        call_command("cancelar_suscripciones_condominios", "--aplicar", stdout=out)
+        self.assertIn("No se pudo cancelar", out.getvalue())
+
+    def test_nunca_toca_donaciones(self):
+        donacion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="donacion", monto=Decimal("2000"),
+            mercadopago_preapproval_id="pre-cancel-donacion", estado="autorizada",
+        )
+        with patch("pagos.management.commands.cancelar_suscripciones_condominios.cancelar_suscripcion_recurrente") as mock_cancelar:
+            call_command("cancelar_suscripciones_condominios", "--aplicar")
+        mock_cancelar.assert_not_called()
+        donacion.refresh_from_db()
+        self.assertEqual(donacion.estado, "autorizada")
+
+    def test_una_ya_cancelada_queda_excluida(self):
+        self._suscripcion(mercadopago_preapproval_id="pre-cancel-ya", estado="cancelada")
+        out = StringIO()
+        call_command("cancelar_suscripciones_condominios", stdout=out)
+        self.assertIn("No hay ninguna suscripción", out.getvalue())
