@@ -1,10 +1,12 @@
-# SecurApp Copropiedad
+# Mi Barrio+
 
-Red de seguridad y comunicación para juntas de vecinos, condominios y barrios en Chile — segundo producto de [DevQuad](https://devquad.cl), en la misma línea que [PataAgenda](https://patagenda.devquad.cl).
+*(ex SecurApp Copropiedad)*
+
+Red de seguridad y comunicación para juntas de vecinos, condominios, pasajes y barrios en Chile — segundo producto de [DevQuad](https://devquad.cl), en la misma línea que [PataAgenda](https://patagenda.devquad.cl).
 
 Botón de pánico con notificación push, avisos y directorio de vecinos, con un panel web (instalable como PWA). DevQuad administra la configuración de cada condominio (torres, unidades, altas de cuentas) desde un panel propio con acceso a todos los condominios clientes -- no hay un rol de pago operado por el propio condominio. Una app nativa (React Native + Expo) es el siguiente paso si el volumen de clientes lo justifica.
 
-**SecurApp Copropiedad es gratis.** No hay suscripción ni cobro al condominio -- cualquier residente puede, de forma opcional, activar una donación mensual voluntaria (residente → DevQuad) vía Mercado Pago, cancelable cuando quiera.
+**Mi Barrio+ es gratis.** No hay suscripción ni cobro al condominio -- cualquier residente puede, de forma opcional, activar una donación mensual voluntaria (residente → DevQuad) vía Mercado Pago, cancelable cuando quiera.
 
 ## Estado actual
 

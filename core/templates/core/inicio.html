@@ -224,7 +224,7 @@ function mensajeAlertaWhatsApp(alerta) {
         lineas.push(`${ETIQUETA_UNIDAD}: ${unidad}`);
     }
     if (alerta.mensaje) lineas.push(`Mensaje: "${alerta.mensaje}"`);
-    lineas.push("", `👉 Revisa la alerta en SecurApp Copropiedad: ${window.location.origin}/`);
+    lineas.push("", `👉 Revisa la alerta en {{ PLATFORM_NAME }}: ${window.location.origin}/`);
     return lineas.join("\n");
 }
 

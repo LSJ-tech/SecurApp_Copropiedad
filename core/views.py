@@ -120,7 +120,7 @@ def probar_correo(request):
     except ValidationError:
         return HttpResponse("Agrega ?destino=tu@email.com (una dirección válida) a la URL.", status=400)
     send_mail(
-        subject="Correo de prueba de SecurApp Copropiedad",
+        subject=f"Correo de prueba de {settings.PLATFORM_NAME}",
         message="Si recibiste esto, el envío de correo (Resend) está funcionando correctamente.",
         from_email=None,
         recipient_list=[destino],
@@ -319,7 +319,7 @@ class SolicitarAccesoView(FormView):
         solicitud = form.save()
         try:
             send_mail(
-                subject=f"Nueva solicitud de acceso a SecurApp Copropiedad: {solicitud.condominio}",
+                subject=f"Nueva solicitud de acceso a {settings.PLATFORM_NAME}: {solicitud.condominio}",
                 message=(
                     f"Nombre: {solicitud.nombre}\nCondominio: {solicitud.condominio}\nComuna: {solicitud.comuna}\n"
                     f"Teléfono: {solicitud.telefono}\nEmail: {solicitud.email}\nMensaje: {solicitud.mensaje}\n\n"
@@ -424,11 +424,11 @@ def _contexto_invitacion(request, condominio):
         # "tu" no cambia con el género de la palabra (condominio, junta de
         # vecinos, comunidad...), así que no hace falta saber el género de
         # etiqueta_organizacion para que la frase quede bien armada.
-        f"Te invito a unirte a *SecurApp* 🔐, la app de tu {condominio.etiqueta_organizacion.lower()} *{condominio.nombre}*.\n\n"
+        f"Te invito a unirte a *{settings.PLATFORM_NAME}* 🔐, la app de tu {condominio.etiqueta_organizacion.lower()} *{condominio.nombre}*.\n\n"
         f"Desde ahí puedes:\n"
         f"✅ Activar el botón de pánico\n"
         f"✅ Ver avisos y alertas\n"
-        f"✅ Revisar tus gastos comunes\n\n"
+        f"✅ Revisar el directorio de vecinos\n\n"
         f"Crea tu cuenta eligiendo tu {condominio.etiqueta_unidad.lower()} acá 👇\n"
         f"{link}"
     )
