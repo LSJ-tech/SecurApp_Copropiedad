@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#1A2E40">
+    <meta name="theme-color" content="#102D46">
     <link rel="icon" type="image/svg+xml" href="{% static 'core/logo.svg' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/favicon-32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'core/favicon-16.png' %}">
@@ -16,40 +16,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'core/brand.css' %}">
     {% block extra_head %}{% endblock %}
     <style>
-        :root {
-            --bs-primary: #1A2E40;
-            --bs-primary-rgb: 26, 46, 64;
-            --bs-link-color: #1A2E40;
-            --bs-link-color-rgb: 26, 46, 64;
-            --bs-link-hover-color: #E07A5F;
-            --bs-link-hover-color-rgb: 224, 122, 95;
-        }
         body {
             font-family: "Work Sans", system-ui, -apple-system, sans-serif;
         }
         h1 {
             font-family: "Fraunces", Georgia, serif;
             font-weight: 700;
-        }
-        .btn-primary {
-            --bs-btn-bg: #1A2E40;
-            --bs-btn-border-color: #1A2E40;
-            --bs-btn-hover-bg: #24405A;
-            --bs-btn-hover-border-color: #24405A;
-            --bs-btn-active-bg: #0F1D29;
-            --bs-btn-active-border-color: #0F1D29;
-            --bs-btn-disabled-bg: #1A2E40;
-            --bs-btn-disabled-border-color: #1A2E40;
-        }
-        .btn-outline-primary {
-            --bs-btn-color: #1A2E40;
-            --bs-btn-border-color: #1A2E40;
-            --bs-btn-hover-bg: #1A2E40;
-            --bs-btn-hover-border-color: #1A2E40;
-            --bs-btn-active-bg: #1A2E40;
-            --bs-btn-active-border-color: #1A2E40;
         }
         .navbar-brand img { display: block; }
 
@@ -60,13 +35,6 @@
            "Sitio de escritorio" activado), lo peor que pasa es que el menú
            se ve en una fila horizontal angosta, nunca una barra lateral fija
            sin botón para cerrarla tapando toda la pantalla. */
-        .navbar-nav .nav-link { color: rgba(255,255,255,0.75); }
-        /* Colores sólidos (no rgba) a propósito: el checker de contraste de
-           Sonar evalúa el color declarado tal cual, sin mezclarlo con el
-           fondo navy real -- con rgba(255,255,255,X) ve "blanco sobre casi
-           blanco" y marca falso contraste insuficiente. Estos hex son el
-           mismo resultado visual (blanco X% sobre #1A2E40), ya mezclado. */
-        .navbar-nav .nav-link:hover, .navbar-nav .nav-link.active { color: #fff; }
     </style>
 </head>
 <body>

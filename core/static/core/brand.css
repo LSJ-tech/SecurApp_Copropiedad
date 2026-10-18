@@ -1,0 +1,56 @@
+/* Paleta oficial de Mi Barrio+ -- fuente única de verdad para los colores
+   de marca (antes duplicados como hex sueltos en cada template). Los
+   templates de correo (core/templates/core/emails/_estilos.html) NO
+   enlazan este archivo a propósito: los clientes de correo no cargan
+   hojas de estilo externas de forma confiable, así que ahí los mismos
+   valores van como hex literal. */
+
+:root {
+    --mb-primary: #102D46;
+    --mb-primary-dark: #284E6B;
+    --mb-primary-darker: #0A1B2A;
+    --mb-secondary: #708090;
+    --mb-accent: #0D9488;
+    --mb-slate: #5B7A8C;
+    --mb-ink: #102D46;
+
+    --bs-primary: var(--mb-primary);
+    --bs-primary-rgb: 16, 45, 70;
+    --bs-link-color: var(--mb-primary);
+    --bs-link-color-rgb: 16, 45, 70;
+    --bs-link-hover-color: var(--mb-accent);
+    --bs-link-hover-color-rgb: 13, 148, 136;
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--mb-primary);
+    --bs-btn-border-color: var(--mb-primary);
+    --bs-btn-hover-bg: var(--mb-primary-dark);
+    --bs-btn-hover-border-color: var(--mb-primary-dark);
+    --bs-btn-active-bg: var(--mb-primary-darker);
+    --bs-btn-active-border-color: var(--mb-primary-darker);
+    --bs-btn-disabled-bg: var(--mb-primary);
+    --bs-btn-disabled-border-color: var(--mb-primary);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--mb-primary);
+    --bs-btn-border-color: var(--mb-primary);
+    --bs-btn-hover-bg: var(--mb-primary);
+    --bs-btn-hover-border-color: var(--mb-primary);
+    --bs-btn-active-bg: var(--mb-primary);
+    --bs-btn-active-border-color: var(--mb-primary);
+}
+
+.navbar-mibarrio {
+    background: rgba(16, 45, 70, 0.92);
+    backdrop-filter: blur(6px);
+}
+
+/* Colores sólidos (no rgba) a propósito: el checker de contraste de Sonar
+   evalúa el color declarado tal cual, sin mezclarlo con el fondo navy real
+   -- con rgba(255,255,255,X) ve "blanco sobre casi blanco" y marca falso
+   contraste insuficiente. Estos hex son el mismo resultado visual (blanco
+   X% sobre #102D46), ya mezclado. */
+.navbar-nav .nav-link { color: rgba(255,255,255,0.75); }
+.navbar-nav .nav-link:hover, .navbar-nav .nav-link.active { color: #fff; }

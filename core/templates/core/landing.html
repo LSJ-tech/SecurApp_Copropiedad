@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="{{ PLATFORM_NAME }}: el botón de pánico que avisa a todo tu condominio al instante. Además, avisos y directorio de vecinos, gratis para tu comunidad.">
-    <meta name="theme-color" content="#1A2E40">
+    <meta name="theme-color" content="#102D46">
     <link rel="icon" type="image/svg+xml" href="{% static 'core/logo.svg' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/favicon-32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'core/favicon-16.png' %}">
@@ -31,6 +31,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;0,800;0,900;1,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'core/brand.css' %}">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -59,32 +60,13 @@
     }
     </script>
     <style>
-        :root {
-            --securapp-primary: #1A2E40;
-            --securapp-primary-dark: #24405A;
-            --securapp-primary-darker: #0F1D29;
-            --securapp-secondary: #708090;
-            --securapp-accent: #E07A5F;
-            --securapp-slate: #5B7A8C;
-            --securapp-ink: #1A2E40;
-        }
         body {
             background: #F7F8F9;
             font-family: "Work Sans", system-ui, -apple-system, sans-serif;
-            color: var(--securapp-ink);
+            color: var(--mb-ink);
         }
         h1, h2, .section-title, .font-display {
             font-family: "Fraunces", Georgia, serif;
-        }
-        .btn-primary {
-            --bs-btn-bg: var(--securapp-primary);
-            --bs-btn-border-color: var(--securapp-primary);
-            --bs-btn-hover-bg: var(--securapp-primary-dark);
-            --bs-btn-hover-border-color: var(--securapp-primary-dark);
-        }
-        .navbar-securapp {
-            background: rgba(26, 46, 64, 0.92);
-            backdrop-filter: blur(6px);
         }
         .hero {
             position: relative;
@@ -108,7 +90,7 @@
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, rgba(15, 29, 41, 0.94) 0%, rgba(26, 46, 64, 0.88) 55%, rgba(36, 64, 90, 0.82) 100%);
+            background: linear-gradient(135deg, rgba(10, 27, 42, 0.94) 0%, rgba(16, 45, 70, 0.88) 55%, rgba(40, 78, 107, 0.82) 100%);
         }
         .hero > .container { position: relative; z-index: 1; }
         .eyebrow {
@@ -119,7 +101,7 @@
             font-style: italic;
             font-weight: 500;
             font-size: 1.05rem;
-            color: var(--securapp-accent);
+            color: var(--mb-accent);
         }
         .hero h1 { font-weight: 800; letter-spacing: -0.01em; }
         .stat-strip-item { border-left: 1px solid rgba(255,255,255,0.25); padding-left: 1.25rem; }
@@ -136,14 +118,14 @@
             font-size: 1.5rem;
             flex-shrink: 0;
         }
-        .icono-emergencia { background: rgba(224, 122, 95, 0.14); color: var(--securapp-accent); }
-        .icono-admin { background: rgba(91, 122, 140, 0.12); color: var(--securapp-slate); }
+        .icono-emergencia { background: rgba(13, 148, 136, 0.14); color: var(--mb-accent); }
+        .icono-admin { background: rgba(91, 122, 140, 0.12); color: var(--mb-slate); }
 
         .grupo-caracteristicas-label {
             font-family: "Fraunces", Georgia, serif;
             font-style: italic;
             font-size: 1.15rem;
-            color: var(--securapp-ink);
+            color: var(--mb-ink);
             margin-bottom: 1.25rem;
         }
         .card-feature {
@@ -155,19 +137,19 @@
             border-left: 3px solid transparent;
         }
         .card-feature--emergencia {
-            border-left-color: var(--securapp-accent);
-            background: linear-gradient(180deg, rgba(224, 122, 95, 0.05) 0%, #fff 140px);
-            box-shadow: 0 8px 24px rgba(224, 122, 95, 0.1);
+            border-left-color: var(--mb-accent);
+            background: linear-gradient(180deg, rgba(13, 148, 136, 0.05) 0%, #fff 140px);
+            box-shadow: 0 8px 24px rgba(13, 148, 136, 0.1);
         }
         .card-feature--admin {
-            border-left-color: var(--securapp-slate);
+            border-left-color: var(--mb-slate);
         }
 
         .paso-numero {
             width: 2.5rem;
             height: 2.5rem;
             border-radius: 50%;
-            background: var(--securapp-primary);
+            background: var(--mb-primary);
             color: #fff;
             display: flex;
             align-items: center;
@@ -188,7 +170,7 @@
             gap: 0.9rem;
             align-items: flex-start;
         }
-        .dato-real .bi { font-size: 1.35rem; color: var(--securapp-primary); }
+        .dato-real .bi { font-size: 1.35rem; color: var(--mb-primary); }
         .dato-real .bi.text-rose { color: #BE123C; }
         .dato-real .bi.text-amber { color: #92400E; }
         .dato-real .bi.text-emerald { color: #047857; }
@@ -203,13 +185,13 @@
         .pain-quote {
             font-style: italic;
             color: #6b7280;
-            border-left: 3px solid var(--securapp-accent);
+            border-left: 3px solid var(--mb-accent);
             padding-left: 0.9rem;
             margin-bottom: 0.9rem;
         }
 
         .cta-final {
-            background: linear-gradient(135deg, var(--securapp-primary-darker) 0%, var(--securapp-primary) 100%);
+            background: linear-gradient(135deg, var(--mb-primary-darker) 0%, var(--mb-primary) 100%);
             color: #fff;
             border-radius: 1.25rem;
         }
@@ -225,7 +207,7 @@
             right: 6%;
             bottom: 14%;
             background: #fff;
-            color: var(--securapp-ink);
+            color: var(--mb-ink);
             border-radius: 1rem;
             padding: 0.85rem 1.1rem;
             box-shadow: 0 20px 40px rgba(30, 27, 75, 0.35);
@@ -259,7 +241,7 @@
 
         /* Sección oscura con blobs decorativos, para el mockup del producto */
         .seccion-producto {
-            background: linear-gradient(180deg, #081219 0%, var(--securapp-primary-darker) 100%);
+            background: linear-gradient(180deg, #081219 0%, var(--mb-primary-darker) 100%);
             position: relative;
             overflow: hidden;
         }
@@ -270,8 +252,8 @@
             filter: blur(80px);
             opacity: 0.35;
         }
-        .seccion-producto::before { width: 420px; height: 420px; background: var(--securapp-secondary); top: -120px; left: -100px; }
-        .seccion-producto::after { width: 380px; height: 380px; background: var(--securapp-accent); bottom: -140px; right: -80px; }
+        .seccion-producto::before { width: 420px; height: 420px; background: var(--mb-secondary); top: -120px; left: -100px; }
+        .seccion-producto::after { width: 380px; height: 380px; background: var(--mb-accent); bottom: -140px; right: -80px; }
         .seccion-producto .container { position: relative; z-index: 1; }
 
         /* Mockup del panel real, dentro de un marco de navegador */
@@ -303,7 +285,7 @@
         .mockup-body { display: flex; min-height: 360px; }
         .mockup-sidebar {
             width: 170px;
-            background: var(--securapp-primary-darker);
+            background: var(--mb-primary-darker);
             color: #fff;
             padding: 1rem 0.75rem;
             flex-shrink: 0;
@@ -336,7 +318,7 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-securapp fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-mibarrio fixed-top">
         <div class="container">
             <a class="navbar-brand fw-bold d-inline-flex align-items-center gap-2" href="{% url 'inicio' %}">
                 <img src="{% static 'core/logo.svg' %}" width="28" height="28" alt="">
@@ -514,15 +496,15 @@
             {% endif %}
             <div class="row text-center g-4">
                 <div class="col-md-4">
-                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_organizaciones }}</div>
+                    <div class="display-5 fw-bold" style="color: var(--mb-primary);">{{ stat_organizaciones }}</div>
                     <p class="text-muted mb-0">Condominios y juntas de vecinos activos</p>
                 </div>
                 <div class="col-md-4">
-                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_unidades }}</div>
+                    <div class="display-5 fw-bold" style="color: var(--mb-primary);">{{ stat_unidades }}</div>
                     <p class="text-muted mb-0">Unidades administradas, entre deptos y casas</p>
                 </div>
                 <div class="col-md-4">
-                    <div class="display-5 fw-bold" style="color: var(--securapp-primary);">{{ stat_miembros }}</div>
+                    <div class="display-5 fw-bold" style="color: var(--mb-primary);">{{ stat_miembros }}</div>
                     <p class="text-muted mb-0">Vecinos usando la plataforma</p>
                 </div>
             </div>

@@ -4,11 +4,11 @@
 {% block extra_head %}
 <style>
     .donacion-hero {
-        /* #B55D42 (no el coral de marca #E07A5F) a propósito: el texto
-           blanco encima necesita 4.5:1 de contraste y el coral de marca
-           solo da ~3:1 -- Sonar lo marcó (css:S7924) y de verdad se veía
-           más pálido justo en esa esquina del degradado. */
-        background: linear-gradient(135deg, #B55D42 0%, #c2495f 55%, #1A2E40 100%);
+        /* #B55D42 (no el color de marca) a propósito: el texto blanco
+           encima necesita 4.5:1 de contraste y los colores de marca no
+           lo garantizan en esa esquina del degradado -- Sonar lo marcó
+           (css:S7924) con el coral viejo, mismo criterio se mantiene acá. */
+        background: linear-gradient(135deg, #B55D42 0%, #c2495f 55%, #102D46 100%);
         border-radius: 1rem;
         color: #fff;
         padding: 2.5rem 2rem;
@@ -32,12 +32,12 @@
         padding: 1rem 1.25rem;
         background: #fff;
         border: 1px solid rgba(0,0,0,0.06);
-        box-shadow: 0 2px 10px rgba(26,46,64,0.06);
+        box-shadow: 0 2px 10px rgba(16,45,70,0.06);
     }
     .donacion-stat .valor {
         font-size: 1.75rem;
         font-weight: 700;
-        color: #1A2E40;
+        color: #102D46;
     }
     .donacion-stat .etiqueta {
         color: #6c757d;
