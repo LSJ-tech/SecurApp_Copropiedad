@@ -13,7 +13,6 @@ Implementado y probado de punta a punta:
 - Multi-tenant real: cada condominio solo ve sus propios datos (verificado con tests de aislamiento).
 - 3 roles: **devquad** (`User.is_staff`, sin Membresia propia -- administra TODOS los condominios desde un panel con selector, ver `DevquadCondominiosView`/`condominio_activo_devquad`: miembros, unidades, avisos, Mi condominio, números de emergencia), **delegado** (representa a su propia torre/calle: publica avisos acotados a esa torre, ve el directorio), **residente** (dispara alertas, lee avisos, dona).
 - Botón de pánico: la app/API crea una `Alerta` con ubicación GPS, se envía push a todo el condominio (vía Expo), y **cualquier miembro** puede ver el mapa y resolverla o marcarla como falsa alarma. Se auto-cierra sola si nadie responde en 30 minutos. Historial completo filtrable en `/alertas/historial/`.
-- **Red vecinal geográfica (app `vecindario`, piloto Región de Valparaíso):** capa de emergencia abierta, sin condominio -- cualquier persona en Valparaíso, Viña del Mar o Casablanca se registra con su dirección/GPS (`/vecindario/registro/`) y queda agrupada por "barrio" (celda de geohash + sus 8 vecinas, ~5km) para notificación por radio geográfico, no por tenant. Quien no tiene condominio usa `/mi-barrio/` como dashboard; quien tiene ambos (condominio + red vecinal) ve un toggle opcional "avisar también a mi barrio" en el botón de pánico normal, apagado por defecto, y puede actualizar su dirección/GPS cuando quiera desde `/mi-barrio/ubicacion/`. Geocodificación vía Nominatim/OpenStreetMap (gratis, sin API key). Los miembros de condominios existentes se suman con su propia ubicación real desde `/vecindario/unirse/` (banner en el inicio si no se han sumado todavía).
 - Avisos (muro de noticias simple): devquad publica a todo el condominio; un delegado también publica, pero acotado a su propia torre (ver `Aviso.torre`). Se manda push a los destinatarios, todos los miembros leen.
 - Panel de devquad con KPIs (unidades, miembros, alertas activas) y accesos directos a Miembros/Torres/Unidades/Mi condominio, con un selector para elegir en qué condominio operar (`/devquad/condominios/`).
 - Donación voluntaria (residente → DevQuad, exclusiva de residente/delegado) vía Mercado Pago (API Preapproval -- `SuscripcionRecurrente`), cancelable en cualquier momento desde el panel o el admin. Mismo patrón de seguridad que PataAgenda: el webhook siempre re-consulta el recurso por ID, nunca confía en el body.
@@ -25,7 +24,7 @@ Implementado y probado de punta a punta:
 - Etiquetas de "Torre" y "Unidad" configurables por condominio (ej. "Block"/"Departamento" para Empart) -- las fija devquad vía `/admin/core/condominio/`, no hay form en la app para esto.
 - Correo de bienvenida en HTML al registrarse (autoregistro o alta por devquad), con el mismo look del panel.
 
-No implementado a propósito todavía: QR de visitas, confirmaciones de alerta entre vecinos, reportes, app nativa. **Retirado (ver memoria del proyecto):** gastos comunes, registro de accesos, gestión de personal/liquidaciones de sueldo y la suscripción de pago del condominio -- las apps `gastoscomunes`/`accesos`/`personal` se borraron del código; sus tablas quedaron intactas (huérfanas, no gestionadas) en la base de datos de producción.
+No implementado a propósito todavía: QR de visitas, confirmaciones de alerta entre vecinos, reportes, app nativa. **Retirado (ver memoria del proyecto):** gastos comunes, registro de accesos, gestión de personal/liquidaciones de sueldo y la suscripción de pago del condominio -- las apps `gastoscomunes`/`accesos`/`personal` se borraron del código; sus tablas quedaron intactas (huérfanas, no gestionadas) en la base de datos de producción. **También retirada: la red vecinal geográfica** (app `vecindario`, registro público por GPS sin condominio) -- se volvió al modelo de alertas cerradas, exclusivas de quien tiene Membresia en un condominio.
 
 ## Stack
 
@@ -55,7 +54,6 @@ alertas/            # botón de pánico
 comunicacion/       # avisos
 notificaciones/     # dispositivos push y envío vía Expo/Web Push
 pagos/              # donaciones voluntarias (Mercado Pago)
-vecindario/         # red vecinal geográfica (piloto Región de Valparaíso)
 ```
 
 Cada app de dominio (excepto `core`) sigue el mismo patrón: `models.py`, `serializers.py` + `api_views.py` + `api_urls.py` (API para la app móvil, bajo `/api/v1/`), y `views.py`/`forms.py`/`urls.py` cuando además tiene panel web.

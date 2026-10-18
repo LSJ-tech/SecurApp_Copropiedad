@@ -11,13 +11,11 @@ urlpatterns = [
     path('', include('pagos.urls')),
     path('', include('alertas.urls')),
     path('', include('comunicacion.urls')),
-    path('', include('vecindario.urls')),
 
     path(API_V1_PREFIX, include('core.api_urls')),
     path(API_V1_PREFIX, include('notificaciones.api_urls')),
     path(API_V1_PREFIX, include('alertas.api_urls')),
     path(API_V1_PREFIX, include('comunicacion.api_urls')),
-    path(API_V1_PREFIX, include('vecindario.api_urls')),
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

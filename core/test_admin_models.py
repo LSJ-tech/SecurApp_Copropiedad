@@ -440,7 +440,7 @@ class AdminIndexYSidebarTests(TestCase):
         self.assertEqual(r.status_code, 200)
         contenido = r.content.decode()
         self.assertIn("core/logo", contenido)
-        for texto in ("Condominios", "Blocks", "Departamentos", "Membresías", "Alertas", "Avisos", "Perfiles geográficos", "Usuarios"):
+        for texto in ("Condominios", "Blocks", "Departamentos", "Membresías", "Alertas", "Avisos", "Usuarios"):
             self.assertIn(texto, contenido)
 
 

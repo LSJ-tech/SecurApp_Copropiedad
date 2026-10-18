@@ -10,9 +10,6 @@
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'compartir-invitacion' %}active{% endif %}" href="{% url 'compartir-invitacion' %}"><i class="bi bi-share"></i> Invitar vecinos</a></li>
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'numeros-emergencia' %}active{% endif %}" href="{% url 'numeros-emergencia' %}"><i class="bi bi-telephone"></i> Números de emergencia</a></li>
     {% endif %}
-    {% if user.perfil_geografico %}
-    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mi-barrio' %}active{% endif %}" href="{% url 'mi-barrio' %}"><i class="bi bi-geo-alt"></i> Mi barrio</a></li>
-    {% endif %}
     {% if user.membresia.rol == "residente" or user.membresia.rol == "delegado" %}
     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'mis-donaciones' %}active{% endif %}" href="{% url 'mis-donaciones' %}"><i class="bi bi-heart"></i> Mis donaciones</a></li>
     {% endif %}

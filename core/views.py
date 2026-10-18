@@ -496,12 +496,6 @@ class InicioView(TemplateView):
                 self.condominio = condominio
                 self.template_name = "core/inicio.html"
                 return super().get(request, *args, **kwargs)
-            # Red vecinal geográfica (app vecindario): no se importa el
-            # modelo acá a propósito (ver perfil_geografico como related_name
-            # en vecindario.models.PerfilGeografico) -- mismo patrón que
-            # membresia arriba, evita acoplar core a una app más nueva.
-            if getattr(request.user, "perfil_geografico", None) is not None:
-                return redirect("mi-barrio")
             messages.error(request, MENSAJE_SIN_CONDOMINIO)
             return redirect("login")
         if not membresia.condominio.puede_operar:

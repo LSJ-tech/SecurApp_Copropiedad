@@ -119,13 +119,6 @@
 </div>
 <div id="error-panico" class="alert alert-danger d-none"></div>
 
-{% if not user.perfil_geografico %}
-<div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-    <span><i class="bi bi-geo-alt"></i> Súmate también a la red vecinal de tu barrio -- avisa a tus vecinos reales, no solo al condominio.</span>
-    <a href="{% url 'vecindario-unirse' %}" class="btn btn-sm btn-outline-primary">Activar mi barrio</a>
-</div>
-{% endif %}
-
 <div class="modal fade" id="modalPanico" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -154,14 +147,6 @@
                 </fieldset>
                 <label class="form-label" for="panico-mensaje">Mensaje (opcional)</label>
                 <textarea id="panico-mensaje" class="form-control" rows="2" placeholder="Cuéntanos qué está pasando"></textarea>
-                {% if user.perfil_geografico %}
-                <div class="form-check mt-3">
-                    <input type="checkbox" class="form-check-input" id="panico-avisar-barrio">
-                    <label class="form-check-label small" for="panico-avisar-barrio">
-                        Avisar también a mi barrio (no solo al condominio)
-                    </label>
-                </div>
-                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -321,11 +306,9 @@ document.getElementById("btn-confirmar-panico").addEventListener("click", functi
     avisoError.classList.add("d-none");
     boton.disabled = true;
     boton.textContent = "Enviando...";
-    let ubicacionCapturada = null;
     const tipoCapturado = document.getElementById("panico-tipo").value;
     const mensajeCapturado = document.getElementById("panico-mensaje").value;
     obtenerUbicacion().then(function (ubicacion) {
-        ubicacionCapturada = ubicacion;
         return fetch("/api/v1/alertas/", {
             method: "POST",
             credentials: "same-origin",
@@ -353,25 +336,6 @@ document.getElementById("btn-confirmar-panico").addEventListener("click", functi
         document.getElementById("aviso-panico").classList.remove("d-none");
         document.getElementById("link-whatsapp-panico").href = linkWhatsAppAlerta(alerta);
         if (typeof cargarAlertas === "function") cargarAlertas();
-
-        // Avisar también al barrio es una llamada aparte, independiente del
-        // POST a /api/v1/alertas/ de arriba -- si falla, no debe tocar el
-        // flujo de la alerta del condominio, que ya está en producción.
-        const avisarBarrio = document.getElementById("panico-avisar-barrio");
-        if (avisarBarrio && avisarBarrio.checked && ubicacionCapturada) {
-            fetch("/api/v1/vecindario/alertas/", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
-                body: JSON.stringify({
-                    tipo: tipoCapturado,
-                    mensaje: mensajeCapturado,
-                    lat: ubicacionCapturada.lat,
-                    lng: ubicacionCapturada.lng,
-                }),
-            }).catch(function () {});
-            avisarBarrio.checked = false;
-        }
     }).catch(function (err) {
         avisoError.textContent = (err && err.message) || "No se pudo enviar la alerta. Revisa tu conexión e inténtalo de nuevo.";
         avisoError.classList.remove("d-none");
