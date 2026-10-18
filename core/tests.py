@@ -1337,6 +1337,21 @@ class DirectorioVecinosTests(TestCase):
         self.assertNotIn("vecino_secreto@example.com", contenido)
         self.assertNotIn("Residente", contenido)
 
+    def test_vecino_sin_nombre_cargado_no_muestra_el_username(self):
+        """Si el vecino no cargó nombre/apellido, el directorio no debe
+        caer al username como respaldo -- eso filtraría su usuario de
+        login, justo lo que este directorio dice explícitamente no mostrar
+        (ver DirectorioVecinosView, "a propósito NO muestra usuario")."""
+        vecino = crear_membresia(
+            self.condominio, "residente", unidad=self.unidad, username="directorio_sin_nombre_secreto",
+        )
+        yo = crear_membresia(self.condominio, "delegado", unidad=self.unidad, username="directorio_yo2")
+        self.client.force_login(yo.user)
+        r = self.client.get(reverse("directorio"))
+        contenido = r.content.decode()
+        self.assertNotIn("directorio_sin_nombre_secreto", contenido)
+        self.assertIn("Vecino/a", contenido)
+
 
 class CondominioRequiredMixinRamasTests(TestCase):
     """Ramas de CondominioRequiredMixin.dispatch() no cubiertas vía InicioView
@@ -1580,6 +1595,14 @@ class PaginasPublicasRenderizanTests(TestCase):
     def test_privacidad_renderiza(self):
         r = self.client.get(reverse("privacidad"))
         self.assertEqual(r.status_code, 200)
+
+    def test_privacidad_no_afirma_que_la_app_movil_ya_entrega_notificaciones(self):
+        """No existe ninguna app móvil (Expo/React Native) en este repo --
+        solo el código servidor que la enviaría si existiera. La política
+        no debe describir eso en presente como si ya ocurriera hoy."""
+        r = self.client.get(reverse("privacidad"))
+        contenido = r.content.decode()
+        self.assertNotIn("entrega las notificaciones a tu celular", contenido)
 
 
 def crear_devquad(username="devquad_test"):
