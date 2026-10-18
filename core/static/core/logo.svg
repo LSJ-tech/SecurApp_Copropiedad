@@ -1,13 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
     <defs>
-        <linearGradient id="securappBg" x1="0" y1="0" x2="100" y2="100">
-            <stop offset="0" stop-color="#24405A"/>
-            <stop offset="1" stop-color="#0F1D29"/>
+        <linearGradient id="mbBg" x1="0" y1="0" x2="100" y2="100">
+            <stop offset="0" stop-color="#284E6B"/>
+            <stop offset="1" stop-color="#0A1B2A"/>
         </linearGradient>
     </defs>
-    <rect width="100" height="100" rx="24" fill="url(#securappBg)"/>
-    <rect x="24" y="24" width="22" height="22" rx="6" fill="#fff"/>
-    <rect x="54" y="24" width="22" height="22" rx="6" fill="#fff" fill-opacity="0.85"/>
-    <rect x="24" y="54" width="22" height="22" rx="6" fill="#fff" fill-opacity="0.85"/>
-    <rect x="54" y="54" width="22" height="22" rx="6" fill="#fff"/>
+    <rect width="100" height="100" rx="24" fill="url(#mbBg)"/>
+    <path d="M50 14 C62 14 71 23 71 35 C71 48 55 62 50 68 C45 62 29 48 29 35 C29 23 38 14 50 14 Z" fill="#fff"/>
+    <path d="M50 18 L68 32 L62 32 L62 50 L38 50 L38 32 L32 32 Z" fill="#102D46"/>
+    <rect x="46" y="40" width="8" height="10" fill="#fff"/>
+    <g fill="#0D9488">
+        <circle cx="32" cy="76" r="7"/>
+        <path d="M32 85 C23 85 18 90 18 97 L46 97 C46 90 41 85 32 85 Z"/>
+        <circle cx="68" cy="76" r="7"/>
+        <path d="M68 85 C59 85 54 90 54 97 L82 97 C82 90 77 85 68 85 Z"/>
+        <circle cx="50" cy="72" r="8"/>
+        <path d="M50 82 C39 82 33 88 33 97 L67 97 C67 88 61 82 50 82 Z"/>
+    </g>
 </svg>
