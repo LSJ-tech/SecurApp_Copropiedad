@@ -6,9 +6,11 @@
 {% block contenido %}
 <h1 class="h4 mb-4">Hola, {{ user.first_name|default:user.username }}</h1>
 
+{% if membresia %}
 <button type="button" id="btn-panico-flotante" class="btn btn-danger rounded-circle shadow" data-bs-toggle="modal" data-bs-target="#modalPanico" aria-label="Botón de pánico: activar alerta" style="position: fixed; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); width: 64px; height: 64px; z-index: 1030; padding: 0;">
     <i class="bi bi-exclamation-triangle-fill fs-4"></i>
 </button>
+{% endif %}
 
 {% if membresia.rol == "residente" or membresia.rol == "delegado" %}
 <div class="card mb-4">
@@ -589,7 +591,7 @@ function cargarAvisos() {
                         <strong>${a.titulo}</strong>
                         ${a.torre_nombre ? `<span class="badge bg-dark">Solo ${ETIQUETA_TORRE} ${a.torre_nombre}</span>` : ""}
                     </div>
-                    <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre || ""}</div>
+                    <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre || "DevQuad"}</div>
                     <div>${a.cuerpo}</div>
                     ${a.leido_por_count !== null && a.leido_por_count !== undefined ? `<div class="small text-muted mt-1"><i class="bi bi-eye"></i> Visto por ${a.leido_por_count} de ${a.total_destinatarios} vecinos</div>` : ""}
                 </li>

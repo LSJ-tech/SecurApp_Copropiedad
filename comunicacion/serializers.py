@@ -8,7 +8,7 @@ from .models import Aviso
 
 
 class AvisoSerializer(serializers.ModelSerializer):
-    autor_nombre = serializers.CharField(source="autor.user.get_full_name", read_only=True)
+    autor_nombre = serializers.CharField(source="autor.user.get_full_name", read_only=True, default=None)
     torre_nombre = serializers.CharField(source="torre.nombre", read_only=True, default=None)
     leido_por_count = serializers.SerializerMethodField()
     total_destinatarios = serializers.SerializerMethodField()
@@ -21,11 +21,10 @@ class AvisoSerializer(serializers.ModelSerializer):
         ]
 
     def _puede_ver_estadisticas(self):
-        """Solo directiva/administración ven cuántos vecinos vieron el aviso
-        -- a un residente no le aporta nada y solo ensucia la tarjeta."""
+        """Solo devquad ve cuántos vecinos vieron el aviso -- a un residente
+        no le aporta nada y solo ensucia la tarjeta."""
         request = self.context.get("request")
-        membresia = getattr(request.user, "membresia", None) if request else None
-        return bool(membresia and membresia.rol in ("directiva", "administracion"))
+        return bool(request and request.user.is_staff)
 
     def get_leido_por_count(self, obj) -> Optional[int]:
         if not self._puede_ver_estadisticas():

@@ -5,7 +5,10 @@ from core.models import Condominio, Membresia, Torre
 
 class Aviso(models.Model):
     condominio = models.ForeignKey(Condominio, on_delete=models.CASCADE, related_name="avisos")
-    autor = models.ForeignKey(Membresia, on_delete=models.CASCADE, related_name="avisos")
+    autor = models.ForeignKey(
+        Membresia, on_delete=models.SET_NULL, null=True, blank=True, related_name="avisos",
+        help_text="Vacío si lo publicó devquad (is_staff, sin Membresia) -- ver AvisoViewSet.perform_create.",
+    )
     torre = models.ForeignKey(
         Torre, on_delete=models.CASCADE, null=True, blank=True, related_name="avisos",
         help_text="Vacío = visible para todo el condominio. Con torre, solo lo ven sus residentes (ej. un aviso de un delegado, acotado a su propia torre).",
@@ -23,7 +26,7 @@ class Aviso(models.Model):
 
 class AvisoLectura(models.Model):
     """Quién vio cada aviso -- base de "Visto por X de Y vecinos" en el
-    serializer, visible solo para directiva/administración (ver
+    serializer, visible solo para devquad (ver
     AvisoSerializer.get_leido_por_count)."""
 
     aviso = models.ForeignKey(Aviso, on_delete=models.CASCADE, related_name="lecturas")

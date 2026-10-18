@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, ListView
 
-from core.mixins import CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin
+from core.mixins import CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin
 from core.models import REGION_CHOICES
 
 from .empresas_servicios import EMPRESAS_SUGERIDAS_POR_REGION
@@ -67,7 +67,7 @@ class NumeroEmergenciaListView(CondominioRequiredMixin, ListView):
         # -- no tiene choices= en el modelo (lo valida el form al crear el
         # condominio), así que no existe get_region_display().
         context["region_nombre"] = dict(REGION_CHOICES).get(self.condominio.region, self.condominio.region)
-        if self.membresia.rol in ("directiva", "administracion"):
+        if self.request.user.is_staff:
             context["propuestas_pendientes"] = PropuestaNumeroEmergencia.objects.filter(
                 condominio=self.condominio, estado="pendiente",
             ).select_related("autor__user")
@@ -77,7 +77,7 @@ class NumeroEmergenciaListView(CondominioRequiredMixin, ListView):
         return context
 
 
-class NumeroEmergenciaCreateView(EsDirectivaOAdministracionMixin, CondominioFormMixin, CreateView):
+class NumeroEmergenciaCreateView(SoloStaffMixin, CondominioFormMixin, CreateView):
     model = NumeroEmergencia
     form_class = NumeroEmergenciaForm
     template_name = "alertas/numero_emergencia_form.html"
@@ -97,7 +97,7 @@ class NumeroEmergenciaCreateView(EsDirectivaOAdministracionMixin, CondominioForm
         return initial
 
 
-class EliminarNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+class EliminarNumeroEmergenciaView(SoloStaffMixin, CondominioRequiredMixin, View):
     def post(self, request, pk):
         numero = get_object_or_404(NumeroEmergencia, pk=pk, condominio=self.condominio)
         if numero.es_nacional:
@@ -109,8 +109,8 @@ class EliminarNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRe
 
 class ProponerNumeroEmergenciaView(CondominioFormMixin, CreateView):
     """Abierto a cualquier rol -- a diferencia de NumeroEmergenciaCreateView
-    (directiva/administración, directo), esto queda "Pendiente" hasta que
-    directiva/administración lo apruebe o rechace (ver
+    (devquad, directo), esto queda "Pendiente" hasta que devquad lo
+    apruebe o rechace (ver
     AprobarPropuestaNumeroEmergenciaView/RechazarPropuestaNumeroEmergenciaView)."""
 
     model = PropuestaNumeroEmergencia
@@ -120,11 +120,11 @@ class ProponerNumeroEmergenciaView(CondominioFormMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.autor = self.membresia
-        messages.success(self.request, "Gracias, tu propuesta quedó pendiente de revisión por directiva/administración.")
+        messages.success(self.request, "Gracias, tu propuesta quedó pendiente de revisión.")
         return super().form_valid(form)
 
 
-class AprobarPropuestaNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+class AprobarPropuestaNumeroEmergenciaView(SoloStaffMixin, CondominioRequiredMixin, View):
     def post(self, request, pk):
         propuesta = get_object_or_404(PropuestaNumeroEmergencia, pk=pk, condominio=self.condominio, estado="pendiente")
         NumeroEmergencia.objects.create(
@@ -138,7 +138,7 @@ class AprobarPropuestaNumeroEmergenciaView(EsDirectivaOAdministracionMixin, Cond
         return redirect("numeros-emergencia")
 
 
-class RechazarPropuestaNumeroEmergenciaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
+class RechazarPropuestaNumeroEmergenciaView(SoloStaffMixin, CondominioRequiredMixin, View):
     def post(self, request, pk):
         propuesta = get_object_or_404(PropuestaNumeroEmergencia, pk=pk, condominio=self.condominio, estado="pendiente")
         propuesta.estado = "rechazada"

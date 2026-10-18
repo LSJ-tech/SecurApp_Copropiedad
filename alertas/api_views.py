@@ -6,7 +6,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.permissions import CondominioQuerysetMixin, TieneMembresia
+from rest_framework.exceptions import PermissionDenied
+
+from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, condominio_de_la_api
 
 from .models import MINUTOS_AUTO_CIERRE, Alerta
 from .serializers import AlertaSerializer
@@ -18,15 +20,21 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     get_queryset) -- las alertas, a diferencia del resto de la API, también
     incluyen las de los condominios_vecinos del propio condominio (ver
     Condominio.ids_red_alertas): es la única excepción deliberada al
-    aislamiento multi-tenant, y solo para esto."""
+    aislamiento multi-tenant, y solo para esto.
+
+    Crear una alerta sigue exigiendo una Membresia real (autor no admite
+    null -- una alerta de pánico siempre la dispara una persona concreta
+    del condominio, nunca devquad "en nombre de nadie"): ver perform_create.
+    Ver/resolver sí las puede operar devquad (resuelta_por sí admite null)."""
 
     queryset = Alerta.objects.select_related("autor__user", "autor__unidad", "resuelta_por__user", "resuelta_por__unidad")
     serializer_class = AlertaSerializer
-    permission_classes = [IsAuthenticated, TieneMembresia]
+    permission_classes = [IsAuthenticated, TieneCondominioActivo]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
-        ids_red = self.request.user.membresia.condominio.ids_red_alertas
+        condominio = condominio_de_la_api(self.request)
+        ids_red = condominio.ids_red_alertas
         limite = timezone.now() - timedelta(minutes=MINUTOS_AUTO_CIERRE)
         Alerta.objects.filter(condominio_id__in=ids_red, estado="activa", fecha_creacion__lt=limite).update(estado="auto_cerrada")
 
@@ -40,18 +48,20 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        membresia = self.request.user.membresia
+        membresia = getattr(self.request.user, "membresia", None)
+        if membresia is None:
+            raise PermissionDenied("Crear una alerta requiere ser residente/delegado de un condominio.")
         alerta = serializer.save(condominio=membresia.condominio, autor=membresia)
         notificar_alerta(alerta)
 
-    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated, TieneMembresia])
+    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated, TieneCondominioActivo])
     def resolver(self, request, pk=None):
         alerta = self.get_object()
         estado = request.data.get("estado", "resuelta")
         if estado not in ("resuelta", "falsa_alarma"):
             return Response({"detail": "estado inválido."}, status=400)
         alerta.estado = estado
-        alerta.resuelta_por = request.user.membresia
+        alerta.resuelta_por = getattr(request.user, "membresia", None)
         alerta.fecha_resolucion = timezone.now()
         alerta.save()
         return Response(AlertaSerializer(alerta).data)

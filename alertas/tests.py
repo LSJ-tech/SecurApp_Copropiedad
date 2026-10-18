@@ -19,6 +19,11 @@ def crear_membresia(condominio, rol, **user_kwargs):
     return Membresia.objects.create(user=user, condominio=condominio, rol=rol, terminos_aceptados_en=timezone.now())
 
 
+def crear_devquad(username="devquad_test"):
+    """Cuenta devquad -- is_staff, sin Membresia (ver condominio_activo_devquad)."""
+    return User.objects.create_user(username=username, is_staff=True)
+
+
 class FiltroEstadoAlertaTests(TestCase):
     """`?estado=activa` alguna vez no filtraba nada (no había filter_backend
     configurado) y 'Alertas activas' mostraba TODAS las alertas, incluidas
@@ -285,7 +290,11 @@ class NumeroEmergenciaListViewTests(TestCase):
 
     def setUp(self):
         self.residente = crear_membresia(self.condominio, "residente", username="num_emerg_residente")
-        self.directiva = crear_membresia(self.condominio, "directiva", username="num_emerg_directiva")
+        self.devquad = crear_devquad("num_emerg_devquad")
+
+    def _login_devquad(self, condominio=None):
+        self.client.force_login(self.devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[(condominio or self.condominio).pk]))
 
     def test_precarga_los_numeros_nacionales(self):
         from .models import NUMEROS_NACIONALES, NumeroEmergencia
@@ -329,7 +338,7 @@ class NumeroEmergenciaListViewTests(TestCase):
         self.assertContains(r, "Nacional")
 
     def test_sugerencias_segun_la_region_del_condominio(self):
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertIn("Chilquinta", r.context["sugerencias"]["electricidad"])
         self.assertContains(r, "Chilquinta")
@@ -341,8 +350,7 @@ class NumeroEmergenciaListViewTests(TestCase):
 
     def test_sin_sugerencias_para_una_region_sin_cobertura(self):
         condominio = Condominio.objects.create(nombre="Test Sin Sugerencias", plan="premium", region="aysen")
-        directiva = crear_membresia(condominio, "directiva", username="num_emerg_aysen")
-        self.client.force_login(directiva.user)
+        self._login_devquad(condominio)
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertEqual(r.context["sugerencias"], {})
 
@@ -354,7 +362,11 @@ class NumeroEmergenciaCreateViewTests(TestCase):
 
     def setUp(self):
         self.residente = crear_membresia(self.condominio, "residente", username="crear_num_residente")
-        self.directiva = crear_membresia(self.condominio, "directiva", username="crear_num_directiva")
+        self.devquad = crear_devquad("crear_num_devquad")
+
+    def _login_devquad(self):
+        self.client.force_login(self.devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
 
     def test_residente_no_puede_agregar(self):
         self.client.force_login(self.residente.user)
@@ -363,8 +375,8 @@ class NumeroEmergenciaCreateViewTests(TestCase):
         from .models import NumeroEmergencia
         self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio).exists())
 
-    def test_directiva_puede_agregar(self):
-        self.client.force_login(self.directiva.user)
+    def test_devquad_puede_agregar(self):
+        self._login_devquad()
         r = self.client.post(reverse("numero-emergencia-crear"), {"categoria": "electricidad", "nombre": "Chilquinta", "telefono": "600 600 5000"})
         # assertRedirects sigue el redirect y confirma que responde 200 --
         # eso de paso dispara la sincronización de nacionales de
@@ -376,7 +388,7 @@ class NumeroEmergenciaCreateViewTests(TestCase):
         self.assertFalse(numero.es_nacional)
 
     def test_prellena_desde_una_sugerencia_pero_nunca_el_telefono(self):
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.get(reverse("numero-emergencia-crear") + "?nombre=Chilquinta&categoria=electricidad")
         self.assertContains(r, 'value="Chilquinta"')
         self.assertNotIn("telefono", r.context["form"].initial)
@@ -390,7 +402,11 @@ class EliminarNumeroEmergenciaViewTests(TestCase):
 
     def setUp(self):
         self.residente = crear_membresia(self.condominio, "residente", username="borrar_num_residente")
-        self.directiva = crear_membresia(self.condominio, "directiva", username="borrar_num_directiva")
+        self.devquad = crear_devquad("borrar_num_devquad")
+
+    def _login_devquad(self, condominio=None):
+        self.client.force_login(self.devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[(condominio or self.condominio).pk]))
 
     def _numero(self, condominio=None):
         from .models import NumeroEmergencia
@@ -404,9 +420,9 @@ class EliminarNumeroEmergenciaViewTests(TestCase):
         from .models import NumeroEmergencia
         self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
 
-    def test_directiva_puede_borrar(self):
+    def test_devquad_puede_borrar(self):
         numero = self._numero()
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
         self.assertRedirects(r, reverse("numeros-emergencia"))
         from .models import NumeroEmergencia
@@ -414,17 +430,17 @@ class EliminarNumeroEmergenciaViewTests(TestCase):
 
     def test_no_puede_borrar_uno_de_otro_condominio(self):
         numero = self._numero(condominio=self.otro_condominio)
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]))
         self.assertEqual(r.status_code, 404)
         from .models import NumeroEmergencia
         self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
 
-    def test_ni_siquiera_directiva_puede_borrar_un_nacional(self):
+    def test_ni_siquiera_devquad_puede_borrar_un_nacional(self):
         from .models import NumeroEmergencia
 
         numero = NumeroEmergencia.objects.create(condominio=self.condominio, categoria="policia", nombre="Carabineros", telefono="133")
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("numero-emergencia-eliminar", args=[numero.pk]), follow=True)
         self.assertContains(r, "no se pueden eliminar")
         self.assertTrue(NumeroEmergencia.objects.filter(pk=numero.pk).exists())
@@ -473,7 +489,11 @@ class RevisarPropuestaNumeroEmergenciaViewTests(TestCase):
 
     def setUp(self):
         self.residente = crear_membresia(self.condominio, "residente", username="revisar_prop_residente")
-        self.directiva = crear_membresia(self.condominio, "directiva", username="revisar_prop_directiva")
+        self.devquad = crear_devquad("revisar_prop_devquad")
+
+    def _login_devquad(self, condominio=None):
+        self.client.force_login(self.devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[(condominio or self.condominio).pk]))
 
     def _propuesta(self, condominio=None, **kwargs):
         from .models import PropuestaNumeroEmergencia
@@ -492,23 +512,25 @@ class RevisarPropuestaNumeroEmergenciaViewTests(TestCase):
         self.assertEqual(propuesta.estado, "pendiente")
         self.assertFalse(NumeroEmergencia.objects.filter(condominio=self.condominio, nombre="CGE").exists())
 
-    def test_directiva_puede_aprobar(self):
+    def test_devquad_puede_aprobar(self):
         propuesta = self._propuesta()
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("propuesta-numero-emergencia-aprobar", args=[propuesta.pk]), follow=True)
         self.assertContains(r, "se agregó a los números de emergencia")
         propuesta.refresh_from_db()
         self.assertEqual(propuesta.estado, "aprobada")
-        self.assertEqual(propuesta.revisada_por, self.directiva)
+        # devquad no tiene Membresia -- queda registrado que nadie en
+        # particular (del condominio) la revisó, ver AprobarPropuestaNumeroEmergenciaView.
+        self.assertIsNone(propuesta.revisada_por)
         self.assertIsNotNone(propuesta.fecha_revision)
 
         numero = NumeroEmergencia.objects.get(condominio=self.condominio, nombre="CGE")
         self.assertEqual(numero.telefono, "800 800 767")
         self.assertFalse(numero.es_nacional)
 
-    def test_directiva_puede_rechazar(self):
+    def test_devquad_puede_rechazar(self):
         propuesta = self._propuesta()
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("propuesta-numero-emergencia-rechazar", args=[propuesta.pk]))
         self.assertRedirects(r, reverse("numeros-emergencia"))
         propuesta.refresh_from_db()
@@ -525,7 +547,7 @@ class RevisarPropuestaNumeroEmergenciaViewTests(TestCase):
 
     def test_no_puede_revisar_dos_veces(self):
         propuesta = self._propuesta()
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         self.client.post(reverse("propuesta-numero-emergencia-aprobar", args=[propuesta.pk]))
         r = self.client.post(reverse("propuesta-numero-emergencia-aprobar", args=[propuesta.pk]))
         self.assertEqual(r.status_code, 404)
@@ -533,7 +555,7 @@ class RevisarPropuestaNumeroEmergenciaViewTests(TestCase):
 
     def test_no_puede_revisar_una_de_otro_condominio(self):
         propuesta = self._propuesta(condominio=self.otro_condominio)
-        self.client.force_login(self.directiva.user)
+        self._login_devquad()
         r = self.client.post(reverse("propuesta-numero-emergencia-aprobar", args=[propuesta.pk]))
         self.assertEqual(r.status_code, 404)
 
@@ -545,21 +567,23 @@ class NumeroEmergenciaListViewPropuestasContextTests(TestCase):
 
     def setUp(self):
         self.residente = crear_membresia(self.condominio, "residente", username="ctx_prop_residente")
-        self.directiva = crear_membresia(self.condominio, "directiva", username="ctx_prop_directiva")
+        self.otro_residente = crear_membresia(self.condominio, "residente", username="ctx_prop_residente_2")
+        self.devquad = crear_devquad("ctx_prop_devquad")
 
     def test_residente_no_ve_las_propuestas_pendientes_de_todos(self):
         from .models import PropuestaNumeroEmergencia
 
-        PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.directiva, categoria="otro", nombre="Otra", telefono="111")
+        PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.otro_residente, categoria="otro", nombre="Otra", telefono="111")
         self.client.force_login(self.residente.user)
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertNotIn("propuestas_pendientes", r.context)
 
-    def test_directiva_ve_las_propuestas_pendientes_de_todos(self):
+    def test_devquad_ve_las_propuestas_pendientes_de_todos(self):
         from .models import PropuestaNumeroEmergencia
 
         propuesta = PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.residente, categoria="otro", nombre="Otra", telefono="111")
-        self.client.force_login(self.directiva.user)
+        self.client.force_login(self.devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertEqual(list(r.context["propuestas_pendientes"]), [propuesta])
 
@@ -567,7 +591,7 @@ class NumeroEmergenciaListViewPropuestasContextTests(TestCase):
         from .models import PropuestaNumeroEmergencia
 
         propia = PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.residente, categoria="otro", nombre="Propia", telefono="111")
-        PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.directiva, categoria="otro", nombre="Ajena", telefono="222")
+        PropuestaNumeroEmergencia.objects.create(condominio=self.condominio, autor=self.otro_residente, categoria="otro", nombre="Ajena", telefono="222")
 
         self.client.force_login(self.residente.user)
         r = self.client.get(reverse("numeros-emergencia"))

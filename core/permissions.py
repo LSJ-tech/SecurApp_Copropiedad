@@ -1,23 +1,26 @@
 from rest_framework.permissions import BasePermission
 
+from .mixins import condominio_activo_devquad
+
 
 def _rol(request):
     membresia = getattr(request.user, "membresia", None)
     return membresia.rol if membresia else None
 
 
-class EsDirectivaOAdministracion(BasePermission):
-    def has_permission(self, request, view):
-        return _rol(request) in ("directiva", "administracion")
-
-
-class EsDirectivaAdministracionODelegado(BasePermission):
-    """Para crear avisos: directiva/administración publican a todo el
-    condominio, un delegado solo a su propia torre (ver
-    AvisoViewSet.perform_create)."""
-
-    def has_permission(self, request, view):
-        return _rol(request) in ("directiva", "administracion", "delegado")
+def condominio_de_la_api(request):
+    """Condominio resuelto para esta request -- vía la Membresia de
+    residente/delegado, o vía el condominio activo en sesión de un devquad
+    (is_staff, sin Membresia propia -- ver DevquadCondominiosView y
+    condominio_activo_devquad en core/mixins.py, mismo mecanismo que usa
+    CondominioRequiredMixin del lado de las vistas normales). None si no
+    corresponde a ninguno de los dos casos."""
+    membresia = getattr(request.user, "membresia", None)
+    if membresia is not None:
+        return membresia.condominio
+    if request.user.is_authenticated and request.user.is_staff:
+        return condominio_activo_devquad(request)
+    return None
 
 
 class EsDevquad(BasePermission):
@@ -39,22 +42,25 @@ class EsDevquadODelegado(BasePermission):
         return bool(request.user and request.user.is_staff) or _rol(request) == "delegado"
 
 
-class TieneMembresia(BasePermission):
-    """Cualquier rol, siempre que tenga una Membresia asociada (aislamiento básico de tenant)."""
+class TieneCondominioActivo(BasePermission):
+    """Reemplaza a TieneMembresia (nombre ya no preciso: devquad nunca
+    tiene Membresia). Cualquiera con un condominio resuelto -- residente/
+    delegado vía su Membresia, o devquad vía el condominio activo en
+    sesión (ver condominio_de_la_api)."""
 
     def has_permission(self, request, view):
-        return getattr(request.user, "membresia", None) is not None
+        return condominio_de_la_api(request) is not None
 
 
 class CondominioQuerysetMixin:
     """Mezclar en cualquier ViewSet/APIView de la API: filtra siempre por el
-    condominio de la membresía del usuario logueado. Sin esto, un endpoint
-    filtraría solo por pk y rompería el aislamiento entre condominios -- el
-    error más común al empezar con DRF multi-tenant.
+    condominio resuelto para el usuario logueado (ver condominio_de_la_api).
+    Sin esto, un endpoint filtraría solo por pk y rompería el aislamiento
+    entre condominios -- el error más común al empezar con DRF multi-tenant.
     """
 
-    permission_classes_base = [TieneMembresia]
+    permission_classes_base = [TieneCondominioActivo]
 
     def get_queryset(self):
-        condominio_id = self.request.user.membresia.condominio_id
-        return super().get_queryset().filter(condominio_id=condominio_id)
+        condominio = condominio_de_la_api(self.request)
+        return super().get_queryset().filter(condominio_id=condominio.pk if condominio else None)

@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from core.permissions import TieneMembresia
+from core.permissions import TieneCondominioActivo
 
 from .models import CuotaUnidad
 from .serializers import CuotaUnidadSerializer
@@ -13,7 +13,7 @@ class CuotaUnidadViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = CuotaUnidad.objects.all()  # drf-spectacular infiere el tipo del pk de acá, ver get_queryset
     serializer_class = CuotaUnidadSerializer
-    permission_classes = [IsAuthenticated, TieneMembresia]
+    permission_classes = [IsAuthenticated, TieneCondominioActivo]
 
     def get_queryset(self):
         membresia = self.request.user.membresia
