@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ PLATFORM_NAME }}: el botón de pánico que avisa a todo tu condominio al instante. Además, avisos, accesos y gastos comunes en un solo panel.">
+    <meta name="description" content="{{ PLATFORM_NAME }}: el botón de pánico que avisa a todo tu condominio al instante. Además, avisos y directorio de vecinos, gratis para tu comunidad.">
     <meta name="theme-color" content="#1A2E40">
     <link rel="icon" type="image/svg+xml" href="{% static 'core/logo.svg' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/favicon-32.png' %}">
@@ -17,14 +17,14 @@
     <meta property="og:site_name" content="{{ PLATFORM_NAME }}">
     <meta property="og:url" content="https://securapp.devquad.cl/">
     <meta property="og:title" content="{{ PLATFORM_NAME }} · El botón de pánico de tu condominio">
-    <meta property="og:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos, accesos y gastos comunes, para directiva, administración, conserjería y residentes.">
+    <meta property="og:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos y directorio de vecinos, gratis para tu comunidad.">
     <meta property="og:image" content="https://securapp.devquad.cl{% static 'core/img/og-securapp.jpg' %}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:locale" content="es_CL">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ PLATFORM_NAME }} · El botón de pánico de tu condominio">
-    <meta name="twitter:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos, accesos y gastos comunes, para directiva, administración, conserjería y residentes.">
+    <meta name="twitter:description" content="Botón de pánico que avisa a todo el condominio al instante. También avisos y directorio de vecinos, gratis para tu comunidad.">
     <meta name="twitter:image" content="https://securapp.devquad.cl{% static 'core/img/og-securapp.jpg' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
@@ -38,7 +38,7 @@
         "name": "{{ PLATFORM_NAME }}",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "description": "Botón de pánico que avisa a todo el condominio al instante, más administración de condominios y juntas de vecinos: avisos, control de accesos y gastos comunes.",
+        "description": "Botón de pánico que avisa a todo el condominio al instante, más avisos y directorio de vecinos, gratis para condominios y juntas de vecinos en Chile.",
         "url": "https://securapp.devquad.cl/",
         "publisher": {
             "@type": "Organization",
@@ -52,8 +52,8 @@
         "@context": "https://schema.org",
         "@type": "FAQPage",
         "mainEntity": [
-            {"@type": "Question", "name": "¿Cómo pagan los residentes los gastos comunes?", "acceptedAnswer": {"@type": "Answer", "text": "Por transferencia directa a la administración de tu condominio. {{ PLATFORM_NAME }} no procesa ese pago: muestra los datos de transferencia a cada residente y directiva o administración marca la cuota como pagada al recibirla."}},
-            {"@type": "Question", "name": "¿Mis datos están separados de otros condominios?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Cada condominio es completamente independiente: nadie fuera del tuyo puede ver tus alertas, avisos, accesos ni gastos comunes."}},
+            {"@type": "Question", "name": "¿Cuánto cuesta {{ PLATFORM_NAME }}?", "acceptedAnswer": {"@type": "Answer", "text": "Es gratis -- el botón de pánico y los avisos no tienen costo para nadie. Cualquier residente puede hacer una donación voluntaria para apoyar el desarrollo de la plataforma, completamente opcional."}},
+            {"@type": "Question", "name": "¿Mis datos están separados de otros condominios?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Cada condominio es completamente independiente: nadie fuera del tuyo puede ver tus alertas ni avisos."}},
             {"@type": "Question", "name": "¿Necesito instalar una aplicación?", "acceptedAnswer": {"@type": "Answer", "text": "No hace falta bajar nada de una tienda de apps: se usa desde el navegador del celular o computador. Sí recomendamos agregarla a la pantalla de inicio (toma unos segundos) para que quede como un ícono más y para que te lleguen las notificaciones del botón de pánico, especialmente en iPhone."}}
         ]
     }
@@ -364,13 +364,13 @@
             <span class="eyebrow mb-3"><i class="bi bi-shield-check"></i> Hecho en Chile, pensado primero para la seguridad de tu condominio</span>
             <h1 class="display-4 mb-3">Que la ayuda llegue al instante a tu condominio</h1>
             <p class="fs-5 mb-4 mx-auto" style="max-width: 640px; opacity: 0.95;">
-                Un botón de pánico avisa a todo tu condominio al instante, sin depender de que alguien vea el WhatsApp a tiempo. Y en el mismo panel, también avisos, control de accesos y gastos comunes, para directiva, administración, conserjería y residentes.
+                Un botón de pánico avisa a todo tu condominio al instante, sin depender de que alguien vea el WhatsApp a tiempo. Y en el mismo panel, también avisos y directorio de vecinos -- gratis.
             </p>
             <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
                 <a href="#solicitar" class="btn btn-light btn-lg px-4">Solicitar acceso</a>
                 <a href="#como-funciona" class="btn btn-outline-light btn-lg px-4">Ver cómo funciona</a>
             </div>
-            <p class="small mb-5" style="opacity: 0.85;">Pensado para condominios y juntas de vecinos en Chile. Acceso por invitación.</p>
+            <p class="small mb-5" style="opacity: 0.85;">Pensado para condominios y juntas de vecinos en Chile. Gratis, sin letra chica.</p>
 
             <div class="row justify-content-center mx-auto" style="max-width: 760px;">
                 <div class="col-12 col-sm-4 stat-strip-item">
@@ -378,8 +378,8 @@
                     <div class="small" style="opacity: 0.85;">Botón de pánico con push a todo el condominio</div>
                 </div>
                 <div class="col-12 col-sm-4 stat-strip-item">
-                    <div class="stat-numero"><i class="bi bi-people-fill" style="color: #FDA4AF;"></i> 5 roles</div>
-                    <div class="small" style="opacity: 0.85;">Directiva, administración, conserjería, delegados de torre y residentes, cada uno con su acceso</div>
+                    <div class="stat-numero"><i class="bi bi-people-fill" style="color: #FDA4AF;"></i> Gratis</div>
+                    <div class="small" style="opacity: 0.85;">Residentes y delegados de torre, cada uno con su acceso</div>
                 </div>
                 <div class="col-12 col-sm-4 stat-strip-item">
                     <div class="stat-numero"><i class="bi bi-shield-lock-fill" style="color: #6EE7B7;"></i> Aislado</div>
@@ -413,7 +413,7 @@
                 <div class="col-lg-5">
                     <span class="eyebrow mb-3"><i class="bi bi-chat-dots"></i> Hablemos de tu comunidad</span>
                     <h2 class="fw-bold mt-3 mb-3 section-title">Cuéntanos de tu condominio</h2>
-                    <p class="text-muted mb-4">Llena el formulario y te contactamos para coordinar el acceso con tu directiva. Sin compromiso.</p>
+                    <p class="text-muted mb-4">Llena el formulario y te contactamos para coordinar el acceso. Sin compromiso.</p>
                     <div class="dato-real mb-3">
                         <i class="bi bi-1-circle-fill"></i>
                         <div class="small"><strong>Te contactamos</strong> — por teléfono o email, dentro de los próximos días hábiles.</div>
@@ -470,7 +470,7 @@
             <div class="text-center mb-5">
                 <span class="eyebrow mb-3"><i class="bi bi-display"></i> El producto real, no una maqueta</span>
                 <h2 class="fw-bold mt-3 mb-2" style="color: #fff;">Así se ve tu panel</h2>
-                <p class="mx-auto" style="max-width: 520px; color: rgba(255,255,255,0.75);">El mismo panel que usan directiva, administración y conserjería hoy — contenido de ejemplo, para que veas cómo se organiza.</p>
+                <p class="mx-auto" style="max-width: 520px; color: rgba(255,255,255,0.75);">El mismo panel que usamos para administrar tu condominio hoy — contenido de ejemplo, para que veas cómo se organiza.</p>
             </div>
             <div class="mockup-browser mx-auto" style="max-width: 760px;">
                 <div class="mockup-topbar">
@@ -482,11 +482,10 @@
                 <div class="mockup-body">
                     <div class="mockup-sidebar">
                         <div class="item activo"><i class="bi bi-house"></i> <span>Inicio</span></div>
-                        <div class="item"><i class="bi bi-door-open"></i> <span>Accesos</span></div>
                         <div class="item"><i class="bi bi-people"></i> <span>Miembros</span></div>
-                        <div class="item"><i class="bi bi-cash-coin"></i> <span>Gastos comunes</span></div>
+                        <div class="item"><i class="bi bi-person-lines-fill"></i> <span>Directorio</span></div>
                         <div class="item"><i class="bi bi-telephone"></i> <span>Números de emergencia</span></div>
-                        <div class="item"><i class="bi bi-person-badge"></i> <span>Personal</span></div>
+                        <div class="item"><i class="bi bi-gear"></i> <span>Mi condominio</span></div>
                     </div>
                     <div class="mockup-content">
                         <div class="mockup-card">
@@ -533,7 +532,7 @@
 
     <section id="caracteristicas" class="py-5 reveal" style="margin-top: 2rem; scroll-margin-top: 5rem;">
         <div class="container">
-            <h2 class="text-center fw-bold mb-5 section-title">Seguridad primero, administración también</h2>
+            <h2 class="text-center fw-bold mb-5 section-title">Seguridad primero, comunidad también</h2>
 
             <p class="grupo-caracteristicas-label">Para una emergencia</p>
             <div class="row g-4 mb-5">
@@ -548,32 +547,25 @@
                     <div class="card-feature card-feature--emergencia">
                         <div class="icono-feature icono-emergencia mb-3"><i class="bi bi-telephone"></i></div>
                         <h3 class="h5 fw-semibold">Números de emergencia</h3>
-                        <p class="text-muted mb-0">Carabineros, Bomberos y Ambulancia ya vienen cargados; Plan Cuadrante, la eléctrica o la sanitaria de tu comuna las agrega directiva/administración, o cualquier vecino las propone.</p>
+                        <p class="text-muted mb-0">Carabineros, Bomberos y Ambulancia ya vienen cargados; Plan Cuadrante, la eléctrica o la sanitaria de tu comuna las agregamos nosotros, o cualquier vecino las propone.</p>
                     </div>
                 </div>
             </div>
 
             <p class="grupo-caracteristicas-label">Para el día a día, con tu comunidad</p>
             <div class="row g-4">
-                <div class="col-md-6 col-lg-4">
+                <div class="col-md-6">
                     <div class="card-feature card-feature--admin">
                         <div class="icono-feature icono-admin mb-3"><i class="bi bi-megaphone"></i></div>
                         <h3 class="h5 fw-semibold">Avisos a todos los vecinos</h3>
-                        <p class="text-muted mb-0">Directiva o administración publica un aviso para todo el condominio; un delegado de torre también puede publicar, acotado solo a su propia torre. Todos los destinatarios lo ven en su panel, sin reenviar mensajes grupo por grupo.</p>
+                        <p class="text-muted mb-0">Publicamos un aviso para todo el condominio; un delegado de torre también puede publicar, acotado solo a su propia torre. Todos los destinatarios lo ven en su panel, sin reenviar mensajes grupo por grupo.</p>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4">
+                <div class="col-md-6">
                     <div class="card-feature card-feature--admin">
-                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-door-open"></i></div>
-                        <h3 class="h5 fw-semibold">Registro de accesos</h3>
-                        <p class="text-muted mb-0">Conserjería deja registrado quién entra y sale, con historial ordenado por unidad en vez de un cuaderno en portería.</p>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-4">
-                    <div class="card-feature card-feature--admin">
-                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-cash-coin"></i></div>
-                        <h3 class="h5 fw-semibold">Gastos comunes claros</h3>
-                        <p class="text-muted mb-0">El cargo se prorratea solo por unidad, cada residente ve su cuota pendiente y los datos para transferir, y directiva marca los pagos recibidos.</p>
+                        <div class="icono-feature icono-admin mb-3"><i class="bi bi-person-lines-fill"></i></div>
+                        <h3 class="h5 fw-semibold">Directorio de vecinos</h3>
+                        <p class="text-muted mb-0">Nombre y block/depto de cada vecino, para saber quién vive dónde -- sin exponer usuario ni email de nadie.</p>
                     </div>
                 </div>
             </div>
@@ -592,35 +584,28 @@
                         <i class="bi bi-diagram-3 text-rose"></i>
                         <div>
                             <h3 class="h6 fw-semibold mb-1">Torres y deptos, o simplemente casas</h3>
-                            <p class="text-muted mb-0">Si son torres y departamentos, se prorratea con alícuota por unidad. Si son casas numeradas sin bloques, también -- cada comunidad elige su propia estructura y su propio nombre (condominio, junta de vecinos, comunidad...).</p>
+                            <p class="text-muted mb-0">Sirve igual para torres y departamentos que para casas numeradas sin bloques -- cada comunidad elige su propia estructura y su propio nombre (condominio, junta de vecinos, comunidad...).</p>
                         </div>
                     </div>
                     <div class="dato-real mb-4">
                         <i class="bi bi-qr-code text-amber"></i>
                         <div>
                             <h3 class="h6 fw-semibold mb-1">Vecinos que se registran solos</h3>
-                            <p class="text-muted mb-0">Comparte un link o código QR: cada vecino elige su unidad y crea su propia cuenta, sin que la directiva tenga que cargarlos uno por uno.</p>
+                            <p class="text-muted mb-0">Comparte un link o código QR: cada vecino elige su unidad y crea su propia cuenta solo.</p>
                         </div>
                     </div>
                     <div class="dato-real mb-4">
                         <i class="bi bi-person-badge text-emerald"></i>
                         <div>
                             <h3 class="h6 fw-semibold mb-1">Un acceso para cada rol</h3>
-                            <p class="text-muted mb-0">Directiva y administración gestionan el día a día, conserjería registra accesos, un delegado representa a su propia torre o calle, y en una emergencia cualquier vecino puede ver la alerta e ir a ayudar. Cada uno ve lo que necesita para su rol.</p>
+                            <p class="text-muted mb-0">Nosotros configuramos tu condominio y mantenemos todo al día; un delegado representa a su propia torre o calle y puede publicar avisos acotados a ella; y en una emergencia cualquier vecino puede ver la alerta e ir a ayudar. Cada uno ve lo que necesita para su rol.</p>
                         </div>
                     </div>
-                    <div class="dato-real mb-4">
+                    <div class="dato-real">
                         <i class="bi bi-phone text-rose"></i>
                         <div>
                             <h3 class="h6 fw-semibold mb-1">Lista para la app de residentes</h3>
                             <p class="text-muted mb-0">El mismo panel ya expone una API documentada, pensada para que los residentes usen todo esto también desde el celular.</p>
-                        </div>
-                    </div>
-                    <div class="dato-real">
-                        <i class="bi bi-person-vcard text-amber"></i>
-                        <div>
-                            <h3 class="h6 fw-semibold mb-1">Personal y liquidaciones de sueldo</h3>
-                            <p class="text-muted mb-0">Administración registra a conserjería y aseo, y genera la liquidación de sueldo real (AFP, salud, cesantía, impuesto único) en PDF, lista para enviar por correo.</p>
                         </div>
                     </div>
                 </div>
@@ -631,29 +616,17 @@
     <section class="py-5 reveal">
         <div class="container">
             <h2 class="text-center fw-bold mb-5 section-title">¿Te pasa alguna de estas?</h2>
-            <div class="row g-4">
-                <div class="col-md-6 col-lg-3">
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-6">
                     <div class="pain-card">
                         <p class="pain-quote">"Si pasa algo de noche, hay que llamar uno por uno."</p>
                         <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el botón de pánico avisa a todo el condominio al instante.</p>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-3">
+                <div class="col-md-6">
                     <div class="pain-card">
                         <p class="pain-quote">"El grupo de WhatsApp tiene 300 mensajes sin leer y nadie vio el aviso importante."</p>
                         <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el aviso queda en el panel de cada residente, no se pierde en el chat.</p>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="pain-card">
-                        <p class="pain-quote">"Nadie sabe cuánto debe cada departamento hasta fin de mes."</p>
-                        <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> el gasto común se prorratea solo y cada residente ve su cuota al día.</p>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg-3">
-                    <div class="pain-card">
-                        <p class="pain-quote">"El cuaderno de la portería se pierde o nadie lo llena bien."</p>
-                        <p class="small mb-0"><strong>Con {{ PLATFORM_NAME }}:</strong> los accesos quedan registrados y ordenados por unidad.</p>
                     </div>
                 </div>
             </div>
@@ -668,21 +641,21 @@
                     <div class="paso-numero">1</div>
                     <div>
                         <h3 class="h6 fw-semibold">Crea tu condominio o junta de vecinos</h3>
-                        <p class="text-muted small">Regístrate como directiva. Con varias torres o simplemente casas numeradas, las configuramos contigo. Sin instalar nada.</p>
+                        <p class="text-muted small">Escríbenos y nosotros lo configuramos contigo. Con varias torres o simplemente casas numeradas, no hay que instalar nada.</p>
                     </div>
                 </div>
                 <div class="col-md-4 d-flex gap-3">
                     <div class="paso-numero">2</div>
                     <div>
                         <h3 class="h6 fw-semibold">Comparte el link o QR con tus vecinos</h3>
-                        <p class="text-muted small">Cada residente elige su unidad y crea su propia cuenta solo. Las cuentas de conserjería y administración se crean desde el panel.</p>
+                        <p class="text-muted small">Cada residente elige su unidad y crea su propia cuenta solo.</p>
                     </div>
                 </div>
                 <div class="col-md-4 d-flex gap-3">
                     <div class="paso-numero">3</div>
                     <div>
                         <h3 class="h6 fw-semibold">Usa el día a día</h3>
-                        <p class="text-muted small">Alertas, avisos, accesos y gastos comunes quedan ordenados en un solo lugar para toda la comunidad.</p>
+                        <p class="text-muted small">Alertas, avisos y directorio de vecinos quedan ordenados en un solo lugar para toda la comunidad.</p>
                     </div>
                 </div>
             </div>
@@ -698,15 +671,7 @@
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">¿Cómo empiezo a usar {{ PLATFORM_NAME }} en mi condominio o junta de vecinos?</button>
                     </h3>
                     <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">Completa el <a href="#solicitar">formulario de contacto</a> o escríbenos a <a href="mailto:contacto@devquad.cl">contacto@devquad.cl</a>. Coordinamos con tu directiva y te damos acceso con todas las funciones activas.</div>
-                    </div>
-                </div>
-                <div class="accordion-item">
-                    <h3 class="accordion-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">¿Cómo pagan los residentes los gastos comunes?</button>
-                    </h3>
-                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">Por transferencia directa a la administración de tu condominio. {{ PLATFORM_NAME }} no procesa ese pago: muestra los datos de transferencia a cada residente y directiva o administración marca la cuota como pagada al recibirla.</div>
+                        <div class="accordion-body text-muted">Completa el <a href="#solicitar">formulario de contacto</a> o escríbenos a <a href="mailto:contacto@devquad.cl">contacto@devquad.cl</a>. Coordinamos el acceso y te damos acceso con todas las funciones activas.</div>
                     </div>
                 </div>
                 <div class="accordion-item">
@@ -714,7 +679,7 @@
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">¿Mis datos están separados de otros condominios?</button>
                     </h3>
                     <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">Sí. Cada condominio es completamente independiente: nadie fuera del tuyo puede ver tus alertas, avisos, accesos ni gastos comunes.</div>
+                        <div class="accordion-body text-muted">Sí. Cada condominio es completamente independiente: nadie fuera del tuyo puede ver tus alertas ni avisos.</div>
                     </div>
                 </div>
                 <div class="accordion-item">
@@ -727,18 +692,10 @@
                 </div>
                 <div class="accordion-item">
                     <h3 class="accordion-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">¿Cómo empiezo a usar {{ PLATFORM_NAME }}?</button>
-                    </h3>
-                    <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">Escríbenos a <a href="mailto:contacto@devquad.cl">contacto@devquad.cl</a> y nosotros dejamos tu condominio configurado.</div>
-                    </div>
-                </div>
-                <div class="accordion-item">
-                    <h3 class="accordion-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">¿Cuánto cuesta {{ PLATFORM_NAME }}?</button>
                     </h3>
                     <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">{{ PLATFORM_NAME }} es gratis para lo esencial: botón de pánico, comunicación vecinal y control de accesos no tienen costo. El sistema de gestión de administración -- generar gastos comunes y gestionar el personal del condominio, incluidas las liquidaciones de sueldo -- cuesta $19.990 al mes, fijo, sin importar cuántos departamentos o residentes tengan. Lo paga la administración, igual que cualquier otra suscripción de software, e incluye soporte continuo. Todo condominio nuevo parte con 20 días de prueba gratis.</div>
+                        <div class="accordion-body text-muted">{{ PLATFORM_NAME }} es gratis: el botón de pánico, los avisos y el directorio de vecinos no tienen costo para nadie. Cualquier residente puede hacer una donación voluntaria para apoyar el desarrollo de la plataforma, pero es completamente opcional.</div>
                     </div>
                 </div>
             </div>
@@ -749,7 +706,7 @@
         <div class="container">
             <div class="cta-final text-center p-5">
                 <h2 class="h3 fw-bold mb-2">Lleva el botón de pánico a tu condominio o junta de vecinos</h2>
-                <p class="mb-4 mx-auto" style="max-width: 520px; opacity: 0.9;">El botón de pánico, los avisos y el resto de las funciones quedan activos desde el primer día. Coordinamos el acceso con tu directiva.</p>
+                <p class="mb-4 mx-auto" style="max-width: 520px; opacity: 0.9;">El botón de pánico, los avisos y el resto de las funciones quedan activos desde el primer día. Coordinamos el acceso contigo.</p>
                 <a href="#solicitar" class="btn btn-light btn-lg px-4">Solicitar acceso</a>
             </div>
         </div>
