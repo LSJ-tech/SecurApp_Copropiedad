@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 db.sqlite3
 .env
+.env.migracion
+backup_migracion_*.json
 server*.log
 *.sqlite3
 staticfiles/
