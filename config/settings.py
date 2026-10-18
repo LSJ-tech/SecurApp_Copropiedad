@@ -1,5 +1,5 @@
 """
-Django settings for config project (SecurApp Copropiedad).
+Django settings for config project (Mi Barrio+, ex SecurApp Copropiedad).
 """
 
 import datetime
