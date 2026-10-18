@@ -11,11 +11,6 @@ pip install --only-binary :all: --no-binary http-ece -r requirements.txt
 python manage.py collectstatic --noinput
 python manage.py migrate
 
-# AFP/tramos de impuesto único/periodo semilla para liquidaciones de sueldo.
-# Idempotente (update_or_create / get_or_create), seguro de correr en cada
-# deploy -- así queda cargado en producción sin pasar por Render Shell.
-python manage.py cargar_parametros_previsionales
-
 # Crea el superusuario (dueño de la plataforma) si no existe. No hace nada si
 # DJANGO_SUPERUSER_USERNAME/PASSWORD no están definidas (por ejemplo, en local).
 python manage.py shell -c "
