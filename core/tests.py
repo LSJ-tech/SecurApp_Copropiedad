@@ -759,25 +759,16 @@ class PruebaGratisTests(TestCase):
 
 
 class DonacionVisibilidadTests(TestCase):
-    """La donación es exclusiva de residentes -- directiva/administración solo
-    ven la suscripción (que es la que de verdad pagan), y conserjería no ve
-    ninguna de las dos (no le corresponde ninguno de los dos pagos)."""
+    """La donación es exclusiva de residente/delegado -- devquad no la ve
+    (no tiene Membresia propia en el condominio que está operando)."""
 
     @classmethod
     def setUpTestData(cls):
         cls.condominio = Condominio.objects.create(nombre="Test Donacion Visibilidad", plan="premium")
 
-    def test_administracion_no_ve_la_tarjeta_de_donacion(self):
-        membresia = crear_membresia(self.condominio, "administracion", username="donvis_admon")
-        self.client.force_login(membresia.user)
-        r = self.client.get(reverse("inicio"))
-        self.assertEqual(r.status_code, 200)
-        self.assertNotIn(b"Apoya el proyecto", r.content)
-        self.assertIn("Suscripción de".encode(), r.content)
-
-    def test_directiva_no_ve_la_tarjeta_de_donacion(self):
-        membresia = crear_membresia(self.condominio, "directiva", username="donvis_directiva")
-        self.client.force_login(membresia.user)
+    def test_devquad_no_ve_la_tarjeta_de_donacion(self):
+        self.client.force_login(crear_devquad("donvis_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("inicio"))
         self.assertEqual(r.status_code, 200)
         self.assertNotIn(b"Apoya el proyecto", r.content)
@@ -789,12 +780,13 @@ class DonacionVisibilidadTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Apoya el proyecto", r.content)
 
-    def test_conserje_no_ve_la_tarjeta_de_donacion(self):
-        membresia = crear_membresia(self.condominio, "conserje", username="donvis_conserje")
+    def test_delegado_si_ve_la_tarjeta_de_donacion(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+        membresia = crear_membresia(self.condominio, "delegado", unidad=unidad, username="donvis_delegado")
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("inicio"))
         self.assertEqual(r.status_code, 200)
-        self.assertNotIn(b"Apoya el proyecto", r.content)
+        self.assertIn(b"Apoya el proyecto", r.content)
 
 
 class ApiAuthTests(TestCase):
@@ -1039,25 +1031,26 @@ class EtiquetaOrganizacionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.condominio = Condominio.objects.create(nombre="Junta Los Aromos", plan="premium", etiqueta_organizacion="Junta de vecinos")
-        cls.directiva = crear_membresia(cls.condominio, "directiva", username="directiva_junta_vecinos")
+
+    def _login_devquad(self, condominio, username):
+        self.client.force_login(crear_devquad(username))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
 
     def test_inicio_usa_la_etiqueta_de_la_organizacion(self):
-        self.client.force_login(self.directiva.user)
+        self._login_devquad(self.condominio, "inicio_devquad_junta")
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, "Mi junta de vecinos")
         self.assertNotContains(r, "Mi condominio")
 
     def test_mi_condominio_usa_la_etiqueta_de_la_organizacion(self):
-        self.client.force_login(crear_devquad("mi_condominio_devquad"))
-        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        self._login_devquad(self.condominio, "mi_condominio_devquad")
         r = self.client.get(reverse("mi-condominio"))
         self.assertContains(r, "Mi junta de vecinos")
         self.assertNotContains(r, "Mi condominio")
 
     def test_por_defecto_sigue_diciendo_condominio(self):
         condominio_default = Condominio.objects.create(nombre="Condominio Default Test", plan="premium")
-        directiva = crear_membresia(condominio_default, "directiva", username="directiva_condominio_default")
-        self.client.force_login(directiva.user)
+        self._login_devquad(condominio_default, "devquad_condominio_default")
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, "Mi condominio")
 
@@ -1255,18 +1248,35 @@ class MiembroListFiltroRolTests(TestCase):
 
 
 class DashboardResidenteTests(TestCase):
-    """El dashboard de residente tiene los mismos botones de acceso rápido
-    que ya tenían directiva/administración/conserjería (commit del
-    directorio de vecinos) -- antes solo tenía la tarjeta de gastos comunes."""
+    """El dashboard de residente ya no ofrece Directorio (ver decisión de
+    producto) ni gastos comunes (app retirada) -- sí sigue ofreciendo
+    invitar vecinos."""
 
-    def test_residente_ve_los_botones_de_gastos_comunes_y_directorio(self):
+    def test_residente_no_ve_directorio_pero_si_invitar_vecinos(self):
         condominio = Condominio.objects.create(nombre="Test Dashboard Residente", plan="premium")
         membresia = crear_membresia(condominio, "residente", username="dashboard_residente")
         self.client.force_login(membresia.user)
         r = self.client.get(reverse("inicio"))
-        self.assertContains(r, reverse("mis-cuotas"))
-        self.assertContains(r, reverse("directorio"))
+        self.assertNotContains(r, reverse("directorio"))
         self.assertContains(r, reverse("compartir-invitacion"))
+
+    def test_residente_no_puede_entrar_directo_al_directorio(self):
+        """Regresión: el link desaparece del dashboard, pero la URL en sí
+        también debe rechazar a residente, no solo esconder el botón."""
+        condominio = Condominio.objects.create(nombre="Test Directorio Bloqueado", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="directorio_bloqueado_residente")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("directorio"), follow=True)
+        self.assertRedirects(r, reverse("inicio"))
+        self.assertContains(r, "ya no está disponible")
+
+    def test_delegado_si_puede_ver_el_directorio(self):
+        condominio = Condominio.objects.create(nombre="Test Directorio Delegado", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        membresia = crear_membresia(condominio, "delegado", unidad=unidad, username="directorio_delegado")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("directorio"))
+        self.assertEqual(r.status_code, 200)
 
     def test_residente_ve_cantidad_de_torres_unidades_y_miembros(self):
         condominio = Condominio.objects.create(nombre="Test Dashboard Residente Conteos", plan="premium")
@@ -1328,20 +1338,24 @@ class DirectorioVecinosTests(TestCase):
         r = self.client.get(reverse("directorio"))
         self.assertEqual(r.status_code, 302)
 
-    def test_cualquier_rol_puede_entrar(self):
-        for rol in ("residente", "conserje", "administracion", "directiva"):
-            membresia = crear_membresia(self.condominio, rol, unidad=self.unidad, username=f"directorio_{rol}")
-            self.client.force_login(membresia.user)
-            r = self.client.get(reverse("directorio"))
-            self.assertEqual(r.status_code, 200, rol)
-            self.client.logout()
+    def test_delegado_y_devquad_pueden_entrar(self):
+        delegado = crear_membresia(self.condominio, "delegado", unidad=self.unidad, username="directorio_delegado_rol")
+        self.client.force_login(delegado.user)
+        r = self.client.get(reverse("directorio"))
+        self.assertEqual(r.status_code, 200, "delegado")
+        self.client.logout()
+
+        self.client.force_login(crear_devquad("directorio_devquad_rol"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.get(reverse("directorio"))
+        self.assertEqual(r.status_code, 200, "devquad")
 
     def test_muestra_nombre_y_depto_pero_no_usuario_ni_email_ni_rol(self):
         vecino = crear_membresia(
             self.condominio, "residente", unidad=self.unidad, username="directorio_vecino_secreto",
             email="vecino_secreto@example.com", first_name="Rosa", last_name="Mena",
         )
-        yo = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="directorio_yo")
+        yo = crear_membresia(self.condominio, "delegado", unidad=self.unidad, username="directorio_yo")
         self.client.force_login(yo.user)
         r = self.client.get(reverse("directorio"))
         contenido = r.content.decode()

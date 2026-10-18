@@ -760,14 +760,22 @@ class SolicitarEliminacionView(LoginRequiredMixin, View):
 
 
 class DirectorioVecinosView(CondominioRequiredMixin, ListView):
-    """Directorio simple abierto a cualquier miembro (incluido residente) --
-    solo nombre y block/depto. A propósito NO muestra usuario, email ni rol:
-    eso sigue siendo exclusivo de directiva/administración en
-    MiembroListView."""
+    """Directorio simple -- solo nombre y block/depto. A propósito NO
+    muestra usuario, email ni rol: eso sigue siendo exclusivo de devquad en
+    MiembroListView. Residente ya no tiene acceso (decisión de producto);
+    delegado y devquad sí."""
 
     template_name = "core/directorio_vecinos.html"
     context_object_name = "membresias"
     paginate_by = 50
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            membresia = getattr(request.user, "membresia", None)
+            if membresia and membresia.rol == "residente":
+                messages.error(request, "El directorio ya no está disponible para residentes.")
+                return redirect("inicio")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         qs = Membresia.objects.filter(condominio=self.condominio).select_related("user", "unidad", "unidad__torre")
