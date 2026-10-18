@@ -11,7 +11,6 @@ urlpatterns = [
     path("devquad/condominios/nuevo/", views.DevquadCrearCondominioView.as_view(), name="devquad-crear-condominio"),
     path("devquad/condominios/<int:pk>/entrar/", views.DevquadEntrarCondominioView.as_view(), name="devquad-entrar-condominio"),
     path("devquad/condominios/salir/", views.DevquadSalirCondominioView.as_view(), name="devquad-salir-condominio"),
-    path("registro/", views.RegistroCondominioView.as_view(), name="registro-condominio"),
     path("solicitar-acceso/", views.SolicitarAccesoView.as_view(), name="solicitar-acceso"),
     path("unirme/<uuid:token>/", views.RegistroResidenteView.as_view(), name="registro-residente"),
     path("login/", auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
@@ -74,5 +73,4 @@ urlpatterns = [
     path("torres/nueva/", views.TorreCreateView.as_view(), name="crear-torre"),
     path("unidades/", views.UnidadListView.as_view(), name="unidades"),
     path("unidades/nueva/", views.UnidadCreateView.as_view(), name="crear-unidad"),
-    path("unidades/aplicar-alicuota/", views.AplicarAlicuotaMasivaView.as_view(), name="aplicar-alicuota-masiva"),
 ]

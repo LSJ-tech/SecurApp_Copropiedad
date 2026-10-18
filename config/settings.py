@@ -298,7 +298,6 @@ UNFOLD = {
                     {"title": "Blocks", "icon": "domain", "link": reverse_lazy("admin:core_torre_changelist")},
                     {"title": "Departamentos", "icon": "door_front", "link": reverse_lazy("admin:core_unidad_changelist")},
                     {"title": "Membresías", "icon": "groups", "link": reverse_lazy("admin:core_membresia_changelist")},
-                    {"title": "Códigos de invitación", "icon": "vpn_key", "link": reverse_lazy("admin:core_codigoinvitacion_changelist")},
                     {"title": "Solicitudes de acceso", "icon": "mail", "link": reverse_lazy("admin:core_solicitudacceso_changelist")},
                     {"title": "Solicitudes de eliminación", "icon": "person_remove", "link": reverse_lazy("admin:core_solicitudeliminacion_changelist")},
                 ],

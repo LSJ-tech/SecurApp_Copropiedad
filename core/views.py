@@ -31,10 +31,10 @@ from django.views.generic import CreateView, FormView, ListView, TemplateView, U
 from django.views.generic.base import View
 
 from .comunas_chile import COMUNAS_POR_REGION
-from .forms import CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroCondominioForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
-from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, EsDirectivaOAdministracionMixin, SoloDirectivaMixin, SoloStaffMixin, condominio_activo_devquad
+from .forms import CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
+from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin, condominio_activo_devquad
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
-from .models import CodigoInvitacion, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
+from .models import Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
 from .usuarios import generar_password_temporal, generar_username
 
 EMAIL_CONTACTO_DEVQUAD = "contacto@devquad.cl"
@@ -343,48 +343,6 @@ class SolicitarAccesoView(FormView):
         return redirect("inicio")
 
 
-class RegistroCondominioView(FormView):
-    template_name = "core/registro_condominio.html"
-    form_class = RegistroCondominioForm
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["comunas_por_region"] = COMUNAS_POR_REGION
-        return context
-
-    def form_valid(self, form):
-        datos = form.cleaned_data
-        username = generar_username(datos["nombre"], datos["apellido"])
-        with transaction.atomic():
-            codigo_obj = CodigoInvitacion.objects.select_for_update().get(pk=form.codigo_obj.pk)
-            if codigo_obj.condominio_id is not None:
-                messages.error(self.request, "Ese código de invitación ya fue usado.")
-                return redirect("registro-condominio")
-
-            condominio = Condominio.objects.create(
-                nombre=datos["nombre_condominio"],
-                direccion=datos.get("direccion_condominio", ""),
-                comuna=datos.get("comuna_condominio", ""),
-                region=datos.get("region_condominio", ""),
-            )
-            user = User.objects.create_user(
-                username=username, password=datos["password1"],
-                first_name=datos["nombre"], last_name=datos["apellido"],
-            )
-            Membresia.objects.create(user=user, condominio=condominio, rol="directiva", terminos_aceptados_en=timezone.now())
-            codigo_obj.condominio = condominio
-            codigo_obj.fecha_uso = timezone.now()
-            codigo_obj.save()
-
-        login(self.request, user, backend="django.contrib.auth.backends.ModelBackend")
-        messages.success(
-            self.request,
-            f"¡Listo! Creamos la cuenta de {condominio.nombre}. Tu usuario es «{username}» — anótalo, lo necesitas "
-            f"para volver a entrar. {settings.PLATFORM_NAME} es gratis, sin límites de tiempo ni de unidades.",
-        )
-        return redirect("inicio")
-
-
 class RegistroResidenteView(FormView):
     """Autoregistro público de residente -- el link/QR trae el token del condominio, el residente elige su depto."""
 
@@ -506,7 +464,7 @@ class CompartirInvitacionView(CondominioRequiredMixin, TemplateView):
         return context
 
 
-class RegenerarTokenResidentesView(SoloDirectivaMixin, CondominioRequiredMixin, View):
+class RegenerarTokenResidentesView(SoloStaffMixin, CondominioRequiredMixin, View):
     def post(self, request):
         self.condominio.token_registro_residentes = uuid.uuid4()
         self.condominio.save(update_fields=["token_registro_residentes"])
@@ -818,7 +776,7 @@ class DirectorioVecinosView(CondominioRequiredMixin, ListView):
         ).order_by("_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "user__last_name")
 
 
-class MiembroListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, ListView):
+class MiembroListView(SoloStaffMixin, CondominioRequiredMixin, ListView):
     template_name = "core/miembro_list.html"
     context_object_name = "membresias"
     paginate_by = 50
@@ -849,7 +807,7 @@ class MiembroListView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, 
         return context
 
 
-class CrearMiembroView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, FormView):
+class CrearMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
     template_name = "core/miembro_form.html"
     form_class = CrearMiembroForm
     success_url = reverse_lazy("miembros")
@@ -857,7 +815,6 @@ class CrearMiembroView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin,
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["condominio"] = self.condominio
-        kwargs["creador_rol"] = self.membresia.rol
         return kwargs
 
     def form_valid(self, form):
@@ -883,7 +840,7 @@ class CrearMiembroView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin,
         return super().form_valid(form)
 
 
-class CondominioUpdateView(SoloDirectivaMixin, CondominioRequiredMixin, TemplateView):
+class CondominioUpdateView(SoloStaffMixin, CondominioRequiredMixin, TemplateView):
     """Ya no edita nada acá -- los datos de transferencia de gastos comunes
     se movieron a DatosTransferenciaUpdateView (exclusivo de administración).
     Esta página le queda a la directiva solo para el autoregistro de
@@ -897,7 +854,7 @@ class CondominioUpdateView(SoloDirectivaMixin, CondominioRequiredMixin, Template
         return context
 
 
-class TorreListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
+class TorreListView(SoloStaffMixin, CondominioFormMixin, ListView):
     model = Torre
     template_name = "core/torre_list.html"
     context_object_name = "torres"
@@ -917,7 +874,7 @@ class TorreCreateView(SoloStaffMixin, CondominioFormMixin, CreateView):
     success_url = reverse_lazy("torres")
 
 
-class UnidadListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListView):
+class UnidadListView(SoloStaffMixin, CondominioFormMixin, ListView):
     model = Unidad
     template_name = "core/unidad_list.html"
     context_object_name = "unidades"
@@ -940,22 +897,7 @@ class UnidadListView(EsDirectivaOAdministracionMixin, CondominioFormMixin, ListV
         return context
 
 
-class AplicarAlicuotaMasivaView(EsDirectivaOAdministracionMixin, CondominioRequiredMixin, View):
-    def post(self, request):
-        try:
-            valor = Decimal(request.POST.get("alicuota", "").replace(",", ".")).quantize(Decimal("0.0001"))
-        except (InvalidOperation, TypeError):
-            messages.error(request, "Ingresa un número válido para la alícuota.")
-            return redirect("unidades")
-        if valor <= -100 or valor >= 100:
-            messages.error(request, "El valor es demasiado grande (máximo 99.9999).")
-            return redirect("unidades")
-        total = Unidad.objects.filter(condominio=self.condominio).update(alicuota=valor)
-        messages.success(request, f"Alícuota {valor} aplicada a las {total} unidades de tu condominio.")
-        return redirect("unidades")
-
-
-class UnidadCreateView(EsDirectivaOAdministracionMixin, CondominioFormMixin, CreateView):
+class UnidadCreateView(SoloStaffMixin, CondominioFormMixin, CreateView):
     model = Unidad
     form_class = UnidadForm
     template_name = "core/unidad_form.html"

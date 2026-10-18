@@ -15,7 +15,7 @@ from unfold.forms import AdminPasswordChangeForm, BaseDialogForm, UserChangeForm
 from unfold.views import ChangeList
 
 from .comunas_chile import COMUNAS_POR_REGION, comuna_choices_agrupadas
-from .models import PLAN_CHOICES, REGION_CHOICES, CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
+from .models import PLAN_CHOICES, REGION_CHOICES, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
 # Unidad/Torre/Membresia son datos operativos de cada condominio -- se
 # registran acá porque, a diferencia de PataAgenda, no hay un panel interno
@@ -142,7 +142,7 @@ class ComunaAdminWidget(forms.Select):
 class CondominioAdminForm(forms.ModelForm):
     """region/comuna como desplegable (antes texto libre) -- comuna en
     cascada según la región elegida, mismo dato que usa el formulario
-    público de autoregistro (ver RegistroCondominioForm)."""
+    de alta de condominio de devquad (ver CrearCondominioForm)."""
 
     region = forms.ChoiceField(choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región")
     comuna = forms.ChoiceField(
@@ -378,20 +378,6 @@ class MembresiaAdmin(ModelAdmin):
 
     def get_changelist(self, request, **kwargs):
         return ChangeListOrdenAnotado
-
-
-@admin.register(CodigoInvitacion)
-class CodigoInvitacionAdmin(ModelAdmin):
-    """"Añadir" ya genera un código nuevo solo (ver default del campo) -- basta con Guardar."""
-
-    list_display = ["codigo", "usado_display", "condominio", "fecha_creacion", "fecha_uso"]
-    list_filter = ["fecha_creacion"]
-    readonly_fields = ["condominio", "fecha_uso"]
-    list_select_related = ["condominio"]
-
-    @admin.display(description="Usado", boolean=True)
-    def usado_display(self, obj):
-        return obj.usado
 
 
 @admin.action(description="Marcar como atendido")

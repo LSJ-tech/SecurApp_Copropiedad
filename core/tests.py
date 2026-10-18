@@ -10,8 +10,8 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-from .forms import CrearMiembroForm, RegistroCondominioForm, RegistroResidenteForm
-from .models import CodigoInvitacion, Condominio, Membresia, Torre, Unidad
+from .forms import CrearCondominioForm, CrearMiembroForm, RegistroResidenteForm
+from .models import Condominio, Membresia, Torre, Unidad
 from .views import EMAIL_CONTACTO_DEVQUAD
 
 
@@ -30,8 +30,8 @@ def crear_membresia(condominio, rol, unidad=None, terminos=True, **user_kwargs):
 class RolesPermisosTests(TestCase):
     """Cada rol debe poder llegar solo a lo que le corresponde -- ver los
     mixins en core/mixins.py. Esto cubre el día a día (miembros/torres/
-    unidades), lo exclusivo de directiva (Mi condominio) y lo exclusivo del
-    admin de la plataforma (crear torre)."""
+    unidades/accesos/mi condominio -- exclusivo de devquad, ver
+    SoloStaffMixin) y la creación de miembros (CrearMiembroForm)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -40,72 +40,57 @@ class RolesPermisosTests(TestCase):
         cls.unidad = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre, numero="101")
 
     def setUp(self):
-        self.directiva = crear_membresia(self.condominio, "directiva", username="roles_directiva")
-        self.administracion = crear_membresia(self.condominio, "administracion", username="roles_admon")
-        self.conserje = crear_membresia(self.condominio, "conserje", username="roles_conserje")
         self.residente = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="roles_residente")
+        self.delegado = crear_membresia(self.condominio, "delegado", unidad=self.unidad, username="roles_delegado")
 
-    def _login(self, membresia):
-        self.client.force_login(membresia.user)
+    def _login_devquad(self):
+        devquad = crear_devquad(f"roles_devquad_{Membresia.objects.count()}")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
 
-    def test_dia_a_dia_directiva_y_administracion_permitido(self):
-        for membresia in (self.directiva, self.administracion):
-            self._login(membresia)
-            for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
-                r = self.client.get(reverse(url_name))
-                self.assertEqual(r.status_code, 200, f"{membresia.rol} debería poder ver {url_name}")
-            self.client.logout()
+    def test_dia_a_dia_devquad_permitido(self):
+        self._login_devquad()
+        for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
+            r = self.client.get(reverse(url_name))
+            self.assertEqual(r.status_code, 200, f"devquad debería poder ver {url_name}")
 
-    def test_dia_a_dia_bloqueado_para_conserje_y_residente(self):
-        for membresia in (self.conserje, self.residente):
-            self._login(membresia)
+    def test_dia_a_dia_bloqueado_para_residente_y_delegado(self):
+        for membresia in (self.residente, self.delegado):
+            self.client.force_login(membresia.user)
             for url_name in ("miembros", "torres", "unidades", "gastos-comunes-list"):
                 r = self.client.get(reverse(url_name))
                 self.assertEqual(r.status_code, 302, f"{membresia.rol} NO debería poder ver {url_name}")
             self.client.logout()
 
-    def test_accesos_permitido_para_directiva_administracion_conserje(self):
-        for membresia in (self.directiva, self.administracion, self.conserje):
-            self._login(membresia)
-            r = self.client.get(reverse("registro-ingreso-list"))
-            self.assertEqual(r.status_code, 200)
-            self.client.logout()
+    def test_accesos_permitido_para_devquad(self):
+        self._login_devquad()
+        r = self.client.get(reverse("registro-ingreso-list"))
+        self.assertEqual(r.status_code, 200)
 
     def test_accesos_bloqueado_para_residente(self):
-        self._login(self.residente)
+        self.client.force_login(self.residente.user)
         r = self.client.get(reverse("registro-ingreso-list"))
         self.assertEqual(r.status_code, 302)
 
-    def test_mi_condominio_exclusivo_directiva(self):
-        self._login(self.directiva)
+    def test_mi_condominio_exclusivo_devquad(self):
+        self._login_devquad()
         self.assertEqual(self.client.get(reverse("mi-condominio")).status_code, 200)
         self.client.logout()
-        self._login(self.administracion)
+        self.client.force_login(self.residente.user)
         self.assertEqual(self.client.get(reverse("mi-condominio")).status_code, 302)
 
-    def test_crear_torre_exclusivo_del_admin_de_la_plataforma(self):
-        """Ni siquiera la directiva puede crear torres -- eso es de DevQuad (/admin)."""
-        for membresia in (self.directiva, self.administracion):
-            self._login(membresia)
-            r = self.client.post(reverse("crear-torre"), {"nombre": "Nueva"})
-            self.assertEqual(r.status_code, 302)
-            self.client.logout()
-        self.assertEqual(Torre.objects.filter(condominio=self.condominio, nombre="Nueva").count(), 0)
-
-    def test_crear_miembro_form_rol_aware(self):
-        """Administración no puede nombrar directiva/administración, directiva sí."""
-        form_admon = CrearMiembroForm(condominio=self.condominio, creador_rol="administracion")
-        self.assertEqual([c[0] for c in form_admon.fields["rol"].choices], ["conserje", "residente", "delegado"])
-
-        form_directiva = CrearMiembroForm(condominio=self.condominio, creador_rol="directiva")
-        choices_directiva = [c[0] for c in form_directiva.fields["rol"].choices]
-        self.assertIn("directiva", choices_directiva)
-        self.assertIn("administracion", choices_directiva)
+    def test_crear_miembro_form_siempre_ofrece_solo_residente_y_delegado(self):
+        """Devquad nunca puede crearse a sí mismo (ni a otro devquad) desde
+        este formulario -- esa cuenta es User.is_staff, se da de alta fuera
+        del panel. No depende de quién crea: a diferencia del viejo
+        CrearMiembroForm (creador_rol), ahora las opciones son fijas."""
+        form = CrearMiembroForm(condominio=self.condominio)
+        self.assertEqual([c[0] for c in form.fields["rol"].choices], ["residente", "delegado"])
 
     def test_crear_miembro_residente_exige_unidad(self):
         form = CrearMiembroForm(
             data={"nombre": "Ana", "apellido": "Soto", "email": "ana@example.com", "rol": "residente"},
-            condominio=self.condominio, creador_rol="directiva",
+            condominio=self.condominio,
         )
         self.assertFalse(form.is_valid())
         self.assertIn("Selecciona la unidad", str(form.errors))
@@ -113,13 +98,11 @@ class RolesPermisosTests(TestCase):
     def test_crear_miembro_delegado_exige_unidad(self):
         form = CrearMiembroForm(
             data={"nombre": "Ana", "apellido": "Soto", "email": "ana2@example.com", "rol": "delegado"},
-            condominio=self.condominio, creador_rol="directiva",
+            condominio=self.condominio,
         )
         self.assertFalse(form.is_valid())
         self.assertIn("Selecciona la unidad", str(form.errors))
 
-    def test_administracion_puede_nombrar_delegado(self):
-        self.assertIn("delegado", [c[0] for c in CrearMiembroForm(condominio=self.condominio, creador_rol="administracion").fields["rol"].choices])
 
 
 class MembresiaValidacionTests(TestCase):
@@ -144,11 +127,6 @@ class MembresiaValidacionTests(TestCase):
         m = Membresia(user=user, condominio=self.cond1, rol="residente", unidad=self.unidad_cond2)
         with self.assertRaises(ValidationError):
             m.full_clean()
-
-    def test_conserje_sin_unidad_es_valido(self):
-        user = User.objects.create(username="conserje_sin_unidad")
-        m = Membresia(user=user, condominio=self.cond1, rol="conserje", unidad=None)
-        m.full_clean()  # no debe lanzar
 
     def test_residente_con_unidad_correcta_es_valido(self):
         user = User.objects.create(username="residente_ok")
@@ -214,20 +192,6 @@ class ConsentimientoRegistroTests(TestCase):
     """Los dos registros públicos exigen el checkbox de Términos/Privacidad
     (commit b58ea4e)."""
 
-    def test_registro_condominio_exige_checkbox(self):
-        codigo = CodigoInvitacion.objects.create()
-        datos = {
-            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Nuevo Condo",
-            "nombre": "Logan", "apellido": "Test",
-            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123",
-        }
-        form_sin_checkbox = RegistroCondominioForm(data=datos)
-        self.assertFalse(form_sin_checkbox.is_valid())
-
-        datos["acepto_terminos"] = True
-        form_con_checkbox = RegistroCondominioForm(data=datos)
-        self.assertTrue(form_con_checkbox.is_valid(), form_con_checkbox.errors)
-
     def test_registro_residente_exige_checkbox(self):
         condominio = Condominio.objects.create(nombre="Test Registro Residente", plan="premium")
         unidad = Unidad.objects.create(condominio=condominio, numero="1")
@@ -243,43 +207,38 @@ class ConsentimientoRegistroTests(TestCase):
         self.assertTrue(form_con_checkbox.is_valid(), form_con_checkbox.errors)
 
 
-class RegistroCondominioRegionComunaTests(TestCase):
-    """region/comuna pasaron de texto libre a desplegable, comuna en
-    cascada según la región (ver comunas_chile.py y
+class CrearCondominioRegionComunaTests(TestCase):
+    """region/comuna del nuevo formulario de devquad (DevquadCrearCondominioView)
+    son desplegables en cascada según la región (ver comunas_chile.py y
     cascada_region_comuna.js) -- confirma que el form acepta una
     combinación real, rechaza una que no corresponde, y que la página
-    de registro carga el JS y los datos para la cascada."""
+    carga el JS y los datos para la cascada."""
 
     def _datos(self, region, comuna, **extra):
-        codigo = CodigoInvitacion.objects.create()
-        datos = {
-            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Condo Region Comuna",
-            "region_condominio": region, "comuna_condominio": comuna,
-            "nombre": "Logan", "apellido": "Test", "acepto_terminos": True,
-            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123",
-        }
+        datos = {"nombre": "Condo Region Comuna", "etiqueta_organizacion": "Condominio", "region": region, "comuna": comuna}
         datos.update(extra)
         return datos
 
     def test_acepta_una_combinacion_real(self):
-        form = RegistroCondominioForm(data=self._datos("valparaiso", "Valparaíso"))
+        form = CrearCondominioForm(data=self._datos("valparaiso", "Valparaíso"))
         self.assertTrue(form.is_valid(), form.errors)
 
     def test_rechaza_comuna_que_no_es_de_esa_region(self):
-        form = RegistroCondominioForm(data=self._datos("valparaiso", "Santiago"))
+        form = CrearCondominioForm(data=self._datos("valparaiso", "Santiago"))
         self.assertFalse(form.is_valid())
         self.assertIn("no pertenece a la región elegida", str(form.errors))
 
     def test_permite_dejar_region_y_comuna_vacias(self):
-        form = RegistroCondominioForm(data=self._datos("", ""))
+        form = CrearCondominioForm(data=self._datos("", ""))
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_la_pagina_de_registro_carga_el_js_de_la_cascada(self):
-        r = self.client.get(reverse("registro-condominio"))
+    def test_la_pagina_de_crear_condominio_carga_el_js_de_la_cascada(self):
+        self.client.force_login(crear_devquad())
+        r = self.client.get(reverse("devquad-crear-condominio"))
         self.assertEqual(r.status_code, 200)
         html = r.content.decode()
-        self.assertIn('name="region_condominio"', html)
-        self.assertIn('name="comuna_condominio"', html)
+        self.assertIn('name="region"', html)
+        self.assertIn('name="comuna"', html)
         self.assertIn("cascada_region_comuna.js", html)
         self.assertIn("Valparaíso", html)
 
@@ -295,18 +254,6 @@ class NormalizarNombreTests(TestCase):
         self.assertEqual(_normalizar_nombre("JUAN PEREZ"), "Juan Perez")
         self.assertEqual(_normalizar_nombre("  juan   perez  "), "Juan Perez")
         self.assertEqual(_normalizar_nombre("o'higgins"), "O'Higgins")
-
-    def test_registro_condominio_normaliza_nombre_y_apellido(self):
-        codigo = CodigoInvitacion.objects.create()
-        datos = {
-            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Nuevo Condo Normalizar",
-            "nombre": "juan", "apellido": "PEREZ",
-            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
-        }
-        form = RegistroCondominioForm(data=datos)
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["nombre"], "Juan")
-        self.assertEqual(form.cleaned_data["apellido"], "Perez")
 
     def test_registro_residente_normaliza_nombre_y_apellido(self):
         condominio = Condominio.objects.create(nombre="Test Normalizar Residente", plan="premium")
@@ -325,7 +272,7 @@ class NormalizarNombreTests(TestCase):
         unidad = Unidad.objects.create(condominio=condominio, numero="1")
         form = CrearMiembroForm(
             data={"nombre": "ana", "apellido": "SOTO", "email": "ana_normaliza@example.com", "rol": "residente", "unidad": unidad.pk},
-            condominio=condominio, creador_rol="directiva",
+            condominio=condominio,
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["nombre"], "Ana")
@@ -693,28 +640,28 @@ class CorreoBienvenidaTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_crear_miembro_con_email_recibe_bienvenida(self):
-        directiva = crear_membresia(self.condominio, "directiva", username="bienvenida_directiva")
-        self.client.force_login(directiva.user)
+        self.client.force_login(crear_devquad("bienvenida_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.post(reverse("crear-miembro"), {
-            "nombre": "Juan", "apellido": "Perez", "email": "juan@example.com", "rol": "conserje",
+            "nombre": "Juan", "apellido": "Perez", "email": "juan@example.com", "rol": "residente", "unidad": self.unidad.pk,
         })
         self.assertEqual(r.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["juan@example.com"])
 
     def test_crear_miembro_sin_email_no_crea_la_cuenta(self):
-        directiva = crear_membresia(self.condominio, "directiva", username="bienvenida_directiva3")
-        self.client.force_login(directiva.user)
-        r = self.client.post(reverse("crear-miembro"), {"nombre": "Luis", "apellido": "Rojas", "rol": "conserje"})
+        self.client.force_login(crear_devquad("bienvenida_devquad3"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.post(reverse("crear-miembro"), {"nombre": "Luis", "apellido": "Rojas", "rol": "residente", "unidad": self.unidad.pk})
         self.assertEqual(r.status_code, 200)
         self.assertFalse(User.objects.filter(first_name="Luis").exists())
         self.assertEqual(len(mail.outbox), 0)
 
     def test_el_correo_de_bienvenida_nunca_incluye_la_contrasena(self):
-        directiva = crear_membresia(self.condominio, "directiva", username="bienvenida_directiva2")
-        self.client.force_login(directiva.user)
+        self.client.force_login(crear_devquad("bienvenida_devquad2"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         self.client.post(reverse("crear-miembro"), {
-            "nombre": "Pedro", "apellido": "Diaz", "email": "pedro@example.com", "rol": "conserje",
+            "nombre": "Pedro", "apellido": "Diaz", "email": "pedro@example.com", "rol": "residente", "unidad": self.unidad.pk,
         })
         user = User.objects.get(email="pedro@example.com")
         self.assertNotIn(user.password, mail.outbox[0].body)
@@ -751,11 +698,11 @@ class EmailUnicoTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Ya existe una cuenta registrada con este email")
 
-    def test_directiva_no_puede_crear_miembro_con_email_repetido(self):
-        directiva = crear_membresia(self.condominio, "directiva", username="email_unico_directiva")
-        self.client.force_login(directiva.user)
+    def test_devquad_no_puede_crear_miembro_con_email_repetido(self):
+        self.client.force_login(crear_devquad("email_unico_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.post(reverse("crear-miembro"), {
-            "nombre": "Juan", "apellido": "Perez", "email": "repetido@example.com", "rol": "conserje",
+            "nombre": "Juan", "apellido": "Perez", "email": "repetido@example.com", "rol": "residente", "unidad": self.unidad.pk,
         })
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Ya existe una cuenta registrada con este email")
@@ -793,16 +740,13 @@ class PruebaGratisTests(TestCase):
         dias_restantes = (condominio.pagado_hasta - timezone.localdate()).days
         self.assertEqual(dias_restantes, 20)
 
-    def test_registro_self_service_tambien_trae_la_prueba_gratis(self):
-        codigo = CodigoInvitacion.objects.create()
-        r = self.client.post(reverse("registro-condominio"), {
-            "codigo_invitacion": codigo.codigo, "nombre_condominio": "Condo Prueba Self Service",
-            "nombre": "Logan", "apellido": "Test",
-            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123",
-            "acepto_terminos": True,
+    def test_crear_condominio_desde_devquad_tambien_trae_la_prueba_gratis(self):
+        self.client.force_login(crear_devquad())
+        r = self.client.post(reverse("devquad-crear-condominio"), {
+            "nombre": "Condo Prueba Devquad", "etiqueta_organizacion": "Condominio",
         })
         self.assertEqual(r.status_code, 302)
-        condominio = Condominio.objects.get(nombre="Condo Prueba Self Service")
+        condominio = Condominio.objects.get(nombre="Condo Prueba Devquad")
         self.assertIsNotNone(condominio.pagado_hasta)
         self.assertGreaterEqual(condominio.pagado_hasta, timezone.localdate())
 
@@ -1104,7 +1048,8 @@ class EtiquetaOrganizacionTests(TestCase):
         self.assertNotContains(r, "Mi condominio")
 
     def test_mi_condominio_usa_la_etiqueta_de_la_organizacion(self):
-        self.client.force_login(self.directiva.user)
+        self.client.force_login(crear_devquad("mi_condominio_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("mi-condominio"))
         self.assertContains(r, "Mi junta de vecinos")
         self.assertNotContains(r, "Mi condominio")
@@ -1256,6 +1201,8 @@ class QRYRegenerarTokenResidentesTests(TestCase):
         self.assertEqual(r["Content-Type"], "image/png")
 
     def test_regenerar_token_cambia_el_token(self):
+        self.client.force_login(crear_devquad("qr_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         token_original = self.condominio.token_registro_residentes
         r = self.client.post(reverse("regenerar-token-residentes"))
         self.assertRedirects(r, reverse("mi-condominio"))
@@ -1271,49 +1218,20 @@ class QRYRegenerarTokenResidentesTests(TestCase):
         self.assertEqual(self.condominio.token_registro_residentes, token_original)
 
 
-class AplicarAlicuotaMasivaTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.condominio = Condominio.objects.create(nombre="Test Alicuota Masiva", plan="premium")
-
-    def setUp(self):
-        self.administracion = crear_membresia(self.condominio, "administracion", username="alicuota_admon")
-        self.client.force_login(self.administracion.user)
-        self.unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
-
-    def test_valor_valido_se_aplica_a_todas_las_unidades(self):
-        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "0,0033"})
-        self.assertRedirects(r, reverse("unidades"))
-        self.unidad.refresh_from_db()
-        self.assertEqual(str(self.unidad.alicuota), "0.0033")
-
-    def test_valor_invalido_no_cambia_nada(self):
-        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "no-es-un-numero"}, follow=True)
-        self.assertContains(r, "número válido")
-        self.unidad.refresh_from_db()
-        self.assertEqual(self.unidad.alicuota, 0)
-
-    def test_valor_fuera_de_rango_no_cambia_nada(self):
-        r = self.client.post(reverse("aplicar-alicuota-masiva"), {"alicuota": "100"}, follow=True)
-        self.assertContains(r, "demasiado grande")
-        self.unidad.refresh_from_db()
-        self.assertEqual(self.unidad.alicuota, 0)
-
-
 class MiembroListFiltroRolTests(TestCase):
     def test_filtra_por_rol(self):
         condominio = Condominio.objects.create(nombre="Test Filtro Rol", plan="premium")
-        directiva = crear_membresia(condominio, "directiva", username="filtro_rol_directiva")
         crear_membresia(condominio, "residente", username="filtro_rol_residente")
-        self.client.force_login(directiva.user)
+        self.client.force_login(crear_devquad("filtro_rol_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
         r = self.client.get(reverse("miembros") + "?rol=residente")
         self.assertEqual(len(r.context["membresias"]), 1)
 
     def test_no_muestra_el_nombre_de_usuario(self):
         condominio = Condominio.objects.create(nombre="Test Sin Usuario", plan="premium")
-        directiva = crear_membresia(condominio, "directiva", username="sinusuario_directiva", first_name="Ana", last_name="Soto")
         crear_membresia(condominio, "residente", username="sinusuario_residente_unico", first_name="Rosa", last_name="Mena")
-        self.client.force_login(directiva.user)
+        self.client.force_login(crear_devquad("sinusuario_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
         r = self.client.get(reverse("miembros"))
         self.assertNotContains(r, "sinusuario_residente_unico")
         self.assertContains(r, "Rosa Mena")
@@ -1326,11 +1244,11 @@ class MiembroListFiltroRolTests(TestCase):
         torre_2 = Torre.objects.create(condominio=condominio, nombre="2")
         unidad_10 = Unidad.objects.create(condominio=condominio, torre=torre_10, numero="1")
         unidad_2 = Unidad.objects.create(condominio=condominio, torre=torre_2, numero="1")
-        directiva = crear_membresia(condominio, "directiva", username="orden_miembros_directiva")
         crear_membresia(condominio, "residente", unidad=unidad_10, username="orden_miembros_t10")
         crear_membresia(condominio, "residente", unidad=unidad_2, username="orden_miembros_t2")
 
-        self.client.force_login(directiva.user)
+        self.client.force_login(crear_devquad("orden_miembros_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
         r = self.client.get(reverse("miembros"))
         residentes = [m for m in r.context["membresias"] if m.rol == "residente"]
         self.assertEqual([m.unidad.torre.nombre for m in residentes], ["2", "10"])
@@ -1449,17 +1367,20 @@ class CondominioRequiredMixinRamasTests(TestCase):
 
     def test_condominio_desactivado_redirige_a_cuenta_desactivada(self):
         condominio = Condominio.objects.create(nombre="Test Desactivado", plan="premium", activo=False)
-        membresia = crear_membresia(condominio, "directiva", username="mixin_desactivado")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        membresia = crear_membresia(condominio, "residente", unidad=unidad, username="mixin_desactivado")
         self.client.force_login(membresia.user)
-        r = self.client.get(reverse("miembros"))
+        r = self.client.get(reverse("compartir-invitacion"))
         self.assertRedirects(r, reverse("cuenta-desactivada"))
 
 
 class SoloStaffMixinPermiteStaffTests(TestCase):
     def test_staff_si_puede_crear_torre(self):
+        """El caso típico de devquad: is_staff, sin Membresia propia, operando
+        un condominio elegido vía el switcher (DevquadEntrarCondominioView)."""
         condominio = Condominio.objects.create(nombre="Test Staff Torre", plan="premium")
-        membresia = crear_membresia(condominio, "directiva", username="staff_torre", is_staff=True)
-        self.client.force_login(membresia.user)
+        self.client.force_login(crear_devquad("staff_torre"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
         r = self.client.post(reverse("crear-torre"), {"nombre": "Nueva"})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(Torre.objects.filter(condominio=condominio, nombre="Nueva").exists())
@@ -1609,8 +1530,8 @@ class ConteosTorreYUnidadTests(TestCase):
         Unidad.objects.create(condominio=cls.condominio, torre=cls.torre_2, numero="1")
 
     def setUp(self):
-        self.directiva = crear_membresia(self.condominio, "directiva", username="conteos_directiva")
-        self.client.force_login(self.directiva.user)
+        self.client.force_login(crear_devquad("conteos_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         # dos residentes distintos registrados en la misma unidad (ej. pareja)
         crear_membresia(self.condominio, "residente", unidad=self.unidad_1_1, username="conteos_res1")
         crear_membresia(self.condominio, "residente", unidad=self.unidad_1_1, username="conteos_res2")

@@ -6,8 +6,6 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from .usuarios import generar_codigo_invitacion
-
 REGION_CHOICES = [
     ("arica_parinacota", "Arica y Parinacota"),
     ("tarapaca", "Tarapacá"),
@@ -230,25 +228,6 @@ class Membresia(models.Model):
             raise ValidationError({"unidad": "Las cuentas de residente y delegado deben tener una unidad asignada."})
         if self.unidad_id and self.condominio_id and self.unidad.condominio_id != self.condominio_id:
             raise ValidationError({"unidad": "La unidad debe pertenecer al mismo condominio de la membresía."})
-
-
-class CodigoInvitacion(models.Model):
-    """Gate del registro público: sin un código válido y no usado, no se puede crear un condominio."""
-
-    codigo = models.CharField(max_length=20, unique=True, default=generar_codigo_invitacion)
-    condominio = models.OneToOneField(Condominio, on_delete=models.CASCADE, null=True, blank=True, related_name="codigo_invitacion")
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_uso = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ["-fecha_creacion"]
-
-    def __str__(self):
-        return self.codigo
-
-    @property
-    def usado(self):
-        return self.condominio_id is not None
 
 
 class SolicitudAcceso(models.Model):

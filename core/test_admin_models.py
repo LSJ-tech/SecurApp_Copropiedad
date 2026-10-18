@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from .admin import (
     MAX_FILAS_INLINE,
-    CodigoInvitacionAdmin,
     CondominioAdmin,
     MembresiaAdmin,
     MembresiaInline,
@@ -21,7 +20,7 @@ from .admin import (
     marcar_atendida,
     marcar_atendido,
 )
-from .models import CodigoInvitacion, Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
+from .models import Condominio, Membresia, SolicitudAcceso, SolicitudEliminacion, Torre, Unidad
 
 
 class ExtenderTreintaDiasTests(TestCase):
@@ -111,20 +110,6 @@ class CondominioAdminEstadoSuscripcionTests(TestCase):
         r = self.client.get("/admin/core/condominio/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Sin restricción")
-
-
-class CodigoInvitacionAdminTests(TestCase):
-    def setUp(self):
-        self.admin = CodigoInvitacionAdmin(CodigoInvitacion, admin.site)
-
-    def test_usado_display_false_sin_condominio(self):
-        codigo = CodigoInvitacion.objects.create()
-        self.assertFalse(self.admin.usado_display(codigo))
-
-    def test_usado_display_true_con_condominio(self):
-        condominio = Condominio.objects.create(nombre="Test Codigo Usado", plan="premium")
-        codigo = CodigoInvitacion.objects.create(condominio=condominio)
-        self.assertTrue(self.admin.usado_display(codigo))
 
 
 class MarcarAtendidoTests(TestCase):
@@ -516,6 +501,7 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
 
     def test_crear_usuario_y_asignarle_condominio_en_el_mismo_formulario(self):
         condominio = Condominio.objects.create(nombre="Condominio Para Alta Usuario", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
         r = self.client.post("/admin/auth/user/add/", {
             "username": "nuevo_con_condominio",
             "password1": "unaClaveBienSegura123!",
@@ -525,13 +511,13 @@ class UserAdminReenganchadoConUnfoldTests(TestCase):
             "membresia-MIN_NUM_FORMS": "0",
             "membresia-MAX_NUM_FORMS": "1",
             "membresia-0-condominio": str(condominio.pk),
-            "membresia-0-unidad": "",
-            "membresia-0-rol": "directiva",
+            "membresia-0-unidad": str(unidad.pk),
+            "membresia-0-rol": "residente",
         })
         self.assertEqual(r.status_code, 302)
         nuevo = User.objects.get(username="nuevo_con_condominio")
         self.assertEqual(nuevo.membresia.condominio, condominio)
-        self.assertEqual(nuevo.membresia.rol, "directiva")
+        self.assertEqual(nuevo.membresia.rol, "residente")
 
     def test_grupos_sigue_registrado_y_accesible(self):
         r = self.client.get("/admin/auth/group/")

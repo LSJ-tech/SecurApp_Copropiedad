@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db.models.functions import Length
 
 from .comunas_chile import COMUNAS_POR_REGION, comuna_choices_agrupadas
-from .models import REGION_CHOICES, ROL_CHOICES, CodigoInvitacion, Condominio, SolicitudAcceso, Torre, Unidad
+from .models import REGION_CHOICES, Condominio, SolicitudAcceso, Torre, Unidad
 
 LABEL_TU_NOMBRE = "Tu nombre"
 LABEL_EMAIL = "Email"
@@ -62,70 +62,6 @@ class ConfirmacionContrasenaMixin(forms.Form):
         return cleaned
 
 
-class RegistroCondominioForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
-    """Alta de un condominio nuevo y de su primer usuario (directiva), sin intervención manual."""
-
-    field_order = [
-        "codigo_invitacion", "nombre_condominio", "direccion_condominio", "region_condominio", "comuna_condominio",
-        "nombre", "apellido", "password1", "password2", "acepto_terminos",
-    ]
-
-    codigo_invitacion = forms.CharField(
-        max_length=20, label="Código de invitación",
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-        help_text="Pídeselo a quien te invitó a usar la plataforma.",
-    )
-    nombre_condominio = forms.CharField(
-        max_length=150, label="Nombre del condominio o junta de vecinos",
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    direccion_condominio = forms.CharField(
-        max_length=255, required=False, label="Dirección o sector",
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-        help_text="No tiene que ser una dirección exacta -- puede ser \"Sector Los Aromos\" o similar.",
-    )
-    comuna_condominio = forms.ChoiceField(
-        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    region_condominio = forms.ChoiceField(
-        choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    nombre = forms.CharField(
-        max_length=150, label=LABEL_TU_NOMBRE,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    apellido = forms.CharField(
-        max_length=150, label="Tu apellido",
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    acepto_terminos = forms.BooleanField(
-        required=True, label="Acepto los Términos de Uso y la Política de Privacidad",
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        error_messages={"required": "Tienes que aceptar los Términos de Uso y la Política de Privacidad para continuar."},
-    )
-
-    def clean_codigo_invitacion(self):
-        codigo = self.cleaned_data["codigo_invitacion"].strip().upper()
-        try:
-            self.codigo_obj = CodigoInvitacion.objects.get(codigo=codigo, condominio__isnull=True)
-        except CodigoInvitacion.DoesNotExist:
-            raise ValidationError("Código inválido o ya usado.")
-        return codigo
-
-    def clean(self):
-        cleaned = super().clean()
-        region = cleaned.get("region_condominio")
-        comuna = cleaned.get("comuna_condominio")
-        # El filtrado real pasa por JS (ver cascada_region_comuna.js) -- esto
-        # solo cubre a quien tiene JS desactivado y deja una combinación que
-        # no corresponde (ej. elige la región después de la comuna).
-        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
-            raise ValidationError("Esa comuna no pertenece a la región elegida.")
-        return cleaned
-
-
 class CrearCondominioForm(forms.ModelForm):
     """Alta de un condominio/junta de vecinos nuevo desde el panel de
     devquad (DevquadCondominiosView) -- reemplaza al viejo
@@ -161,28 +97,22 @@ class CrearCondominioForm(forms.ModelForm):
 
 
 class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
-    """Directiva/administración crea la cuenta de otro miembro del condominio.
-
-    Solo directiva puede nombrar directiva/administración (cuentas de
-    gobierno/gestión) -- administración solo puede crear conserjería o
-    residentes (cuentas operativas), nunca a su propio nivel o superior.
-    """
+    """Devquad crea la cuenta de otro miembro del condominio -- solo puede
+    asignar residente/delegado (cuentas del lado del condominio). Devquad
+    mismo nunca se crea desde este formulario: esa cuenta es User.is_staff,
+    se da de alta fuera del panel (ver core/mixins.py: SoloStaffMixin)."""
 
     nombre = forms.CharField(max_length=150, label="Nombre", widget=forms.TextInput(attrs={"class": "form-control"}))
     apellido = forms.CharField(max_length=150, label="Apellido", widget=forms.TextInput(attrs={"class": "form-control"}))
     email = forms.EmailField(label=LABEL_EMAIL, widget=forms.EmailInput(attrs={"class": "form-control"}))
-    rol = forms.ChoiceField(choices=[c for c in ROL_CHOICES if c[0] != "directiva"], widget=forms.Select(attrs={"class": "form-select"}))
+    rol = forms.ChoiceField(choices=[("residente", "Residente"), ("delegado", "Delegado")], widget=forms.Select(attrs={"class": "form-select"}))
     unidad = forms.ModelChoiceField(
         queryset=Unidad.objects.none(), required=False, label="Unidad (obligatorio para residentes y delegados)",
         empty_label="---------", widget=forms.Select(attrs={"class": "form-select"}),
     )
 
-    def __init__(self, *args, condominio=None, creador_rol=None, **kwargs):
+    def __init__(self, *args, condominio=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if creador_rol == "directiva":
-            self.fields["rol"].choices = ROL_CHOICES
-        else:
-            self.fields["rol"].choices = [c for c in ROL_CHOICES if c[0] in ("conserje", "residente", "delegado")]
         if condominio is not None:
             self.fields["unidad"].label = f"{condominio.etiqueta_unidad} (obligatorio para residentes y delegados)"
             self.fields["unidad"].queryset = (
