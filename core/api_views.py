@@ -14,7 +14,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .forms import CrearMiembroForm, RegistroResidenteForm
+from rest_framework.decorators import action
+
+from .forms import CrearMiembroForm, MoverMiembroForm, RegistroResidenteForm
 from .models import Condominio, Membresia, Torre, Unidad
 from .permissions import CondominioQuerysetMixin, EsDevquad, EsDevquadODelegado, TieneCondominioActivo, condominio_de_la_api
 from .serializers import (
@@ -331,3 +333,20 @@ class MembresiaViewSet(viewsets.GenericViewSet, mixins.ListModelMixin):
         if user.email:
             enviar_correo_bienvenida(user, condominio)
         return Response({"id": membresia.pk, "username": username, "password_temporal": password}, status=201)
+
+    @action(detail=True, methods=["patch"])
+    def mover(self, request, pk=None):
+        """Cambia una Membresia ya existente a otro condominio + unidad --
+        equivalente a MoverMiembroView del panel web. Reusa MoverMiembroForm
+        tal cual (misma validación: la unidad destino tiene que pertenecer
+        al condominio destino elegido)."""
+        condominio = condominio_de_la_api(request)
+        miembro = get_object_or_404(Membresia, pk=pk, condominio=condominio)
+        form = MoverMiembroForm(data=request.data, condominio_actual=condominio)
+        if not form.is_valid():
+            return Response(form.errors, status=400)
+        with transaction.atomic():
+            miembro.condominio = form.cleaned_data["condominio_destino"]
+            miembro.unidad = form.cleaned_data["unidad_destino"]
+            miembro.save(update_fields=["condominio", "unidad"])
+        return Response(MembresiaListSerializer(miembro).data)

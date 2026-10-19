@@ -2689,3 +2689,49 @@ class MembresiaApiTests(TestCase):
         self.client.force_login(residente.user)
         r = self.client.get(reverse("membresia-list"))
         self.assertEqual(r.status_code, 403)
+
+
+class MoverMiembroApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.origen = Condominio.objects.create(nombre="Test Mover Api Origen", plan="premium")
+        cls.destino = Condominio.objects.create(nombre="Test Mover Api Destino", plan="premium")
+        cls.unidad_origen = Unidad.objects.create(condominio=cls.origen, numero="1")
+        cls.unidad_destino = Unidad.objects.create(condominio=cls.destino, numero="101")
+
+    def setUp(self):
+        self.miembro = crear_membresia(self.origen, "residente", unidad=self.unidad_origen, username="mover_api_residente")
+        self.client.force_login(crear_devquad("mover_api_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.origen.pk]))
+
+    def test_mueve_la_membresia_sin_crear_una_nueva(self):
+        r = self.client.patch(
+            reverse("membresia-mover", args=[self.miembro.pk]),
+            {"condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.miembro.refresh_from_db()
+        self.assertEqual(self.miembro.condominio, self.destino)
+        self.assertEqual(self.miembro.unidad, self.unidad_destino)
+        self.assertEqual(Membresia.objects.filter(user=self.miembro.user).count(), 1)
+
+    def test_unidad_que_no_es_del_condominio_destino_da_400(self):
+        tercero = Condominio.objects.create(nombre="Test Mover Api Tercero", plan="premium")
+        unidad_tercero = Unidad.objects.create(condominio=tercero, numero="9")
+        r = self.client.patch(
+            reverse("membresia-mover", args=[self.miembro.pk]),
+            {"condominio_destino": self.destino.pk, "unidad_destino": unidad_tercero.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_miembro_de_otro_condominio_da_404(self):
+        otro = Condominio.objects.create(nombre="Test Mover Api Ajeno", plan="premium")
+        ajeno = crear_membresia(otro, "residente", username="mover_api_ajeno")
+        r = self.client.patch(
+            reverse("membresia-mover", args=[ajeno.pk]),
+            {"condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 404)
