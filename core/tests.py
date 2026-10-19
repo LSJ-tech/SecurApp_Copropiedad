@@ -2563,3 +2563,38 @@ class RegistroPublicoApiTests(TestCase):
             {"nombre": "Pedro"}, content_type="application/json",
         )
         self.assertEqual(r.status_code, 400)
+
+
+class TorreApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Torre Api", plan="premium")
+
+    def _login_devquad(self):
+        devquad = crear_devquad("torre_api_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+
+    def test_lista_solo_las_torres_del_condominio_activo(self):
+        Torre.objects.create(condominio=self.condominio, nombre="1")
+        otro = Condominio.objects.create(nombre="Test Torre Api Otro", plan="premium")
+        Torre.objects.create(condominio=otro, nombre="Ajena")
+        self._login_devquad()
+        r = self.client.get(reverse("torre-list"))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        nombres = [t["nombre"] for t in datos["results"]] if isinstance(datos, dict) else [t["nombre"] for t in datos]
+        self.assertEqual(nombres, ["1"])
+
+    def test_crear_una_torre(self):
+        self._login_devquad()
+        r = self.client.post(reverse("torre-list"), {"nombre": "2"}, content_type="application/json")
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(Torre.objects.filter(condominio=self.condominio, nombre="2").exists())
+
+    def test_un_residente_no_puede_crear(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+        residente = crear_membresia(self.condominio, "residente", unidad=unidad, username="torre_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.post(reverse("torre-list"), {"nombre": "3"}, content_type="application/json")
+        self.assertEqual(r.status_code, 403)

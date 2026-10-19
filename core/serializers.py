@@ -6,13 +6,19 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .comunas_chile import COMUNAS_POR_REGION
 from .forms import _validar_email_unico
-from .models import Condominio, Membresia, Unidad
+from .models import Condominio, Membresia, Torre, Unidad
 
 
 class CondominioResumenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Condominio
         fields = ["id", "nombre", "plan", "puede_operar"]
+
+
+class TorreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Torre
+        fields = ["id", "nombre"]
 
 
 class UnidadResumenSerializer(serializers.ModelSerializer):

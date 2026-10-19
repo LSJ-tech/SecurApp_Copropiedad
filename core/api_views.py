@@ -1,7 +1,7 @@
 from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
-from rest_framework import serializers
+from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from .forms import RegistroResidenteForm
 from .models import Condominio, Membresia, Torre, Unidad
-from .permissions import EsDevquad, EsDevquadODelegado, TieneCondominioActivo, condominio_de_la_api
+from .permissions import CondominioQuerysetMixin, EsDevquad, EsDevquadODelegado, TieneCondominioActivo, condominio_de_la_api
 from .serializers import (
     CambiarContrasenaSerializer,
     CondominioEdicionSerializer,
@@ -23,6 +23,7 @@ from .serializers import (
     DirectorioMiembroSerializer,
     MembresiaSerializer,
     MiPerfilSerializer,
+    TorreSerializer,
 )
 from .usuarios import generar_codigo_invitacion, generar_username
 from .views import _contexto_invitacion, enviar_correo_bienvenida
@@ -249,3 +250,16 @@ class CambiarContrasenaView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=204)
+
+
+class TorreViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
+    """Listar/crear torres del condominio activo -- equivalente a
+    TorreListView/TorreCreateView del panel web."""
+
+    queryset = Torre.objects.all()
+    serializer_class = TorreSerializer
+    permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def perform_create(self, serializer):
+        serializer.save(condominio=condominio_de_la_api(self.request))

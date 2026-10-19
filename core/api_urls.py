@@ -1,7 +1,11 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import api_views
+
+router = DefaultRouter()
+router.register("torres", api_views.TorreViewSet, basename="torre")
 
 urlpatterns = [
     path("auth/login/", api_views.CustomTokenObtainPairView.as_view(), name="api-login"),
@@ -16,4 +20,4 @@ urlpatterns = [
     path("condominio/regenerar-token/", api_views.RegenerarTokenApiView.as_view(), name="api-regenerar-token"),
     path("invitacion/", api_views.InvitacionView.as_view(), name="api-invitacion"),
     path("registro/<str:token>/", api_views.RegistroPublicoView.as_view(), name="api-registro"),
-]
+] + router.urls
