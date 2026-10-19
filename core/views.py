@@ -843,7 +843,9 @@ class MoverMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
         context["unidades_por_condominio"] = {
             str(c.pk): [
                 {"id": u.pk, "numero": str(u)}
-                for u in Unidad.objects.filter(condominio=c).select_related("torre", "condominio")
+                for u in Unidad.objects.filter(condominio=c).select_related("torre", "condominio").annotate(
+                    _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
+                ).order_by("_torre_len", "torre__nombre", "_num_len", "numero")
             ]
             for c in Condominio.objects.exclude(pk=self.condominio.pk)
         }

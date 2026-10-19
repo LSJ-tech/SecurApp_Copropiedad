@@ -2232,6 +2232,23 @@ class MoverMiembroViewTests(TestCase):
         self.assertContains(r, "mover_residente")  # sin nombre/apellido cargado, cae al username
         self.assertContains(r, self.origen.nombre)
 
+    def test_las_opciones_de_unidad_destino_quedan_ordenadas_por_torre_y_numero(self):
+        """Mismo criterio de orden natural que ya usa UnidadListView (por
+        largo de nombre y alfabético, no el orden en que se crearon) --
+        sin esto "Torre 10" aparecía antes que "Torre 2" (orden de texto)."""
+        torre_2 = Torre.objects.create(condominio=self.destino, nombre="2")
+        Unidad.objects.create(condominio=self.destino, torre=torre_2, numero="10")
+        Unidad.objects.create(condominio=self.destino, torre=torre_2, numero="2")
+        r = self.client.get(reverse("mover-miembro", args=[self.miembro.pk]))
+        contenido = r.content.decode()
+        inicio = contenido.index('id="unidades-por-condominio-data"')
+        fin = contenido.index("</script>", inicio)
+        bloque = contenido[inicio:fin]
+        # Torre "1" (unidad_destino de setUpTestData) antes que Torre "2",
+        # y dentro de Torre "2" el depto "2" antes que el "10".
+        self.assertLess(bloque.index("Torre 1 -"), bloque.index("Torre 2 - Unidad 2"))
+        self.assertLess(bloque.index("Torre 2 - Unidad 2"), bloque.index("Torre 2 - Unidad 10"))
+
     def test_las_opciones_de_unidad_destino_usan_las_etiquetas_del_condominio_destino(self):
         """El selector de unidad destino mostraba "Torre X - Y" fijo, sin
         importar cómo le dice ESE condominio a sus torres/unidades (ej.
