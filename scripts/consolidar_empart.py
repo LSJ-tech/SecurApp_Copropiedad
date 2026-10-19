@@ -37,21 +37,21 @@ def leer_database_url_destino():
     sys.exit("Falta DATABASE_URL_DESTINO en .env.migracion")
 
 
-def imprimir_conteos(Condominio, Torre, Unidad, Membresia):
+def imprimir_conteos(modelo_condominio, modelo_torre, modelo_unidad, modelo_membresia):
     from alertas.models import Alerta
     from comunicacion.models import Aviso
     from pagos.models import Pago, SuscripcionRecurrente
 
     for pk in (EMPART_ID, PUESTA_DEL_SOL_ID, SOFANOR_PARRA_ID):
-        c = Condominio.objects.filter(pk=pk).first()
+        c = modelo_condominio.objects.filter(pk=pk).first()
         if c is None:
             print(f"  id={pk}: (ya no existe)")
             continue
         print(
             f"  id={pk} {c.nombre!r}: "
-            f"torres={Torre.objects.filter(condominio=c).count()} "
-            f"unidades={Unidad.objects.filter(condominio=c).count()} "
-            f"membresias={Membresia.objects.filter(condominio=c).count()} "
+            f"torres={modelo_torre.objects.filter(condominio=c).count()} "
+            f"unidades={modelo_unidad.objects.filter(condominio=c).count()} "
+            f"membresias={modelo_membresia.objects.filter(condominio=c).count()} "
             f"alertas={Alerta.objects.filter(condominio=c).count()} "
             f"avisos={Aviso.objects.filter(condominio=c).count()} "
             f"pagos={Pago.objects.filter(membresia__condominio=c).count()} "

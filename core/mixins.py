@@ -38,24 +38,38 @@ class CondominioRequiredMixin(LoginRequiredMixin):
         if request.user.is_authenticated:
             membresia = getattr(request.user, "membresia", None)
             if membresia is None:
-                if request.user.is_staff:
-                    condominio = condominio_activo_devquad(request)
-                    if condominio is None:
-                        return redirect("devquad-condominios")
-                    if not condominio.puede_operar:
-                        return redirect("cuenta-desactivada")
-                    self.membresia = None
-                    self.condominio = condominio
-                    return super().dispatch(request, *args, **kwargs)
-                messages.error(request, MENSAJE_SIN_CONDOMINIO)
-                return redirect("login")
-            if not membresia.condominio.puede_operar:
-                return redirect("cuenta-desactivada")
-            if not membresia.terminos_aceptados_en:
-                return redirect("aceptar-terminos")
-            self.membresia = membresia
-            self.condominio = membresia.condominio
+                respuesta = self._dispatch_sin_membresia(request)
+            else:
+                respuesta = self._dispatch_con_membresia(membresia)
+            if respuesta is not None:
+                return respuesta
         return super().dispatch(request, *args, **kwargs)
+
+    def _dispatch_sin_membresia(self, request):
+        """Caso devquad (is_staff, sin Membresia propia) -- None si puede
+        seguir, o la respuesta a devolver directo si no."""
+        if not request.user.is_staff:
+            messages.error(request, MENSAJE_SIN_CONDOMINIO)
+            return redirect("login")
+        condominio = condominio_activo_devquad(request)
+        if condominio is None:
+            return redirect("devquad-condominios")
+        if not condominio.puede_operar:
+            return redirect("cuenta-desactivada")
+        self.membresia = None
+        self.condominio = condominio
+        return None
+
+    def _dispatch_con_membresia(self, membresia):
+        """Caso residente/delegado -- None si puede seguir, o la respuesta
+        a devolver directo si no."""
+        if not membresia.condominio.puede_operar:
+            return redirect("cuenta-desactivada")
+        if not membresia.terminos_aceptados_en:
+            return redirect("aceptar-terminos")
+        self.membresia = membresia
+        self.condominio = membresia.condominio
+        return None
 
     def get_queryset(self):
         return super().get_queryset().filter(condominio=self.condominio)

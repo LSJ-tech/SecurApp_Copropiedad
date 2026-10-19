@@ -1,0 +1,10 @@
+{% load static %}
+{{ comunas_por_region|json_script:"comunas-por-region-data" }}
+<script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
+<script>
+    initCascadaRegionComuna({
+        regionSelectId: "id_region",
+        comunaSelectId: "id_comuna",
+        comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
+    });
+</script>

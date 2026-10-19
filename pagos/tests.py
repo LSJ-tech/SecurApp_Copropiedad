@@ -87,6 +87,16 @@ class DonarViewTests(TestCase):
         self.assertContains(r, "Ya tienes una donación automática activa")
         self.assertEqual(SuscripcionRecurrente.objects.filter(condominio=self.condominio, tipo="donacion").count(), 1)
 
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value=None)
+    def test_si_mercadopago_no_devuelve_url_no_deja_la_suscripcion_a_medias(self, mock_crear):
+        """crear_suscripcion_recurrente puede fallar del lado de Mercado
+        Pago (red, credenciales, etc.) -- si devuelve None, la
+        SuscripcionRecurrente que se había creado para intentarlo se borra,
+        no queda una fila huérfana en estado "pendiente" para siempre."""
+        r = self.client.post(reverse("donar"), follow=True)
+        self.assertContains(r, "No pudimos iniciar la donación automática")
+        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
+
 
 class CancelarDonacionRecurrenteViewTests(TestCase):
     @classmethod
@@ -112,6 +122,13 @@ class CancelarDonacionRecurrenteViewTests(TestCase):
     def test_sin_donacion_activa_muestra_error(self):
         r = self.client.post(reverse("cancelar-donacion"), follow=True)
         self.assertContains(r, "No tienes ninguna donación automática activa")
+
+    def test_usuario_sin_membresia_no_puede_cancelar(self):
+        sin_membresia = User.objects.create_user(username="cancel_don_sin_membresia")
+        self.client.logout()
+        self.client.force_login(sin_membresia)
+        r = self.client.post(reverse("cancelar-donacion"), follow=True)
+        self.assertContains(r, "Tu cuenta no está vinculada a ningún condominio")
 
     @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=False)
     def test_si_mercadopago_rechaza_la_cancelacion_no_marca_cancelada(self, mock_cancelar):

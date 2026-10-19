@@ -9,17 +9,7 @@
     <div class="card-body">
         <form method="post">
             {% csrf_token %}
-            {% if form.non_field_errors %}
-            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-            {% endif %}
-            {% for field in form %}
-            <div class="mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                {{ field.errors }}
-            </div>
-            {% endfor %}
+            {% include "core/includes/_campos_formulario.html" %}
             <button type="submit" class="btn btn-primary">Guardar</button>
         </form>
     </div>
@@ -30,13 +20,5 @@
 {% include "core/includes/_invitacion_card.html" with mostrar_regenerar=True %}
 {% endblock %}
 {% block extra_js %}
-{{ comunas_por_region|json_script:"comunas-por-region-data" }}
-<script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
-<script>
-    initCascadaRegionComuna({
-        regionSelectId: "{{ form.region.id_for_label }}",
-        comunaSelectId: "{{ form.comuna.id_for_label }}",
-        comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
-    });
-</script>
+{% include "core/includes/_cascada_region_comuna_js.html" %}
 {% endblock %}

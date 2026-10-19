@@ -10,6 +10,24 @@
  * crear un usuario, solo la etiqueta Baja/Media/Alta, sin checklist) --
  * mismo problema, API/UI deliberadamente separada para no tocar esa
  * integración ya probada (ver core/test_admin_models.py). */
+
+function medidorContrasenaSeParece(valor, otroValor) {
+    if (!otroValor || otroValor.length < 3) return false;
+    var a = valor.toLowerCase();
+    var b = otroValor.toLowerCase();
+    return a.includes(b) || b.includes(a);
+}
+
+function medidorContrasenaSimbolo(valor, ok) {
+    if (!valor) return "• ";
+    return ok ? "✓ " : "✗ ";
+}
+
+function medidorContrasenaColor(valor, ok) {
+    if (!valor) return "#6b7280";
+    return ok ? "#16a34a" : "#dc2626";
+}
+
 function initMedidorContrasenaVivo({ campoId, camposComparar }) {
     var campo = document.getElementById(campoId);
     if (!campo) return;
@@ -23,18 +41,11 @@ function initMedidorContrasenaVivo({ campoId, camposComparar }) {
         "</div>" +
         '<div class="medidor-etiqueta small fw-semibold mt-1"></div>' +
         '<ul class="medidor-lista small mt-1 mb-0 ps-3"></ul>';
-    campo.insertAdjacentElement("afterend", contenedor);
+    campo.after(contenedor);
 
     var relleno = contenedor.querySelector(".medidor-relleno");
     var etiqueta = contenedor.querySelector(".medidor-etiqueta");
     var lista = contenedor.querySelector(".medidor-lista");
-
-    function seParece(valor, otroValor) {
-        if (!otroValor || otroValor.length < 3) return false;
-        var a = valor.toLowerCase();
-        var b = otroValor.toLowerCase();
-        return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
-    }
 
     function evaluar() {
         var valor = campo.value;
@@ -45,7 +56,7 @@ function initMedidorContrasenaVivo({ campoId, camposComparar }) {
         if (camposComparar.length) {
             var pareceAOtroCampo = camposComparar.some(function (id) {
                 var otro = document.getElementById(id);
-                return otro && seParece(valor, otro.value);
+                return otro && medidorContrasenaSeParece(valor, otro.value);
             });
             condiciones.push({ ok: valor.length > 0 && !pareceAOtroCampo, texto: "No se parece a tu nombre, apellido o email" });
         }
@@ -54,7 +65,7 @@ function initMedidorContrasenaVivo({ campoId, camposComparar }) {
         var puntaje = cumplidas;
         if (valor.length >= 12) puntaje++;
         if (/[a-z]/.test(valor) && /[A-Z]/.test(valor)) puntaje++;
-        if (/[0-9]/.test(valor)) puntaje++;
+        if (/\d/.test(valor)) puntaje++;
         if (/[^A-Za-z0-9]/.test(valor)) puntaje++;
 
         var nivel = "", color = "#e5e7eb", ancho = "0%";
@@ -71,8 +82,8 @@ function initMedidorContrasenaVivo({ campoId, camposComparar }) {
         lista.innerHTML = "";
         condiciones.forEach(function (c) {
             var li = document.createElement("li");
-            li.textContent = (valor ? (c.ok ? "✓ " : "✗ ") : "• ") + c.texto;
-            li.style.color = valor ? (c.ok ? "#16a34a" : "#dc2626") : "#6b7280";
+            li.textContent = medidorContrasenaSimbolo(valor, c.ok) + c.texto;
+            li.style.color = medidorContrasenaColor(valor, c.ok);
             lista.appendChild(li);
         });
     }

@@ -9,17 +9,7 @@
                 <h1 class="h4 mb-4">Nuevo condominio</h1>
                 <form method="post">
                     {% csrf_token %}
-                    {% if form.non_field_errors %}
-                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-                    {% endif %}
-                    {% for field in form %}
-                    <div class="mb-3">
-                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                        {{ field.errors }}
-                    </div>
-                    {% endfor %}
+                    {% include "core/includes/_campos_formulario.html" %}
                     <button type="submit" class="btn btn-primary w-100">Crear</button>
                     <a href="{% url 'devquad-condominios' %}" class="btn btn-link w-100">Cancelar</a>
                 </form>
@@ -27,15 +17,7 @@
         </div>
     </div>
 </div>
-{{ comunas_por_region|json_script:"comunas-por-region-data" }}
 {% endblock %}
 {% block extra_js %}
-<script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
-<script>
-    initCascadaRegionComuna({
-        regionSelectId: "id_region",
-        comunaSelectId: "id_comuna",
-        comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
-    });
-</script>
+{% include "core/includes/_cascada_region_comuna_js.html" %}
 {% endblock %}

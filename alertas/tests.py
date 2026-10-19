@@ -53,6 +53,31 @@ class FiltroEstadoAlertaTests(TestCase):
         resultados = datos["results"] if isinstance(datos, dict) else datos
         self.assertEqual(len(resultados), 3)
 
+    def test_estado_recientes_excluye_activas_y_limita_a_5(self):
+        """"Recientes" es para el historial corto -- las que siguen activas
+        ya se ven en el resumen de arriba, no hace falta repetirlas acá."""
+        for i in range(6):
+            Alerta.objects.create(condominio=self.condominio, autor=self.membresia, tipo="otro", estado="resuelta")
+        r = self.client.get(reverse("alerta-list") + "?estado=recientes")
+        datos = r.json()
+        resultados = datos["results"] if isinstance(datos, dict) else datos
+        self.assertEqual(len(resultados), 5)
+        self.assertTrue(all(a["estado"] != "activa" for a in resultados))
+
+
+class CrearAlertaDevquadTests(TestCase):
+    """Crear una alerta real exige una Membresia (ver AlertaViewSet.perform_create)
+    -- devquad administra/resuelve alertas de cualquier condominio, pero no
+    puede disparar el botón de pánico "en nombre de nadie"."""
+
+    def test_devquad_no_puede_crear_una_alerta(self):
+        condominio = Condominio.objects.create(nombre="Test Devquad No Crea Alerta", plan="premium")
+        self.client.force_login(crear_devquad("alerta_devquad_no_crea"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.post(reverse("alerta-list"), {"tipo": "robo"}, content_type="application/json")
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Alerta.objects.filter(condominio=condominio).exists())
+
 
 class AutoCierreYResolucionAbiertaTests(TestCase):
     """Cualquier rol puede resolver una alerta (no solo directiva/conserjería,
@@ -78,6 +103,17 @@ class AutoCierreYResolucionAbiertaTests(TestCase):
         alerta.refresh_from_db()
         self.assertEqual(alerta.estado, "resuelta")
         self.assertEqual(alerta.resuelta_por_id, self.vecino.pk)
+
+    def test_resolver_con_estado_invalido_devuelve_400(self):
+        alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+        self.client.force_login(self.vecino.user)
+        r = self.client.patch(
+            reverse("alerta-resolver", kwargs={"pk": alerta.pk}),
+            data={"estado": "lo_que_sea"}, content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        alerta.refresh_from_db()
+        self.assertEqual(alerta.estado, "activa")
 
     def test_alerta_vieja_se_autocierra_al_listar(self):
         alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")

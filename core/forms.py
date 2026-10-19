@@ -244,39 +244,45 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         if not numero:
             raise ValidationError(f"Elige tu {etiqueta} de la lista, o escribe el número si todavía no aparece.")
         if self.modo_casas:
-            # calle no es required=False a nivel de campo porque elegir una
-            # unidad ya existente de la lista no debería exigirla -- pero
-            # para crear una casa nueva por texto libre, sí o sí hace falta.
-            calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
-            if not calle:
-                raise ValidationError("Escribe el nombre de tu calle.")
-            unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
+            cleaned["unidad"] = self._crear_unidad_casa_libre(cleaned, numero)
         else:
-            etiqueta_torre = self.condominio.etiqueta_torre.lower()
-            torre_texto = (cleaned.get("torre_unidad_libre") or "").strip()
-            calle_texto = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
-            if torre_texto:
-                # A diferencia de calle, acá SÍ hay que existir de antes --
-                # la torre la crea administración/DevQuad (ver
-                # SoloStaffMixin), un residente no puede inventar una nueva
-                # por typo.
-                torre = Torre.objects.filter(condominio=self.condominio, nombre__iexact=torre_texto).first()
-                if torre is None:
-                    raise ValidationError(f"No encontramos esa {etiqueta_torre} -- revisa que esté escrita igual que en la lista.")
-                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
-            elif calle_texto:
-                # Casa sin torre dentro de un condominio que sí tiene torres
-                # (ver AutoregistroMixtoTorresYCasasTests) -- mismo criterio
-                # que modo_casas: calle se puede inventar libre, torre no.
-                unidad, _creada = Unidad.objects.get_or_create(
-                    condominio=self.condominio, torre=None, numero=numero, calle=calle_texto,
-                )
-            else:
-                raise ValidationError(
-                    f"Escribe tu {etiqueta_torre}, o si vives en una casa sin {etiqueta_torre}, escribe el nombre de tu calle."
-                )
-        cleaned["unidad"] = unidad
+            cleaned["unidad"] = self._crear_unidad_torre_o_casa_libre(cleaned, numero)
         return cleaned
+
+    def _crear_unidad_casa_libre(self, cleaned, numero):
+        # calle no es required=False a nivel de campo porque elegir una
+        # unidad ya existente de la lista no debería exigirla -- pero
+        # para crear una casa nueva por texto libre, sí o sí hace falta.
+        calle = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
+        if not calle:
+            raise ValidationError("Escribe el nombre de tu calle.")
+        unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=None, numero=numero, calle=calle)
+        return unidad
+
+    def _crear_unidad_torre_o_casa_libre(self, cleaned, numero):
+        etiqueta_torre = self.condominio.etiqueta_torre.lower()
+        torre_texto = (cleaned.get("torre_unidad_libre") or "").strip()
+        calle_texto = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
+        if torre_texto:
+            # A diferencia de calle, acá SÍ hay que existir de antes -- la
+            # torre la crea administración/DevQuad (ver SoloStaffMixin), un
+            # residente no puede inventar una nueva por typo.
+            torre = Torre.objects.filter(condominio=self.condominio, nombre__iexact=torre_texto).first()
+            if torre is None:
+                raise ValidationError(f"No encontramos esa {etiqueta_torre} -- revisa que esté escrita igual que en la lista.")
+            unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
+            return unidad
+        if calle_texto:
+            # Casa sin torre dentro de un condominio que sí tiene torres
+            # (ver AutoregistroMixtoTorresYCasasTests) -- mismo criterio que
+            # modo_casas: calle se puede inventar libre, torre no.
+            unidad, _creada = Unidad.objects.get_or_create(
+                condominio=self.condominio, torre=None, numero=numero, calle=calle_texto,
+            )
+            return unidad
+        raise ValidationError(
+            f"Escribe tu {etiqueta_torre}, o si vives en una casa sin {etiqueta_torre}, escribe el nombre de tu calle."
+        )
 
     def clean_email(self):
         return _validar_email_unico(self.cleaned_data["email"])

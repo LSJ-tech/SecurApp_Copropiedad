@@ -10,8 +10,8 @@ def regenerar_tokens(apps, schema_editor):
     condominio un código nuevo (invalida los links/QR ya compartidos,
     mismo efecto que "Generar link nuevo" pero para todos a la vez --
     aceptado a propósito, ver conversación)."""
-    Condominio = apps.get_model("core", "Condominio")
-    for condominio in Condominio.objects.all():
+    modelo_condominio = apps.get_model("core", "Condominio")
+    for condominio in modelo_condominio.objects.all():
         condominio.token_registro_residentes = generar_codigo_invitacion()
         condominio.save(update_fields=["token_registro_residentes"])
 

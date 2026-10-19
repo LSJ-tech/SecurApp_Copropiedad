@@ -1,4 +1,5 @@
 import re
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -196,6 +197,16 @@ class ConsentimientoRegistroTests(TestCase):
         form_con_checkbox = RegistroResidenteForm(data=datos, condominio=condominio)
         self.assertTrue(form_con_checkbox.is_valid(), form_con_checkbox.errors)
 
+    def test_contrasenas_que_no_coinciden_son_invalidas(self):
+        condominio = Condominio.objects.create(nombre="Test Claves No Coinciden", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        form = RegistroResidenteForm(data={
+            "nombre": "Rosa", "apellido": "Mena", "email": "rosa_claves@example.com", "unidad": unidad.pk,
+            "password1": "unaClaveSegura123", "password2": "otraClaveDistinta456", "acepto_terminos": True,
+        }, condominio=condominio)
+        self.assertFalse(form.is_valid())
+        self.assertIn("Las contraseñas no coinciden.", str(form.errors))
+
 
 class CrearCondominioRegionComunaTests(TestCase):
     """region/comuna del nuevo formulario de devquad (DevquadCrearCondominioView)
@@ -280,6 +291,41 @@ class NormalizarNombreTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["first_name"], "Pedro")
         self.assertEqual(form.cleaned_data["last_name"], "Gomez")
+
+    def test_mi_perfil_permite_borrar_el_email(self):
+        """email no es obligatorio (ver RegistroResidenteForm -- igual se
+        puede crear la cuenta sin), así que borrarlo desde Mi perfil
+        tampoco debería exigir que se valide como único."""
+        from .forms import MiPerfilForm
+
+        condominio = Condominio.objects.create(nombre="Test Borrar Email Perfil", plan="premium")
+        membresia = crear_membresia(condominio, "residente", username="perfil_borra_email", email="tenia@example.com")
+        form = MiPerfilForm(
+            data={"first_name": membresia.user.first_name or "X", "last_name": membresia.user.last_name or "Y", "email": ""},
+            instance=membresia.user,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["email"], "")
+
+    def test_registro_residente_form_sin_condominio_no_rompe(self):
+        """Instanciarlo sin el kwarg condominio (ej. en un contexto que
+        todavía no resolvió el condominio) no debe fallar -- queda con los
+        campos de torre/casa en su estado por defecto, sin acotar."""
+        form = RegistroResidenteForm()
+        self.assertIsNone(form.condominio)
+
+    def test_unidad_form_con_condominio_acota_las_torres_y_usa_su_etiqueta(self):
+        from .forms import UnidadForm
+
+        condominio = Condominio.objects.create(nombre="Test Unidad Form Torre", plan="premium", etiqueta_torre="Block")
+        torre = Torre.objects.create(condominio=condominio, nombre="3")
+        otro_condominio = Condominio.objects.create(nombre="Test Unidad Form Otro", plan="premium")
+        Torre.objects.create(condominio=otro_condominio, nombre="9")
+
+        form = UnidadForm(condominio=condominio)
+        self.assertEqual(form.fields["torre"].label, "Block")
+        self.assertIn(torre, form.fields["torre"].queryset)
+        self.assertEqual(form.fields["torre"].queryset.count(), 1)
 
 
 class NormalizarNombresExistentesTests(TestCase):
@@ -739,6 +785,19 @@ class CorreoBienvenidaTests(TestCase):
         self.assertNotIn(user.password, mail.outbox[0].body)
         self.assertNotRegex(mail.outbox[0].body, r"contraseña")
 
+    @patch("django.core.mail.EmailMultiAlternatives.send", side_effect=Exception("Resend caído"))
+    def test_si_el_envio_falla_la_cuenta_se_crea_igual(self, mock_send):
+        """El correo de bienvenida nunca debe bloquear el alta -- si Resend
+        falla, la cuenta queda creada igual (ver enviar_correo_bienvenida,
+        try/except con logger.exception)."""
+        r = self.client.post(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}), {
+            "nombre": "Carla", "apellido": "Fuentes", "email": "carla@example.com", "unidad": self.unidad.pk,
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(User.objects.filter(email="carla@example.com").exists())
+        mock_send.assert_called_once()
+
 
 class EmailUnicoTests(TestCase):
     """Un mismo email no puede quedar en dos cuentas -- se usa para el correo
@@ -823,9 +882,9 @@ class PruebaGratisTests(TestCase):
         self.assertGreaterEqual(condominio.pagado_hasta, timezone.localdate())
 
     def test_se_puede_crear_sin_prueba_explicitamente(self):
-        """Los management commands de alta manual (ej. crear_condominio_empart)
-        pueden seguir pasando pagado_hasta=None a propósito si no quieren dar
-        el trial -- el default no lo fuerza."""
+        """Un alta manual (ej. un management command o una carga directa por
+        admin) puede seguir pasando pagado_hasta=None a propósito si no
+        quiere dar el trial -- el default no lo fuerza."""
         condominio = Condominio.objects.create(nombre="Test Sin Prueba", plan="premium", pagado_hasta=None)
         self.assertIsNone(condominio.pagado_hasta)
 
@@ -1225,6 +1284,14 @@ class MarcarSolicitudEliminacionAtendidaTests(TestCase):
         self._marcar_atendida(solicitud.pk)
         self.assertEqual(len(mail.outbox), 1)
 
+    @patch("django.core.mail.EmailMultiAlternatives.send", side_effect=Exception("Resend caído"))
+    def test_si_el_envio_falla_igual_queda_marcada_atendida(self, mock_send):
+        solicitud = self._solicitud()
+        self._marcar_atendida(solicitud.pk)
+        solicitud.refresh_from_db()
+        self.assertTrue(solicitud.atendida)
+        mock_send.assert_called_once()
+
 
 class QRYRegenerarTokenResidentesTests(TestCase):
     @classmethod
@@ -1273,6 +1340,16 @@ class MiembroListFiltroRolTests(TestCase):
         self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
         r = self.client.get(reverse("miembros") + "?rol=residente")
         self.assertEqual(len(r.context["membresias"]), 1)
+
+    def test_filtra_por_busqueda_de_nombre(self):
+        condominio = Condominio.objects.create(nombre="Test Filtro Busqueda", plan="premium")
+        crear_membresia(condominio, "residente", username="busqueda_rosa", first_name="Rosa", last_name="Mena")
+        crear_membresia(condominio, "residente", username="busqueda_juan", first_name="Juan", last_name="Soto")
+        self.client.force_login(crear_devquad("filtro_busqueda_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.get(reverse("miembros") + "?q=Rosa")
+        nombres = [m.user.get_full_name() for m in r.context["membresias"]]
+        self.assertEqual(nombres, ["Rosa Mena"])
 
     def test_no_muestra_el_nombre_de_usuario(self):
         condominio = Condominio.objects.create(nombre="Test Sin Usuario", plan="premium")
@@ -1478,6 +1555,81 @@ class CondominioRequiredMixinRamasTests(TestCase):
         r = self.client.get(reverse("compartir-invitacion"))
         self.assertRedirects(r, reverse("cuenta-desactivada"))
 
+    def test_usuario_logueado_sin_membresia_ni_staff_no_puede_entrar(self):
+        """Caso defensivo -- en teoría toda cuenta real es is_staff (devquad)
+        o tiene Membresia, pero el mixin no debe asumirlo ciegamente. Usa
+        /invitar/ (solo CondominioRequiredMixin) y no /miembros/ (que
+        además lleva SoloStaffMixin, que rechazaría antes por otra razón)."""
+        huerfano = User.objects.create_user(username="mixin_sin_nada")
+        self.client.force_login(huerfano)
+        r = self.client.get(reverse("compartir-invitacion"))
+        self.assertRedirects(r, reverse("login"), fetch_redirect_response=False)
+
+    def test_devquad_con_condominio_activo_que_se_desactiva_queda_bloqueado(self):
+        condominio = Condominio.objects.create(nombre="Test Devquad Se Desactiva", plan="premium")
+        self.client.force_login(crear_devquad("mixin_devquad_se_desactiva"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        condominio.activo = False
+        condominio.save(update_fields=["activo"])
+        r = self.client.get(reverse("miembros"))
+        self.assertRedirects(r, reverse("cuenta-desactivada"))
+
+
+class InicioResidenteCondominioDesactivadoTests(TestCase):
+    """InicioView tiene su propia lógica inline de resolución de condominio
+    (no usa CondominioRequiredMixin, ver su docstring) -- esta rama
+    (residente/delegado cuyo condominio se desactivó) no se cubre desde
+    ningún otro test porque CondominioRequiredMixinRamasTests prueba el
+    mismo bloqueo pero vía otra vista (/miembros/)."""
+
+    def test_residente_de_condominio_desactivado_va_a_cuenta_desactivada(self):
+        condominio = Condominio.objects.create(nombre="Test Inicio Desactivado", plan="premium", activo=False)
+        residente = crear_membresia(condominio, "residente", username="inicio_desactivado_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("inicio"))
+        self.assertRedirects(r, reverse("cuenta-desactivada"))
+
+
+class AceptarTerminosViewTests(TestCase):
+    def test_get_redirige_a_inicio_si_ya_acepto(self):
+        condominio = Condominio.objects.create(nombre="Test Terminos Ya Acepto", plan="premium")
+        residente = crear_membresia(condominio, "residente", username="terminos_ya_acepto")  # crear_membresia ya pone terminos_aceptados_en
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("aceptar-terminos"))
+        self.assertRedirects(r, reverse("inicio"))
+
+    def test_get_redirige_a_inicio_si_no_tiene_membresia(self):
+        self.client.force_login(crear_devquad("terminos_sin_membresia"))
+        r = self.client.get(reverse("aceptar-terminos"))
+        # fetch_redirect_response=False: a este devquad sin condominio
+        # activo "inicio" lo rebota de nuevo (a devquad-condominios) -- acá
+        # solo importa que AceptarTerminosView.get() apunte a "inicio".
+        self.assertRedirects(r, reverse("inicio"), fetch_redirect_response=False)
+
+    def test_post_sin_membresia_no_rompe(self):
+        self.client.force_login(crear_devquad("terminos_post_sin_membresia"))
+        r = self.client.post(reverse("aceptar-terminos"), {"acepto": "on"})
+        self.assertRedirects(r, reverse("login"))
+
+
+class MiCambiarContrasenaViewFormValidTests(TestCase):
+    def test_post_valido_cambia_la_contrasena_y_redirige(self):
+        condominio = Condominio.objects.create(nombre="Test Cambiar Post", plan="premium")
+        residente = crear_membresia(
+            condominio, "residente", unidad=Unidad.objects.create(condominio=condominio, numero="1"), username="cambiar_post_residente",
+        )
+        residente.user.set_password("ClaveViejaSegura123")
+        residente.user.save()
+        self.client.force_login(residente.user)
+        r = self.client.post(reverse("cambiar-contrasena"), {
+            "old_password": "ClaveViejaSegura123",
+            "new_password1": "ClaveNuevaSegura456",
+            "new_password2": "ClaveNuevaSegura456",
+        })
+        self.assertRedirects(r, reverse("mi-perfil"))
+        residente.user.refresh_from_db()
+        self.assertTrue(residente.user.check_password("ClaveNuevaSegura456"))
+
 
 class SoloStaffMixinPermiteStaffTests(TestCase):
     def test_staff_si_puede_crear_torre(self):
@@ -1669,6 +1821,18 @@ class ConteosTorreYUnidadTests(TestCase):
         Unidad.objects.create(condominio=self.condominio, numero="99", calle="Los Aromos")
         r = self.client.get(reverse("unidades"))
         self.assertContains(r, "Los Aromos")
+
+    def test_unidades_filtra_por_torre(self):
+        r = self.client.get(reverse("unidades") + f"?torre={self.torre_1.pk}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual({u.torre_id for u in r.context["unidades"]}, {self.torre_1.pk})
+        self.assertEqual(len(r.context["unidades"]), 2)
+
+    def test_crear_unidad_la_acota_al_condominio_activo(self):
+        r = self.client.post(reverse("crear-unidad"), {"numero": "99", "torre": self.torre_1.pk, "alicuota": "0"})
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="99")
+        self.assertEqual(unidad.torre_id, self.torre_1.pk)
 
 
 class ComoInstalarTests(TestCase):
@@ -1878,6 +2042,20 @@ class SolicitudAccesoRegionComunaTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Región: Valparaíso", mail.outbox[0].body)
 
+    @patch("core.views.send_mail", side_effect=Exception("Resend caído"))
+    def test_si_el_aviso_por_correo_falla_el_lead_queda_guardado_igual(self, mock_send):
+        """El correo es solo un aviso a DevQuad -- si falla, el lead (que es
+        lo que de verdad importa, alguien pidiendo acceso) no se pierde."""
+        r = self.client.post(reverse("solicitar-acceso"), self._datos_base())
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(SolicitudAcceso.objects.filter(nombre="Rosa").exists())
+        mock_send.assert_called_once()
+
+    def test_datos_invalidos_no_crean_un_lead(self):
+        r = self.client.post(reverse("solicitar-acceso"), self._datos_base(telefono=""), follow=True)
+        self.assertContains(r, "No pudimos enviar tu solicitud")
+        self.assertFalse(SolicitudAcceso.objects.filter(nombre="Rosa").exists())
+
 
 class MiCambiarContrasenaViewTests(TestCase):
     """Mismo medidor de seguridad en vivo + reglas reales de Django que ya
@@ -1956,3 +2134,37 @@ class CondominioUpdateViewTests(TestCase):
         r = self.client.get(reverse("mi-condominio"))
         self.assertContains(r, "Autoregistro de residentes")
         self.assertContains(r, reverse("regenerar-token-residentes"))
+
+
+class ModelosStrYPropiedadesTests(TestCase):
+    """__str__ y propiedades simples de varios modelos -- cada una se prueba
+    directo, sin pasar por una vista, porque no todas se renderizan en
+    ningún template hoy (ej. SolicitudAcceso.__str__ solo se ve en el
+    admin)."""
+
+    def test_etiqueta_unidad_todos_concuerda_en_genero_masculino(self):
+        condominio = Condominio.objects.create(nombre="Test Etiqueta Todos M", plan="premium", genero_unidad="m")
+        self.assertEqual(condominio.etiqueta_unidad_todos, "TODOS los")
+
+    def test_etiqueta_unidad_todos_concuerda_en_genero_femenino(self):
+        condominio = Condominio.objects.create(nombre="Test Etiqueta Todos F", plan="premium", genero_unidad="f")
+        self.assertEqual(condominio.etiqueta_unidad_todos, "TODAS las")
+
+    def test_str_de_unidad_con_calle_y_sin_torre(self):
+        condominio = Condominio.objects.create(nombre="Test Str Unidad Casa", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, torre=None, numero="45", calle="Los Aromos")
+        self.assertEqual(str(unidad), "Los Aromos 45 - Test Str Unidad Casa")
+
+    def test_str_de_solicitud_acceso(self):
+        from .models import SolicitudAcceso
+
+        solicitud = SolicitudAcceso.objects.create(nombre="Rosa", condominio="Mi Junta", telefono="+56911111111")
+        self.assertEqual(str(solicitud), "Mi Junta (Rosa)")
+
+    def test_str_de_solicitud_eliminacion(self):
+        from .models import SolicitudEliminacion
+
+        solicitud = SolicitudEliminacion.objects.create(
+            nombre="Juan Pérez", username="jperez", condominio_nombre="Mi Condominio",
+        )
+        self.assertEqual(str(solicitud), "Juan Pérez (jperez) - Mi Condominio")
