@@ -104,6 +104,35 @@ class AutoCierreYResolucionAbiertaTests(TestCase):
         self.assertEqual(alerta.estado, "resuelta")
         self.assertEqual(alerta.resuelta_por_id, self.vecino.pk)
 
+    def test_resolver_notifica_a_ambos_canales_de_push(self):
+        """Antes solo se avisaba al crear la alerta -- ahora también se
+        avisa cuando se resuelve o se marca como falsa alarma, para que
+        todo el condominio sepa que la emergencia ya pasó."""
+        alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+        self.client.force_login(self.vecino.user)
+        with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
+             patch("alertas.services.enviar_web_push_a_condominio") as mock_web:
+            r = self.client.patch(
+                reverse("alerta-resolver", kwargs={"pk": alerta.pk}),
+                data={"estado": "resuelta"}, content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(mock_expo.call_count, 1)
+        self.assertEqual(mock_web.call_count, 1)
+        self.assertEqual(mock_expo.call_args.kwargs["excluir_user_id"], self.vecino.user_id)
+        self.assertIn(self.vecino.user.get_full_name() or self.vecino.user.username, mock_expo.call_args.args[2])
+
+    def test_resolver_como_falsa_alarma_usa_un_titulo_distinto(self):
+        alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+        self.client.force_login(self.vecino.user)
+        with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
+             patch("alertas.services.enviar_web_push_a_condominio"):
+            self.client.patch(
+                reverse("alerta-resolver", kwargs={"pk": alerta.pk}),
+                data={"estado": "falsa_alarma"}, content_type="application/json",
+            )
+        self.assertIn("falsa alarma", mock_expo.call_args.args[1].lower())
+
     def test_resolver_con_estado_invalido_devuelve_400(self):
         alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
         self.client.force_login(self.vecino.user)
@@ -273,6 +302,24 @@ class CondominiosVecinosCompartenAlertasTests(TestCase):
              patch("alertas.services.enviar_web_push_a_condominio") as mock_web:
             r = self.client.post(reverse("alerta-list"), {"tipo": "robo"}, content_type="application/json")
         self.assertEqual(r.status_code, 201)
+        self.assertEqual(mock_expo.call_count, 2)
+        self.assertEqual(mock_web.call_count, 2)
+        condominios_avisados = {llamada.args[0] for llamada in mock_expo.call_args_list}
+        self.assertEqual(condominios_avisados, {self.condominio_a, self.condominio_b})
+
+    def test_resolver_avisa_tambien_al_condominio_vecino(self):
+        autor_b = crear_membresia(self.condominio_b, "residente", username="vecino_b_autor6")
+        alerta_b = Alerta.objects.create(condominio=self.condominio_b, autor=autor_b, tipo="robo", estado="activa")
+
+        residente_a = crear_membresia(self.condominio_a, "residente", username="vecino_a_resuelve2")
+        self.client.force_login(residente_a.user)
+        with patch("alertas.services.enviar_push_a_condominio") as mock_expo, \
+             patch("alertas.services.enviar_web_push_a_condominio") as mock_web:
+            r = self.client.patch(
+                reverse("alerta-resolver", kwargs={"pk": alerta_b.pk}),
+                data={"estado": "resuelta"}, content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
         self.assertEqual(mock_expo.call_count, 2)
         self.assertEqual(mock_web.call_count, 2)
         condominios_avisados = {llamada.args[0] for llamada in mock_expo.call_args_list}

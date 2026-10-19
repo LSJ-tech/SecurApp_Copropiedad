@@ -12,7 +12,7 @@ from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, con
 
 from .models import MINUTOS_AUTO_CIERRE, Alerta
 from .serializers import AlertaSerializer
-from .services import notificar_alerta
+from .services import notificar_alerta, notificar_alerta_resuelta
 
 
 class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
@@ -64,4 +64,5 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
         alerta.resuelta_por = getattr(request.user, "membresia", None)
         alerta.fecha_resolucion = timezone.now()
         alerta.save()
+        notificar_alerta_resuelta(alerta)
         return Response(AlertaSerializer(alerta).data)
