@@ -2386,3 +2386,126 @@ class CondominioDeLaApiClaimJwtTests(TestCase):
         request.auth = None
         request.session = self.client.session
         self.assertEqual(condominio_de_la_api(request), condominio)
+
+
+class DevquadCondominioActivoApiTests(TestCase):
+    def test_lista_todos_los_condominios(self):
+        Condominio.objects.create(nombre="Test Lista Api A", plan="premium")
+        Condominio.objects.create(nombre="Test Lista Api B", plan="premium")
+        devquad = crear_devquad("lista_api_devquad")
+        self.client.force_login(devquad)
+        r = self.client.get(reverse("api-devquad-condominios"))
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(len(r.json()), 2)
+
+    def test_un_residente_no_puede_listar(self):
+        condominio = Condominio.objects.create(nombre="Test Lista Api Residente", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        residente = crear_membresia(condominio, "residente", unidad=unidad, username="lista_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("api-devquad-condominios"))
+        self.assertEqual(r.status_code, 403)
+
+    def test_entrar_devuelve_tokens_nuevos_con_el_condominio_en_el_claim(self):
+        condominio = Condominio.objects.create(nombre="Test Entrar Api", plan="premium")
+        devquad = crear_devquad("entrar_api_devquad")
+        refresh = RefreshToken.for_user(devquad)
+        r = self.client.post(
+            reverse("api-devquad-entrar-condominio", args=[condominio.pk]),
+            {"refresh": str(refresh)}, content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}",
+        )
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        access_nuevo = AccessToken(datos["access"])
+        self.assertEqual(access_nuevo["condominio_id"], condominio.pk)
+        self.assertEqual(datos["condominio"]["id"], condominio.pk)
+
+    def test_entrar_blacklistea_el_refresh_recibido(self):
+        condominio = Condominio.objects.create(nombre="Test Entrar Blacklist", plan="premium")
+        devquad = crear_devquad("entrar_blacklist_devquad")
+        refresh = RefreshToken.for_user(devquad)
+        self.client.post(
+            reverse("api-devquad-entrar-condominio", args=[condominio.pk]),
+            {"refresh": str(refresh)}, content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}",
+        )
+        r2 = self.client.post(reverse("api-refresh"), {"refresh": str(refresh)}, content_type="application/json")
+        self.assertEqual(r2.status_code, 401)
+
+
+class DirectorioApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Directorio Api", plan="premium")
+
+    def test_un_residente_no_puede_ver_el_directorio(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+        residente = crear_membresia(self.condominio, "residente", unidad=unidad, username="dir_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("api-directorio"))
+        self.assertEqual(r.status_code, 403)
+
+    def test_un_delegado_ve_nombre_torre_y_unidad(self):
+        torre = Torre.objects.create(condominio=self.condominio, nombre="1")
+        unidad = Unidad.objects.create(condominio=self.condominio, torre=torre, numero="101")
+        vecino = crear_membresia(self.condominio, "residente", unidad=unidad, username="dir_api_vecino", first_name="Ana", last_name="Soto")
+        delegado = crear_membresia(self.condominio, "delegado", unidad=unidad, username="dir_api_delegado")
+        self.client.force_login(delegado.user)
+        r = self.client.get(reverse("api-directorio"))
+        self.assertEqual(r.status_code, 200)
+        fila = next(f for f in r.json() if f["nombre"] == "Ana Soto")
+        self.assertEqual(fila["torre"], "1")
+        self.assertEqual(fila["unidad"], "101")
+
+
+class CondominioApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(
+            nombre="Test Condominio Api", plan="premium", direccion="Calle Vieja 1", comuna="Valparaíso", region="valparaiso",
+        )
+
+    def _login_devquad(self):
+        devquad = crear_devquad("condominio_api_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+
+    def test_get_devuelve_los_datos_actuales(self):
+        self._login_devquad()
+        r = self.client.get(reverse("api-condominio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["direccion"], "Calle Vieja 1")
+
+    def test_patch_actualiza_solo_los_campos_mandados(self):
+        self._login_devquad()
+        r = self.client.patch(reverse("api-condominio"), {"direccion": "Calle Nueva 2"}, content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.direccion, "Calle Nueva 2")
+        self.assertEqual(self.condominio.nombre, "Test Condominio Api")
+
+    def test_patch_con_comuna_que_no_calza_con_la_region_es_invalido(self):
+        self._login_devquad()
+        r = self.client.patch(
+            reverse("api-condominio"), {"region": "valparaiso", "comuna": "Providencia"}, content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.comuna, "Valparaíso")
+
+    def test_un_residente_no_puede_ver_ni_editar(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="1")
+        residente = crear_membresia(self.condominio, "residente", unidad=unidad, username="condominio_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("api-condominio"))
+        self.assertEqual(r.status_code, 403)
+
+    def test_regenerar_token_cambia_el_token(self):
+        self._login_devquad()
+        token_anterior = self.condominio.token_registro_residentes
+        r = self.client.post(reverse("api-regenerar-token"))
+        self.assertEqual(r.status_code, 200)
+        self.condominio.refresh_from_db()
+        self.assertNotEqual(self.condominio.token_registro_residentes, token_anterior)
+        self.assertEqual(r.json()["token_registro_residentes"], self.condominio.token_registro_residentes)
