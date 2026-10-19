@@ -140,6 +140,37 @@ class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
         return cleaned
 
 
+class MoverMiembroForm(forms.Form):
+    """Cambia el condominio (y la unidad) de una Membresia ya existente --
+    nunca se crea una cuenta nueva (Membresia.user es OneToOneField, sigue
+    siendo la misma persona). La unidad destino tiene que pertenecer de
+    verdad al condominio destino elegido -- se valida acá, el selector en
+    cascada de la página (ver mover_miembro.html) es solo una ayuda visual
+    para no buscarla a mano en una lista larga, no el único resguardo."""
+
+    condominio_destino = forms.ModelChoiceField(
+        queryset=Condominio.objects.none(), label="Condominio destino",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    unidad_destino = forms.ModelChoiceField(
+        queryset=Unidad.objects.none(), label="Unidad destino",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, condominio_actual=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["condominio_destino"].queryset = Condominio.objects.exclude(pk=getattr(condominio_actual, "pk", None)).order_by("nombre")
+        self.fields["unidad_destino"].queryset = Unidad.objects.exclude(condominio=condominio_actual).select_related("torre", "condominio")
+
+    def clean(self):
+        cleaned = super().clean()
+        condominio_destino = cleaned.get("condominio_destino")
+        unidad_destino = cleaned.get("unidad_destino")
+        if condominio_destino and unidad_destino and unidad_destino.condominio_id != condominio_destino.pk:
+            raise ValidationError("Esa unidad no pertenece al condominio destino elegido.")
+        return cleaned
+
+
 class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasenaMixin):
     """Autoregistro público de un residente -- elige su propio depto de una lista, vía el link/QR del condominio."""
 

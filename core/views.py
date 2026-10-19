@@ -29,7 +29,7 @@ from django.views.generic import CreateView, FormView, ListView, TemplateView, U
 from django.views.generic.base import View
 
 from .comunas_chile import COMUNAS_POR_REGION
-from .forms import CondominioForm, CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
+from .forms import CondominioForm, CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, MoverMiembroForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin, condominio_activo_devquad
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
 from .models import REGION_CHOICES, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
@@ -815,6 +815,50 @@ class CrearMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
             self.request,
             f"Cuenta creada: usuario «{username}», contraseña temporal «{password}» — entrégasela a la persona, "
             "no queda guardada en ningún otro lado.",
+        )
+        return super().form_valid(form)
+
+
+class MoverMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
+    """Cambia una Membresia ya existente a otro condominio + unidad --
+    nunca borra ni crea una cuenta. No toca historial (alertas, avisos,
+    pagos quedan donde ocurrieron de verdad) ni una donación activa (es de
+    la persona hacia DevQuad, no "del condominio", sigue cobrando igual)."""
+
+    template_name = "core/mover_miembro.html"
+    form_class = MoverMiembroForm
+    success_url = reverse_lazy("miembros")
+
+    def get_miembro(self):
+        return get_object_or_404(Membresia, pk=self.kwargs["pk"], condominio=self.condominio)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["condominio_actual"] = self.condominio
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["miembro"] = self.get_miembro()
+        context["unidades_por_condominio"] = {
+            str(c.pk): [
+                {"id": u.pk, "numero": (f"{u.torre.nombre} - {u.numero}" if u.torre_id else (f"{u.calle} {u.numero}" if u.calle else u.numero))}
+                for u in Unidad.objects.filter(condominio=c).select_related("torre")
+            ]
+            for c in Condominio.objects.exclude(pk=self.condominio.pk)
+        }
+        return context
+
+    def form_valid(self, form):
+        miembro = self.get_miembro()
+        condominio_destino = form.cleaned_data["condominio_destino"]
+        with transaction.atomic():
+            miembro.condominio = condominio_destino
+            miembro.unidad = form.cleaned_data["unidad_destino"]
+            miembro.save(update_fields=["condominio", "unidad"])
+        messages.success(
+            self.request,
+            f"{miembro.user.get_full_name() or miembro.user.username} se movió a {condominio_destino.nombre}.",
         )
         return super().form_valid(form)
 

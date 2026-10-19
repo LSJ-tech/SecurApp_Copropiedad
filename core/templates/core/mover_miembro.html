@@ -1,0 +1,36 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block titulo %}Mover miembro{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Mover de condominio</h1>
+<p class="text-muted">
+    {{ miembro.user.get_full_name|default:miembro.user.username }} — hoy en {{ condominio.nombre }}{% if miembro.unidad %} ({{ miembro.unidad }}){% endif %}.
+</p>
+<p class="text-muted small">
+    No se toca el historial de alertas, avisos ni pagos de esta persona -- quedan donde ocurrieron de verdad. Si tiene una donación automática activa, sigue igual.
+</p>
+
+<div class="card col-md-7">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {% include "core/includes/_campos_formulario.html" %}
+            <button type="submit" class="btn btn-primary">Mover</button>
+            <a href="{% url 'miembros' %}" class="btn btn-link">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+{{ unidades_por_condominio|json_script:"unidades-por-condominio-data" }}
+<script src="{% static 'core/js/cascada_padre_unidad.js' %}"></script>
+<script>
+    initCascadaPadreUnidad({
+        padreSelectId: "{{ form.condominio_destino.id_for_label }}",
+        unidadSelectId: "{{ form.unidad_destino.id_for_label }}",
+        unidadesPorPadre: JSON.parse(document.getElementById("unidades-por-condominio-data").textContent),
+        textoElegirPrimero: "— Elige primero el condominio destino —",
+        textoElegirUnidad: "— Elige la unidad destino —",
+    });
+</script>
+{% endblock %}

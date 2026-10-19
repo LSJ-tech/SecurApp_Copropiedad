@@ -2168,3 +2168,107 @@ class ModelosStrYPropiedadesTests(TestCase):
             nombre="Juan Pérez", username="jperez", condominio_nombre="Mi Condominio",
         )
         self.assertEqual(str(solicitud), "Juan Pérez (jperez) - Mi Condominio")
+
+
+class MoverMiembroViewTests(TestCase):
+    """Mover una Membresia ya existente a otro condominio -- nunca se borra
+    ni se crea una cuenta nueva (Membresia.user es OneToOneField). No toca
+    historial (alertas/avisos/pagos quedan donde ocurrieron de verdad) ni
+    una donación activa (sigue igual, confirmado con el usuario)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.origen = Condominio.objects.create(nombre="Test Mover Origen", plan="premium")
+        cls.destino = Condominio.objects.create(nombre="Test Mover Destino", plan="premium")
+        cls.torre_destino = Torre.objects.create(condominio=cls.destino, nombre="1")
+        cls.unidad_destino = Unidad.objects.create(condominio=cls.destino, torre=cls.torre_destino, numero="101")
+        cls.unidad_origen = Unidad.objects.create(condominio=cls.origen, numero="1")
+
+    def setUp(self):
+        self.miembro = crear_membresia(self.origen, "residente", unidad=self.unidad_origen, username="mover_residente")
+        self.client.force_login(crear_devquad("mover_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.origen.pk]))
+
+    def test_residente_no_puede_acceder(self):
+        self.client.logout()
+        self.client.force_login(self.miembro.user)
+        r = self.client.get(reverse("mover-miembro", args=[self.miembro.pk]))
+        self.assertEqual(r.status_code, 302)
+
+    def test_get_muestra_el_formulario_con_los_datos_actuales(self):
+        r = self.client.get(reverse("mover-miembro", args=[self.miembro.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "mover_residente")  # sin nombre/apellido cargado, cae al username
+        self.assertContains(r, self.origen.nombre)
+
+    def test_post_mueve_la_membresia_sin_crear_una_nueva(self):
+        pk_original = self.miembro.pk
+        r = self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk,
+        })
+        self.assertRedirects(r, reverse("miembros"))
+        self.miembro.refresh_from_db()
+        self.assertEqual(self.miembro.pk, pk_original)
+        self.assertEqual(self.miembro.condominio_id, self.destino.pk)
+        self.assertEqual(self.miembro.unidad_id, self.unidad_destino.pk)
+        self.assertEqual(Membresia.objects.filter(user=self.miembro.user).count(), 1)
+
+    def test_unidad_de_un_tercer_condominio_es_invalida(self):
+        """La unidad no solo tiene que ser de OTRO condominio (eso ya lo
+        filtra el queryset del campo) -- tiene que ser del mismo condominio
+        que se eligió como destino, no de un tercero cualquiera."""
+        tercero = Condominio.objects.create(nombre="Test Mover Tercero", plan="premium")
+        unidad_tercero = Unidad.objects.create(condominio=tercero, numero="9")
+        r = self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": unidad_tercero.pk,
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Esa unidad no pertenece al condominio destino elegido.")
+        self.miembro.refresh_from_db()
+        self.assertEqual(self.miembro.condominio_id, self.origen.pk)
+
+    def test_unidad_del_condominio_de_origen_no_es_una_opcion_valida(self):
+        otra_unidad_origen = Unidad.objects.create(condominio=self.origen, numero="2")
+        r = self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": otra_unidad_origen.pk,
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "no está entre las disponibles")
+        self.miembro.refresh_from_db()
+        self.assertEqual(self.miembro.condominio_id, self.origen.pk)
+
+    def test_no_se_puede_mover_un_miembro_de_otro_condominio_activo(self):
+        """Seguridad: el pk de la URL no alcanza -- el miembro tiene que
+        pertenecer al condominio que devquad tiene activo ahora mismo."""
+        otro_condominio = Condominio.objects.create(nombre="Test Mover Ajeno", plan="premium")
+        ajeno = crear_membresia(otro_condominio, "residente", username="mover_ajeno")
+        r = self.client.get(reverse("mover-miembro", args=[ajeno.pk]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_no_toca_el_historial_de_alertas_del_condominio_viejo(self):
+        from alertas.models import Alerta
+
+        alerta = Alerta.objects.create(condominio=self.origen, autor=self.miembro, tipo="robo", estado="resuelta")
+        self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk,
+        })
+        alerta.refresh_from_db()
+        self.assertEqual(alerta.condominio_id, self.origen.pk)
+
+    def test_no_toca_una_donacion_activa(self):
+        from pagos.models import SuscripcionRecurrente
+
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.origen, membresia=self.miembro, tipo="donacion", monto=2000,
+            mercadopago_preapproval_id="pre-mover-1", estado="autorizada",
+        )
+        self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk,
+        })
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.condominio_id, self.origen.pk)
+        self.assertEqual(suscripcion.estado, "autorizada")
+
+    def test_la_lista_de_miembros_ofrece_el_link_para_mover(self):
+        r = self.client.get(reverse("miembros"))
+        self.assertContains(r, reverse("mover-miembro", args=[self.miembro.pk]))

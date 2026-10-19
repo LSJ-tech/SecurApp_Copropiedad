@@ -69,6 +69,7 @@ urlpatterns = [
     path("invitar/", views.CompartirInvitacionView.as_view(), name="compartir-invitacion"),
     path("miembros/", views.MiembroListView.as_view(), name="miembros"),
     path("miembros/nuevo/", views.CrearMiembroView.as_view(), name="crear-miembro"),
+    path("miembros/<int:pk>/mover/", views.MoverMiembroView.as_view(), name="mover-miembro"),
     path("torres/", views.TorreListView.as_view(), name="torres"),
     path("torres/nueva/", views.TorreCreateView.as_view(), name="crear-torre"),
     path("unidades/", views.UnidadListView.as_view(), name="unidades"),
