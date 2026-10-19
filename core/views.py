@@ -33,7 +33,7 @@ from .comunas_chile import COMUNAS_POR_REGION
 from .forms import CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin, condominio_activo_devquad
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
-from .models import Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
+from .models import REGION_CHOICES, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
 from .usuarios import generar_password_temporal, generar_username
 
 EMAIL_CONTACTO_DEVQUAD = "contacto@devquad.cl"
@@ -321,7 +321,8 @@ class SolicitarAccesoView(FormView):
             send_mail(
                 subject=f"Nueva solicitud de acceso a {settings.PLATFORM_NAME}: {solicitud.condominio}",
                 message=(
-                    f"Nombre: {solicitud.nombre}\nCondominio: {solicitud.condominio}\nComuna: {solicitud.comuna}\n"
+                    f"Nombre: {solicitud.nombre}\nCondominio: {solicitud.condominio}\n"
+                    f"Región: {dict(REGION_CHOICES).get(solicitud.region, solicitud.region)}\nComuna: {solicitud.comuna}\n"
                     f"Teléfono: {solicitud.telefono}\nEmail: {solicitud.email}\nMensaje: {solicitud.mensaje}\n\n"
                     f"Gestionar en /admin/core/solicitudacceso/"
                 ),
@@ -530,6 +531,8 @@ class InicioView(TemplateView):
                 context.update(self._resumen_administracion())
         else:
             context.update(self._estadisticas_landing())
+            context["region_choices"] = REGION_CHOICES
+            context["comunas_por_region"] = COMUNAS_POR_REGION
         return context
 
     def _estadisticas_landing(self):

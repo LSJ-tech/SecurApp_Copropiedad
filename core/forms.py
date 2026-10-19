@@ -292,21 +292,41 @@ class CondominioForm(forms.ModelForm):
 class SolicitudAccesoForm(forms.ModelForm):
     """Formulario público de la landing -- captura el interés de quien todavía no tiene código de invitación."""
 
+    # Mismo patrón que CrearCondominioForm: región/comuna con choices reales
+    # en vez de texto libre, para que los leads capturados acá ya queden con
+    # datos limpios (sin typos/mayúsculas sueltas) pensando en un futuro
+    # filtro/reporte por zona a medida que la app escale.
+    region = forms.ChoiceField(
+        choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    comuna = forms.ChoiceField(
+        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
     class Meta:
         model = SolicitudAcceso
-        fields = ["nombre", "condominio", "comuna", "telefono", "email", "mensaje"]
+        fields = ["nombre", "condominio", "region", "comuna", "telefono", "email", "mensaje"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": LABEL_TU_NOMBRE}),
             "condominio": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombre del condominio o junta de vecinos"}),
-            "comuna": forms.TextInput(attrs={"class": "form-control", "placeholder": "Comuna"}),
             "telefono": forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": LABEL_EMAIL_OPCIONAL}),
             "mensaje": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Cuéntanos un poco de tu comunidad (opcional)"}),
         }
         labels = {
-            "nombre": "Nombre", "condominio": "Condominio o junta de vecinos", "comuna": "Comuna",
+            "nombre": "Nombre", "condominio": "Condominio o junta de vecinos",
             "telefono": "Teléfono", "email": "Email", "mensaje": "Mensaje",
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        region = cleaned.get("region")
+        comuna = cleaned.get("comuna")
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise ValidationError("Esa comuna no pertenece a la región elegida.")
+        return cleaned
 
 
 class TorreForm(forms.ModelForm):

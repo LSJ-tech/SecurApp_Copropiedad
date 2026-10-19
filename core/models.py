@@ -235,6 +235,7 @@ class SolicitudAcceso(models.Model):
 
     nombre = models.CharField(max_length=150)
     condominio = models.CharField(max_length=150, verbose_name="Condominio o junta de vecinos")
+    region = models.CharField(max_length=100, blank=True)
     comuna = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=30)
     email = models.EmailField(blank=True)

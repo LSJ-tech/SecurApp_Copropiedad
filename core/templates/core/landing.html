@@ -422,8 +422,19 @@
                                 <input type="text" id="id_sol_condominio" name="condominio" class="form-control" placeholder="Nombre del condominio" required>
                             </div>
                             <div class="col-md-6">
+                                <label for="id_sol_region" class="form-label small">Región</label>
+                                <select id="id_sol_region" name="region" class="form-select">
+                                    <option value="">---------</option>
+                                    {% for valor, etiqueta in region_choices %}
+                                    <option value="{{ valor }}">{{ etiqueta }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <label for="id_sol_comuna" class="form-label small">Comuna</label>
-                                <input type="text" id="id_sol_comuna" name="comuna" class="form-control" placeholder="Comuna">
+                                <select id="id_sol_comuna" name="comuna" class="form-select">
+                                    <option value="">---------</option>
+                                </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="id_sol_telefono" class="form-label small">Teléfono</label>
@@ -745,6 +756,15 @@
             });
         }, { threshold: 0.12 });
         document.querySelectorAll(".reveal").forEach(function (el) { observador.observe(el); });
+    </script>
+    {{ comunas_por_region|json_script:"comunas-por-region-data" }}
+    <script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
+    <script>
+        initCascadaRegionComuna({
+            regionSelectId: "id_sol_region",
+            comunaSelectId: "id_sol_comuna",
+            comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
+        });
     </script>
 </body>
 </html>

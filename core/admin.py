@@ -387,8 +387,8 @@ def marcar_atendido(modeladmin, request, queryset):
 
 @admin.register(SolicitudAcceso)
 class SolicitudAccesoAdmin(ModelAdmin):
-    list_display = ["condominio", "nombre", "comuna", "telefono", "atendido", "fecha_creacion"]
-    list_filter = ["atendido", "comuna"]
+    list_display = ["condominio", "nombre", "region", "comuna", "telefono", "atendido", "fecha_creacion"]
+    list_filter = ["atendido", "region", "comuna"]
     search_fields = ["nombre", "condominio", "telefono", "email"]
     actions = [marcar_atendido]
 

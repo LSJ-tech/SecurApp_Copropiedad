@@ -11,7 +11,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 from .forms import CrearCondominioForm, CrearMiembroForm, RegistroResidenteForm
-from .models import Condominio, Membresia, Torre, Unidad
+from .models import Condominio, Membresia, SolicitudAcceso, Torre, Unidad
 from .views import EMAIL_CONTACTO_DEVQUAD
 
 
@@ -1787,3 +1787,57 @@ class DevquadCrearCondominioViewTests(TestCase):
         })
         condominio = Condominio.objects.get(nombre="Nuevo Condominio Devquad")
         self.assertRedirects(r, reverse("devquad-entrar-condominio", args=[condominio.pk]), fetch_redirect_response=False)
+
+
+class SolicitudAccesoRegionComunaTests(TestCase):
+    """El formulario público de contacto de la landing (SolicitudAccesoForm)
+    usa el mismo patrón de región/comuna con choices reales que ya existe en
+    CrearCondominioForm (ver DevquadCrearCondominioViewTests) -- antes era
+    texto libre sin validar."""
+
+    def _datos_base(self, **extra):
+        datos = {"nombre": "Rosa", "condominio": "Mi Junta de Vecinos", "telefono": "+56912345678"}
+        datos.update(extra)
+        return datos
+
+    def test_region_y_comuna_que_calzan_son_validas(self):
+        from .forms import SolicitudAccesoForm
+
+        form = SolicitudAccesoForm(data=self._datos_base(region="valparaiso", comuna="Valparaíso"))
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_comuna_que_no_pertenece_a_la_region_es_invalida(self):
+        from .forms import SolicitudAccesoForm
+
+        form = SolicitudAccesoForm(data=self._datos_base(region="valparaiso", comuna="Providencia"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("Esa comuna no pertenece a la región elegida.", form.errors["__all__"])
+
+    def test_region_y_comuna_son_opcionales(self):
+        from .forms import SolicitudAccesoForm
+
+        form = SolicitudAccesoForm(data=self._datos_base())
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_landing_sin_login_muestra_el_selector_de_region_en_cascada(self):
+        r = self.client.get(reverse("inicio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'id="id_sol_region"')
+        self.assertContains(r, 'id="id_sol_comuna"')
+        self.assertContains(r, "Valparaíso")
+        self.assertContains(r, "cascada_region_comuna.js")
+
+    def test_post_guarda_la_region_y_la_comuna(self):
+        r = self.client.post(
+            reverse("solicitar-acceso"),
+            self._datos_base(region="valparaiso", comuna="Valparaíso"),
+        )
+        self.assertEqual(r.status_code, 302)
+        solicitud = SolicitudAcceso.objects.get(nombre="Rosa")
+        self.assertEqual(solicitud.region, "valparaiso")
+        self.assertEqual(solicitud.comuna, "Valparaíso")
+
+    def test_correo_de_aviso_incluye_la_region_legible(self):
+        self.client.post(reverse("solicitar-acceso"), self._datos_base(region="valparaiso", comuna="Valparaíso"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Región: Valparaíso", mail.outbox[0].body)
