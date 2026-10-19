@@ -361,6 +361,7 @@ class RegistroResidenteView(FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["condominio"] = self.condominio
+        context["ayudas_contrasena"] = password_validators_help_texts()
         context["torres"] = (
             Torre.objects.filter(condominio=self.condominio)
             .annotate(_len=Length("nombre")).order_by("_len", "nombre")
@@ -897,6 +898,11 @@ class MiCambiarContrasenaView(PasswordChangeView):
     template_name = "core/cambiar_contrasena.html"
     form_class = MiCambiarContrasenaForm
     success_url = reverse_lazy("mi-perfil")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["ayudas_contrasena"] = password_validators_help_texts()
+        return context
 
     def form_valid(self, form):
         messages.success(self.request, "Tu contraseña fue cambiada correctamente.")

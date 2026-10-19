@@ -41,6 +41,17 @@
                         {% if not form.fields.unidad.queryset.exists %}<div class="form-text">Todavía no hay ninguna registrada -- escribe la tuya abajo.</div>{% endif %}
                         {{ field.errors }}
                     </div>
+                    {% elif field.name == "password1" %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if ayudas_contrasena %}
+                        <ul class="form-text small mb-0 ps-3">
+                            {% for ayuda in ayudas_contrasena %}<li>{{ ayuda }}</li>{% endfor %}
+                        </ul>
+                        {% endif %}
+                        {{ field.errors }}
+                    </div>
                     {% elif field.name != "acepto_terminos" %}
                     <div class="mb-3">
                         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -110,5 +121,12 @@ if (selectorTorre && selectorUnidad) {
     selectorTorre.addEventListener("change", actualizarUnidades);
     actualizarUnidades();
 }
+</script>
+<script src="{% static 'core/js/medidor_contrasena_vivo.js' %}"></script>
+<script>
+    initMedidorContrasenaVivo({
+        campoId: "{{ form.password1.id_for_label }}",
+        camposComparar: ["{{ form.nombre.id_for_label }}", "{{ form.apellido.id_for_label }}", "{{ form.email.id_for_label }}"],
+    });
 </script>
 {% endblock %}

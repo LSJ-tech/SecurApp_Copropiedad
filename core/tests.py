@@ -354,6 +354,12 @@ class AutoregistroCasasLibresTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "número de tu casa")
 
+    def test_muestra_el_medidor_de_seguridad_de_la_contrasena(self):
+        r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+        self.assertContains(r, "medidor_contrasena_vivo.js")
+        self.assertContains(r, "initMedidorContrasenaVivo")
+        self.assertContains(r, "<li>")  # ayudas_contrasena (reglas reales de Django)
+
     def test_elegir_una_unidad_existente_no_crea_una_nueva(self):
         unidad = Unidad.objects.create(condominio=self.condominio, numero="123")
         r = self.client.post(
@@ -1566,6 +1572,14 @@ class RecuperarContrasenaTests(TestCase):
         self.assertContains(r, "<li>")
         self.assertNotContains(r, "&lt;ul&gt;")
 
+    def test_muestra_el_medidor_de_seguridad_en_vivo(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        url_confirmar = reverse("password-reset-confirmar", kwargs={"uidb64": uid, "token": token})
+        r = self.client.get(url_confirmar, follow=True)
+        self.assertContains(r, "medidor_contrasena_vivo.js")
+        self.assertContains(r, "initMedidorContrasenaVivo")
+
     def test_el_link_permite_elegir_contrasena_nueva(self):
         uid = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
@@ -1841,3 +1855,19 @@ class SolicitudAccesoRegionComunaTests(TestCase):
         self.client.post(reverse("solicitar-acceso"), self._datos_base(region="valparaiso", comuna="Valparaíso"))
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Región: Valparaíso", mail.outbox[0].body)
+
+
+class MiCambiarContrasenaViewTests(TestCase):
+    """Mismo medidor de seguridad en vivo + reglas reales de Django que ya
+    se usa en el registro de residente y en recuperar contraseña (ver
+    PasswordResetConfirmView) -- acá es la vista para cambiarla ya logueado."""
+
+    def test_muestra_el_medidor_de_seguridad_de_la_contrasena(self):
+        condominio = Condominio.objects.create(nombre="Test Cambiar Contrasena", plan="premium")
+        membresia = crear_membresia(condominio, "residente", unidad=Unidad.objects.create(condominio=condominio, numero="1"))
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("cambiar-contrasena"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "medidor_contrasena_vivo.js")
+        self.assertContains(r, "initMedidorContrasenaVivo")
+        self.assertContains(r, "<li>")  # ayudas_contrasena
