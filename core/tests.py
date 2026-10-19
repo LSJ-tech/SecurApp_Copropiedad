@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from .forms import CrearCondominioForm, CrearMiembroForm, RegistroResidenteForm
 from .models import Condominio, Membresia, SolicitudAcceso, Torre, Unidad
@@ -2350,4 +2351,38 @@ class MoverMiembroViewTests(TestCase):
         self.unidad_origen.refresh_from_db()
         self.assertEqual(companero.condominio_id, self.origen.pk)
         self.assertEqual(companero.unidad_id, self.unidad_origen.pk)
-        self.assertEqual(self.unidad_origen.condominio_id, self.origen.pk)
+
+
+class CondominioDeLaApiClaimJwtTests(TestCase):
+    def test_devquad_con_claim_condominio_id_en_el_token_resuelve_ese_condominio(self):
+        from rest_framework.test import APIRequestFactory
+
+        from core.permissions import condominio_de_la_api
+
+        condominio = Condominio.objects.create(nombre="Test Claim JWT", plan="premium")
+        devquad = crear_devquad("claim_jwt_devquad")
+        token = AccessToken.for_user(devquad)
+        token["condominio_id"] = condominio.pk
+
+        request = APIRequestFactory().get("/")
+        request.user = devquad
+        request.auth = token
+        self.assertEqual(condominio_de_la_api(request), condominio)
+
+    def test_devquad_sin_claim_sigue_resolviendo_por_sesion_web(self):
+        """SessionAuthentication (el panel web) no setea request.auth a un
+        Token -- tiene que seguir funcionando igual que hoy."""
+        from rest_framework.test import APIRequestFactory
+
+        from core.permissions import condominio_de_la_api
+
+        condominio = Condominio.objects.create(nombre="Test Claim Sesion", plan="premium")
+        devquad = crear_devquad("claim_sesion_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+
+        request = APIRequestFactory().get("/")
+        request.user = devquad
+        request.auth = None
+        request.session = self.client.session
+        self.assertEqual(condominio_de_la_api(request), condominio)

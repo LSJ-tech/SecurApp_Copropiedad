@@ -11,3 +11,4 @@ staticfiles/
 .coverage
 coverage.xml
 htmlcov/
+.superpowers/

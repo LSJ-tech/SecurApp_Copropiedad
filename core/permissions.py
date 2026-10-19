@@ -15,10 +15,16 @@ def condominio_de_la_api(request):
     condominio_activo_devquad en core/mixins.py, mismo mecanismo que usa
     CondominioRequiredMixin del lado de las vistas normales). None si no
     corresponde a ninguno de los dos casos."""
+    from .models import Condominio
+
     membresia = getattr(request.user, "membresia", None)
     if membresia is not None:
         return membresia.condominio
     if request.user.is_authenticated and request.user.is_staff:
+        token = getattr(request, "auth", None)
+        condominio_id = token.get("condominio_id") if token is not None else None
+        if condominio_id is not None:
+            return Condominio.objects.filter(pk=condominio_id).first()
         return condominio_activo_devquad(request)
     return None
 
