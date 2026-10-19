@@ -842,8 +842,8 @@ class MoverMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
         context["miembro"] = self.get_miembro()
         context["unidades_por_condominio"] = {
             str(c.pk): [
-                {"id": u.pk, "numero": (f"{u.torre.nombre} - {u.numero}" if u.torre_id else (f"{u.calle} {u.numero}" if u.calle else u.numero))}
-                for u in Unidad.objects.filter(condominio=c).select_related("torre")
+                {"id": u.pk, "numero": str(u)}
+                for u in Unidad.objects.filter(condominio=c).select_related("torre", "condominio")
             ]
             for c in Condominio.objects.exclude(pk=self.condominio.pk)
         }

@@ -195,7 +195,7 @@ class Unidad(models.Model):
 
     def __str__(self):
         if self.torre_id:
-            return f"Torre {self.torre.nombre} - Depto {self.numero}"
+            return f"{self.condominio.etiqueta_torre} {self.torre.nombre} - {self.condominio.etiqueta_unidad} {self.numero}"
         if self.calle:
             return f"{self.calle} {self.numero} - {self.condominio}"
         return f"{self.numero} - {self.condominio}"

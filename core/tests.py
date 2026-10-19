@@ -2175,6 +2175,17 @@ class ModelosStrYPropiedadesTests(TestCase):
         unidad = Unidad.objects.create(condominio=condominio, torre=None, numero="45", calle="Los Aromos")
         self.assertEqual(str(unidad), "Los Aromos 45 - Test Str Unidad Casa")
 
+    def test_str_de_unidad_con_torre_usa_las_etiquetas_propias_del_condominio(self):
+        """Antes decía "Torre X - Depto Y" fijo, sin importar cómo le dicen
+        en ese condominio -- confundía al mostrar la unidad de alguien cuyo
+        condominio usa otras palabras (ej. "Block"/"Depto")."""
+        condominio = Condominio.objects.create(
+            nombre="Test Str Unidad Etiquetas", plan="premium", etiqueta_torre="Block", etiqueta_unidad="Depto",
+        )
+        torre = Torre.objects.create(condominio=condominio, nombre="2")
+        unidad = Unidad.objects.create(condominio=condominio, torre=torre, numero="2")
+        self.assertEqual(str(unidad), "Block 2 - Depto 2")
+
     def test_str_de_solicitud_acceso(self):
         from .models import SolicitudAcceso
 
@@ -2220,6 +2231,22 @@ class MoverMiembroViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "mover_residente")  # sin nombre/apellido cargado, cae al username
         self.assertContains(r, self.origen.nombre)
+
+    def test_las_opciones_de_unidad_destino_usan_las_etiquetas_del_condominio_destino(self):
+        """El selector de unidad destino mostraba "Torre X - Y" fijo, sin
+        importar cómo le dice ESE condominio a sus torres/unidades (ej.
+        "Block"/"Depto"). Se arma en JS desde unidades_por_condominio (ver
+        get_context_data) -- se verifica en ESE JSON, no en el <select>
+        renderizado por Django (que usa Unidad.__str__ igual, pero la
+        cascada lo reemplaza entero al cargar la página)."""
+        self.destino.etiqueta_torre = "Block"
+        self.destino.etiqueta_unidad = "Depto"
+        self.destino.save(update_fields=["etiqueta_torre", "etiqueta_unidad"])
+        r = self.client.get(reverse("mover-miembro", args=[self.miembro.pk]))
+        contenido = r.content.decode()
+        inicio = contenido.index('id="unidades-por-condominio-data"')
+        fin = contenido.index("</script>", inicio)
+        self.assertIn("Block 1 - Depto 101", contenido[inicio:fin])
 
     def test_post_mueve_la_membresia_sin_crear_una_nueva(self):
         pk_original = self.miembro.pk
@@ -2292,3 +2319,18 @@ class MoverMiembroViewTests(TestCase):
     def test_la_lista_de_miembros_ofrece_el_link_para_mover(self):
         r = self.client.get(reverse("miembros"))
         self.assertContains(r, reverse("mover-miembro", args=[self.miembro.pk]))
+
+    def test_no_mueve_a_otro_miembro_que_comparte_la_misma_unidad(self):
+        """Mover a una persona es por Membresia, no por Unidad -- si dos
+        residentes comparten la misma unidad (ej. pareja en el mismo
+        depto), mover a uno NO debe mover al otro ni tocar la Unidad
+        compartida."""
+        companero = crear_membresia(self.origen, "residente", unidad=self.unidad_origen, username="mover_companero")
+        self.client.post(reverse("mover-miembro", args=[self.miembro.pk]), {
+            "condominio_destino": self.destino.pk, "unidad_destino": self.unidad_destino.pk,
+        })
+        companero.refresh_from_db()
+        self.unidad_origen.refresh_from_db()
+        self.assertEqual(companero.condominio_id, self.origen.pk)
+        self.assertEqual(companero.unidad_id, self.unidad_origen.pk)
+        self.assertEqual(self.unidad_origen.condominio_id, self.origen.pk)
