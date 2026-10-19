@@ -2101,6 +2101,7 @@ class CondominioUpdateViewTests(TestCase):
             "nombre": "Test Editar Condominio", "etiqueta_organizacion": "Junta de vecinos",
             "direccion": "Calle Nueva 2", "region": "metropolitana", "comuna": "Providencia",
             "datos_transferencia": "Banco Estado, cuenta 123",
+            "etiqueta_torre": "Torre", "etiqueta_unidad": "Unidad", "genero_unidad": "f",
         })
         self.assertRedirects(r, reverse("mi-condominio"))
         self.condominio.refresh_from_db()
@@ -2109,6 +2110,25 @@ class CondominioUpdateViewTests(TestCase):
         self.assertEqual(self.condominio.comuna, "Providencia")
         self.assertEqual(self.condominio.etiqueta_organizacion, "Junta de vecinos")
         self.assertEqual(self.condominio.datos_transferencia, "Banco Estado, cuenta 123")
+
+    def test_post_puede_corregir_la_etiqueta_de_unidad(self):
+        """Antes la única forma de arreglar una etiqueta_unidad mal escrita
+        (ej. "Departamentos" en plural, que termina duplicando la "s" que
+        agrega el resto de la app) era un script puntual o el admin de
+        Django -- ahora se corrige desde el propio panel."""
+        self.condominio.etiqueta_unidad = "Departamentos"
+        self.condominio.save(update_fields=["etiqueta_unidad"])
+        self._login_devquad()
+        r = self.client.post(reverse("mi-condominio"), {
+            "nombre": "Test Editar Condominio", "etiqueta_organizacion": "Junta de vecinos",
+            "direccion": "Calle Vieja 1", "region": "valparaiso", "comuna": "Valparaíso",
+            "etiqueta_torre": "Block", "etiqueta_unidad": "Departamento", "genero_unidad": "m",
+        })
+        self.assertRedirects(r, reverse("mi-condominio"))
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.etiqueta_torre, "Block")
+        self.assertEqual(self.condominio.etiqueta_unidad, "Departamento")
+        self.assertEqual(self.condominio.genero_unidad, "m")
 
     def test_comuna_que_no_calza_con_la_region_es_invalida(self):
         self._login_devquad()

@@ -327,15 +327,24 @@ class CondominioForm(RegionComunaMixin, forms.ModelForm):
 
     class Meta:
         model = Condominio
-        fields = ["nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "datos_transferencia"]
+        fields = [
+            "nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "datos_transferencia",
+            "etiqueta_torre", "etiqueta_unidad", "genero_unidad",
+        ]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
             "etiqueta_organizacion": forms.TextInput(attrs={"class": "form-control"}),
             "direccion": forms.TextInput(attrs={"class": "form-control"}),
             "datos_transferencia": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
+            "etiqueta_torre": forms.TextInput(attrs={"class": "form-control"}),
+            "etiqueta_unidad": forms.TextInput(attrs={"class": "form-control"}),
+            "genero_unidad": forms.Select(attrs={"class": "form-select"}),
         }
         labels = {
             "datos_transferencia": "Datos para transferencia de gastos comunes",
+            "etiqueta_torre": "Cómo le dicen a una torre/block acá",
+            "etiqueta_unidad": "Cómo le dicen a una unidad acá",
+            "genero_unidad": "Género de esa palabra",
         }
         help_texts = {
             "datos_transferencia": "Banco, tipo de cuenta, número, RUT y email — se muestra a los residentes al pagar.",
@@ -345,6 +354,8 @@ class CondominioForm(RegionComunaMixin, forms.ModelForm):
             # condominio" como ejemplo, lo que confunde a una junta de
             # vecinos que ve esa frase literal en su propio formulario).
             "etiqueta_organizacion": "Cómo le dicen a esta organización (Condominio, Junta de vecinos, Comunidad, Villa...).",
+            "etiqueta_torre": "Ej. Torre, Block, Edificio, Pabellón. Escríbelo en singular -- el resto de la app agrega la \"s\" cuando corresponde.",
+            "etiqueta_unidad": "Ej. Departamento, Casa, Unidad. También en singular, por el mismo motivo.",
         }
 
 
