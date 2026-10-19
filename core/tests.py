@@ -2351,6 +2351,7 @@ class MoverMiembroViewTests(TestCase):
         self.unidad_origen.refresh_from_db()
         self.assertEqual(companero.condominio_id, self.origen.pk)
         self.assertEqual(companero.unidad_id, self.unidad_origen.pk)
+        self.assertEqual(self.unidad_origen.condominio_id, self.origen.pk)
 
 
 class CondominioDeLaApiClaimJwtTests(TestCase):
@@ -2421,6 +2422,32 @@ class DevquadCondominioActivoApiTests(TestCase):
         self.assertEqual(access_nuevo["condominio_id"], condominio.pk)
         self.assertEqual(datos["condominio"]["id"], condominio.pk)
 
+    def test_el_claim_sobrevive_a_un_refresh_posterior_de_verdad(self):
+        """No alcanza con que el access recién emitido tenga el claim --
+        tiene que seguir ahí después de un /auth/refresh/ real (recorrido
+        completo vía HTTP, no armado a mano), que es lo que de verdad usa
+        la app cuando el access de 30 min expira."""
+        condominio = Condominio.objects.create(nombre="Test Entrar Refresh Real", plan="premium")
+        devquad = crear_devquad("entrar_refresh_real_devquad")
+        refresh_inicial = RefreshToken.for_user(devquad)
+        r_entrar = self.client.post(
+            reverse("api-devquad-entrar-condominio", args=[condominio.pk]),
+            {"refresh": str(refresh_inicial)}, content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {refresh_inicial.access_token}",
+        )
+        refresh_con_claim = r_entrar.json()["refresh"]
+
+        r_refresh = self.client.post(reverse("api-refresh"), {"refresh": refresh_con_claim}, content_type="application/json")
+        self.assertEqual(r_refresh.status_code, 200)
+        access_refrescado = AccessToken(r_refresh.json()["access"])
+        self.assertEqual(access_refrescado["condominio_id"], condominio.pk)
+
+        # Y ese access refrescado de verdad sirve para pegarle a un
+        # endpoint de devquad -- no solo tiene el claim, resuelve el
+        # condominio activo correcto.
+        r_torres = self.client.get(reverse("torre-list"), HTTP_AUTHORIZATION=f"Bearer {access_refrescado}")
+        self.assertEqual(r_torres.status_code, 200)
+
     def test_entrar_blacklistea_el_refresh_recibido(self):
         condominio = Condominio.objects.create(nombre="Test Entrar Blacklist", plan="premium")
         devquad = crear_devquad("entrar_blacklist_devquad")
@@ -2432,6 +2459,25 @@ class DevquadCondominioActivoApiTests(TestCase):
         )
         r2 = self.client.post(reverse("api-refresh"), {"refresh": str(refresh)}, content_type="application/json")
         self.assertEqual(r2.status_code, 401)
+
+    def test_entrar_no_puede_blacklistear_el_refresh_de_otro_usuario(self):
+        """Un devquad autenticado con SU PROPIO access token no debe poder
+        invalidar la sesión de otro usuario mandando el refresh de esa otra
+        persona en el body -- eso la dejaría desconectada sin haber hecho
+        nada."""
+        condominio = Condominio.objects.create(nombre="Test Entrar Refresh Ajeno", plan="premium")
+        devquad = crear_devquad("entrar_ajeno_devquad")
+        otro_usuario = crear_devquad("entrar_ajeno_otro")
+        mi_refresh = RefreshToken.for_user(devquad)
+        refresh_ajeno = RefreshToken.for_user(otro_usuario)
+        r = self.client.post(
+            reverse("api-devquad-entrar-condominio", args=[condominio.pk]),
+            {"refresh": str(refresh_ajeno)}, content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {mi_refresh.access_token}",
+        )
+        self.assertEqual(r.status_code, 400)
+        r2 = self.client.post(reverse("api-refresh"), {"refresh": str(refresh_ajeno)}, content_type="application/json")
+        self.assertEqual(r2.status_code, 200)  # el refresh ajeno sigue vivo
 
 
 class DirectorioApiTests(TestCase):
@@ -2490,6 +2536,36 @@ class CondominioApiTests(TestCase):
         r = self.client.patch(
             reverse("api-condominio"), {"region": "valparaiso", "comuna": "Providencia"}, content_type="application/json",
         )
+        self.assertEqual(r.status_code, 400)
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.comuna, "Valparaíso")
+
+    def test_patch_con_region_inventada_es_invalido(self):
+        """region/comuna son CharField libres en el modelo -- sin validar
+        contra la lista real, el PATCH aceptaba cualquier texto (el form
+        HTML sí usa ChoiceField, ver RegionComunaMixin)."""
+        self._login_devquad()
+        r = self.client.patch(reverse("api-condominio"), {"region": "narnia"}, content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.region, "valparaiso")
+
+    def test_patch_con_region_inventada_es_invalido_incluso_sin_comuna_previa(self):
+        """Mismo caso que arriba, pero con un condominio que todavía no
+        tenía ninguna comuna cargada -- la validación cruzada (región vs.
+        comuna) no alcanza a pescar esto si las dos quedan vacías."""
+        condominio = Condominio.objects.create(nombre="Test Region Sin Comuna Previa", plan="premium")
+        devquad = crear_devquad("region_sin_comuna_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[condominio.pk]))
+        r = self.client.patch(reverse("api-condominio"), {"region": "narnia"}, content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+        condominio.refresh_from_db()
+        self.assertEqual(condominio.region, "")
+
+    def test_patch_con_comuna_inventada_es_invalido(self):
+        self._login_devquad()
+        r = self.client.patch(reverse("api-condominio"), {"comuna": "Comuna Que No Existe"}, content_type="application/json")
         self.assertEqual(r.status_code, 400)
         self.condominio.refresh_from_db()
         self.assertEqual(self.condominio.comuna, "Valparaíso")
@@ -2564,6 +2640,24 @@ class RegistroPublicoApiTests(TestCase):
         )
         self.assertEqual(r.status_code, 400)
 
+    def test_si_falla_crear_la_membresia_no_queda_un_user_huerfano(self):
+        """create_user() y Membresia.objects.create() tienen que ser
+        atómicos -- sin eso, si el segundo paso falla, queda una cuenta sin
+        ninguna membresía a la que nadie podría acceder normalmente."""
+        usuarios_antes = User.objects.count()
+        with patch("core.api_views.Membresia.objects.create", side_effect=Exception("falla simulada")):
+            with self.assertRaises(Exception):
+                self.client.post(
+                    reverse("api-registro", args=[self.condominio.token_registro_residentes]),
+                    {
+                        "nombre": "Ana", "apellido": "Soto", "email": "ana.huerfano.api@example.com",
+                        "unidad": self.unidad.pk, "password1": "ClaveSegura123", "password2": "ClaveSegura123",
+                        "acepto_terminos": True,
+                    },
+                    content_type="application/json",
+                )
+        self.assertEqual(User.objects.count(), usuarios_antes)
+
 
 class TorreApiTests(TestCase):
     @classmethod
@@ -2630,6 +2724,16 @@ class UnidadApiTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertFalse(Unidad.objects.filter(numero="102").exists())
 
+    def test_crear_una_unidad_repetida_da_400_no_500(self):
+        Unidad.objects.create(condominio=self.condominio, torre=self.torre, numero="101")
+        self._login_devquad()
+        r = self.client.post(
+            reverse("unidad-list"), {"numero": "101", "torre": self.torre.pk, "calle": "", "alicuota": "0"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, torre=self.torre, numero="101").count(), 1)
+
     def test_lista_paginada(self):
         for i in range(55):
             Unidad.objects.create(condominio=self.condominio, numero=str(i))
@@ -2639,6 +2743,19 @@ class UnidadApiTests(TestCase):
         datos = r.json()
         self.assertIn("results", datos)
         self.assertEqual(len(datos["results"]), 50)
+
+    def test_lista_en_orden_natural_no_lexicografico(self):
+        """Unidad.Meta.ordering=["numero"] es orden de texto -- "10" sale
+        antes que "2". El panel web (UnidadListView) usa orden natural (por
+        largo y alfabético); la API tiene que dar lo mismo, para que la app
+        no muestre un orden distinto al que ya conoce quien usa la web."""
+        Unidad.objects.create(condominio=self.condominio, torre=self.torre, numero="10")
+        Unidad.objects.create(condominio=self.condominio, torre=self.torre, numero="2")
+        self._login_devquad()
+        r = self.client.get(reverse("unidad-list"))
+        numeros = [u["numero"] for u in r.json()["results"]]
+        self.assertEqual(numeros.index("2"), 0)
+        self.assertEqual(numeros.index("10"), 1)
 
 
 class MembresiaApiTests(TestCase):

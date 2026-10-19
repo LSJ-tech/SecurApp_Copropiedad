@@ -94,11 +94,14 @@ class DevquadEntrarCondominioApiView(APIView):
     como la app no comparte la sesión del panel web (ver
     condominio_activo_devquad en core/mixins.py), en vez de guardar nada en
     sesión reemite el login completo (access+refresh) con el condominio
-    elegido embebido como claim ("condominio_id") en ambos tokens, para que
-    sobreviva a un /auth/refresh/ posterior (ver condominio_de_la_api en
+    elegido embebido como claim ("condominio_id") en el refresh -- el
+    access que se devuelve sale de ESE refresh (refresh.access_token copia
+    su payload), así que ya lo hereda, y un /auth/refresh/ posterior
+    también lo hereda del mismo refresh (ver condominio_de_la_api en
     core/permissions.py). El refresh que se recibe se blacklistea, mismo
     mecanismo que ya usa LogoutView -- no deja dos refresh tokens vivos
-    para la misma sesión de devquad."""
+    para la misma sesión de devquad. Se exige además que ese refresh sea
+    del propio usuario autenticado (nunca de otro)."""
 
     permission_classes = [IsAuthenticated, EsDevquad]
 
@@ -112,13 +115,18 @@ class DevquadEntrarCondominioApiView(APIView):
     def post(self, request, pk):
         condominio = get_object_or_404(Condominio, pk=pk)
         try:
-            RefreshToken(request.data["refresh"]).blacklist()
+            token_recibido = RefreshToken(request.data["refresh"])
         except (KeyError, TokenError):
             return Response({"detail": "refresh token inválido o ausente."}, status=400)
+        # No basta con estar autenticado -- sin este chequeo, cualquier
+        # devquad podría blacklistear el refresh de OTRO usuario mandándolo
+        # en el body, desconectándolo sin haber hecho nada.
+        if str(token_recibido["user_id"]) != str(request.user.pk):
+            return Response({"detail": "Ese refresh token no te pertenece."}, status=400)
+        token_recibido.blacklist()
 
         refresh = RefreshToken.for_user(request.user)
         refresh["condominio_id"] = condominio.pk
-        refresh.access_token["condominio_id"] = condominio.pk
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
@@ -225,14 +233,15 @@ class RegistroPublicoView(APIView):
             return Response(form.errors, status=400)
         datos = form.cleaned_data
         username = generar_username(datos["nombre"], datos["apellido"])
-        user = User.objects.create_user(
-            username=username, password=datos["password1"], email=datos.get("email", ""),
-            first_name=datos["nombre"], last_name=datos["apellido"],
-        )
-        membresia = Membresia.objects.create(
-            user=user, condominio=condominio, unidad=datos["unidad"], rol="residente",
-            terminos_aceptados_en=timezone.now(),
-        )
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username, password=datos["password1"], email=datos.get("email", ""),
+                first_name=datos["nombre"], last_name=datos["apellido"],
+            )
+            membresia = Membresia.objects.create(
+                user=user, condominio=condominio, unidad=datos["unidad"], rol="residente",
+                terminos_aceptados_en=timezone.now(),
+            )
         if user.email:
             enviar_correo_bienvenida(user, condominio)
         refresh = RefreshToken.for_user(user)
@@ -289,6 +298,14 @@ class UnidadViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
     http_method_names = ["get", "post", "head", "options"]
     pagination_class = PaginacionEstandar
+
+    def get_queryset(self):
+        # Meta.ordering=["numero"] es orden de texto ("10" antes que "2") --
+        # mismo criterio de orden natural que ya usa UnidadListView del
+        # panel web, para que la app no muestre un orden distinto.
+        return super().get_queryset().annotate(
+            _torre_len=Length("torre__nombre"), _num_len=Length("numero"),
+        ).order_by("_torre_len", "torre__nombre", "_num_len", "numero")
 
     def perform_create(self, serializer):
         serializer.save(condominio=condominio_de_la_api(self.request))

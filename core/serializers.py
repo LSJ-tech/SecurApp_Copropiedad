@@ -6,7 +6,10 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .comunas_chile import COMUNAS_POR_REGION
 from .forms import _validar_email_unico
-from .models import Condominio, Membresia, Torre, Unidad
+from .models import REGION_CHOICES, Condominio, Membresia, Torre, Unidad
+
+_REGIONES_VALIDAS = {codigo for codigo, _ in REGION_CHOICES}
+_COMUNAS_VALIDAS = {comuna for comunas in COMUNAS_POR_REGION.values() for comuna in comunas}
 
 
 class CondominioResumenSerializer(serializers.ModelSerializer):
@@ -38,12 +41,23 @@ class UnidadSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         torre = attrs.get("torre")
+        numero = attrs.get("numero")
         if torre is not None:
             from .permissions import condominio_de_la_api
 
             condominio = condominio_de_la_api(self.context["request"])
             if torre.condominio_id != condominio.pk:
                 raise serializers.ValidationError({"torre": "Esa torre pertenece a otro condominio."})
+            # UniqueConstraint(condominio, torre, numero) -- sin este chequeo,
+            # un duplicado explota con IntegrityError (500) en vez de un 400
+            # que la app pueda mostrar. Con torre=None la restricción no
+            # aplica entre sí (NULL != NULL en SQL), por eso solo hace falta
+            # acá adentro.
+            existe = Unidad.objects.filter(condominio=condominio, torre=torre, numero=numero)
+            if self.instance is not None:
+                existe = existe.exclude(pk=self.instance.pk)
+            if existe.exists():
+                raise serializers.ValidationError({"numero": "Ya existe una unidad con ese número en esa torre."})
         return attrs
 
 
@@ -106,6 +120,16 @@ class CondominioEdicionSerializer(serializers.ModelSerializer):
             "nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "datos_transferencia",
             "etiqueta_torre", "etiqueta_unidad", "genero_unidad",
         ]
+
+    def validate_region(self, region):
+        if region and region not in _REGIONES_VALIDAS:
+            raise serializers.ValidationError("Esa región no existe.")
+        return region
+
+    def validate_comuna(self, comuna):
+        if comuna and comuna not in _COMUNAS_VALIDAS:
+            raise serializers.ValidationError("Esa comuna no existe.")
+        return comuna
 
     def validate(self, attrs):
         region = attrs.get("region", getattr(self.instance, "region", ""))
