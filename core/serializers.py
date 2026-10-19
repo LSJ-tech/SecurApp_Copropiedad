@@ -27,6 +27,26 @@ class UnidadResumenSerializer(serializers.ModelSerializer):
         fields = ["id", "numero"]
 
 
+class UnidadSerializer(serializers.ModelSerializer):
+    """Crear/listar unidades del condominio activo -- misma validación de
+    Unidad.clean() (la torre tiene que pertenecer al mismo condominio),
+    que un ModelSerializer no corre sola."""
+
+    class Meta:
+        model = Unidad
+        fields = ["id", "numero", "calle", "torre", "alicuota"]
+
+    def validate(self, attrs):
+        torre = attrs.get("torre")
+        if torre is not None:
+            from .permissions import condominio_de_la_api
+
+            condominio = condominio_de_la_api(self.context["request"])
+            if torre.condominio_id != condominio.pk:
+                raise serializers.ValidationError({"torre": "Esa torre pertenece a otro condominio."})
+        return attrs
+
+
 class DirectorioMiembroSerializer(serializers.Serializer):
     """Directorio simple -- solo nombre y block/depto, igual que
     DirectorioVecinosView (core/views.py). A propósito NO es un

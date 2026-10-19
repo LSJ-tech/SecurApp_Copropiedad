@@ -6,6 +6,7 @@ from . import api_views
 
 router = DefaultRouter()
 router.register("torres", api_views.TorreViewSet, basename="torre")
+router.register("unidades", api_views.UnidadViewSet, basename="unidad")
 
 urlpatterns = [
     path("auth/login/", api_views.CustomTokenObtainPairView.as_view(), name="api-login"),

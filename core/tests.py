@@ -2598,3 +2598,44 @@ class TorreApiTests(TestCase):
         self.client.force_login(residente.user)
         r = self.client.post(reverse("torre-list"), {"nombre": "3"}, content_type="application/json")
         self.assertEqual(r.status_code, 403)
+
+
+class UnidadApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Unidad Api", plan="premium")
+        cls.torre = Torre.objects.create(condominio=cls.condominio, nombre="1")
+
+    def _login_devquad(self):
+        devquad = crear_devquad("unidad_api_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+
+    def test_crear_una_unidad(self):
+        self._login_devquad()
+        r = self.client.post(
+            reverse("unidad-list"), {"numero": "101", "torre": self.torre.pk, "calle": "", "alicuota": "0"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(Unidad.objects.filter(condominio=self.condominio, numero="101").exists())
+
+    def test_una_torre_de_otro_condominio_es_invalida(self):
+        otro = Condominio.objects.create(nombre="Test Unidad Api Otro", plan="premium")
+        torre_ajena = Torre.objects.create(condominio=otro, nombre="Ajena")
+        self._login_devquad()
+        r = self.client.post(
+            reverse("unidad-list"), {"numero": "102", "torre": torre_ajena.pk}, content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Unidad.objects.filter(numero="102").exists())
+
+    def test_lista_paginada(self):
+        for i in range(55):
+            Unidad.objects.create(condominio=self.condominio, numero=str(i))
+        self._login_devquad()
+        r = self.client.get(reverse("unidad-list"))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        self.assertIn("results", datos)
+        self.assertEqual(len(datos["results"]), 50)

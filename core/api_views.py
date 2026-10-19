@@ -2,6 +2,7 @@ from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, viewsets
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,6 +25,7 @@ from .serializers import (
     MembresiaSerializer,
     MiPerfilSerializer,
     TorreSerializer,
+    UnidadSerializer,
 )
 from .usuarios import generar_codigo_invitacion, generar_username
 from .views import _contexto_invitacion, enviar_correo_bienvenida
@@ -260,6 +262,29 @@ class TorreViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = TorreSerializer
     permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
     http_method_names = ["get", "post", "head", "options"]
+
+    def perform_create(self, serializer):
+        serializer.save(condominio=condominio_de_la_api(self.request))
+
+
+class PaginacionEstandar(PageNumberPagination):
+    """Paginación local a los recursos con volumen real (unidades,
+    miembros) -- el proyecto no tiene DEFAULT_PAGINATION_CLASS global
+    (Alertas/Avisos nunca paginaron), así que no se toca su forma de
+    respuesta."""
+
+    page_size = 50
+
+
+class UnidadViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
+    """Listar/crear unidades del condominio activo -- equivalente a
+    UnidadListView/UnidadCreateView del panel web."""
+
+    queryset = Unidad.objects.select_related("torre")
+    serializer_class = UnidadSerializer
+    permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
+    http_method_names = ["get", "post", "head", "options"]
+    pagination_class = PaginacionEstandar
 
     def perform_create(self, serializer):
         serializer.save(condominio=condominio_de_la_api(self.request))
