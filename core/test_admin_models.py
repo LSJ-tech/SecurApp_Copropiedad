@@ -274,6 +274,44 @@ class TorreYUnidadAdminFiltroCondominioTests(TestCase):
         self.assertNotContains(r, unidad_otra_torre.numero)
 
 
+class UnidadAdminCondominioSoloAlCrearTests(TestCase):
+    """Una Unidad puede estar compartida por varios residentes (ej. pareja
+    en el mismo depto, todos con su Membresia apuntando a la misma fila) --
+    cambiar su `condominio` desde el admin después de creada mueve a TODOS
+    los que la comparten de una, no solo a la persona que se quería mover
+    (justo el error real reportado: "mové un usuario del depto 54 de Empart
+    y se movieron todos"). La forma segura de mover a una sola persona es
+    MoverMiembroView (ver core/views.py), que re-apunta la Membresia, nunca
+    la Unidad. Acá el campo queda de solo lectura una vez creada, para que
+    no se pueda repetir ese error desde el admin."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Unidad Condominio Fijo", plan="premium")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, numero="54")
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser(username="unidad_condominio_fijo_super", password="x"))
+
+    def test_el_campo_condominio_es_de_solo_lectura_al_editar(self):
+        r = self.client.get(f"/admin/core/unidad/{self.unidad.pk}/change/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'name="condominio"')
+
+    def test_intentar_cambiar_el_condominio_por_post_no_lo_mueve(self):
+        otro_condominio = Condominio.objects.create(nombre="Test Unidad Condominio Fijo Otro", plan="premium")
+        r = self.client.post(f"/admin/core/unidad/{self.unidad.pk}/change/", {
+            "condominio": otro_condominio.pk, "numero": "54", "calle": "", "alicuota": "",
+        })
+        self.unidad.refresh_from_db()
+        self.assertEqual(self.unidad.condominio_id, self.condominio.pk)
+
+    def test_el_campo_condominio_sigue_editable_al_crear(self):
+        r = self.client.get("/admin/core/unidad/add/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'name="condominio"')
+
+
 class UnidadTorreDeOtroCondominioTests(TestCase):
     """El desplegable de torre en el admin de Unidad lista TODAS las torres
     de TODOS los condominios (ver Torre.__str__, que agrega el condominio

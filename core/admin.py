@@ -266,6 +266,18 @@ class UnidadAdmin(ModelAdmin):
     # protegido aunque se elija mal (ver Unidad.clean()).
     autocomplete_fields = ["condominio", "torre"]
 
+    def get_readonly_fields(self, request, obj=None):
+        # Una Unidad puede estar compartida por varios residentes (ej.
+        # pareja en el mismo depto, todos con su Membresia apuntando a la
+        # misma fila) -- cambiar su condominio desde acá después de creada
+        # los movería a TODOS de una, no solo a quien se quiere mover. Para
+        # mover a una sola persona está MoverMiembroView (re-apunta la
+        # Membresia, nunca la Unidad). Al crear, sigue editable: recién
+        # creada todavía no la comparte nadie.
+        if obj is not None:
+            return [*super().get_readonly_fields(request, obj), "condominio"]
+        return super().get_readonly_fields(request, obj)
+
     @admin.display(description="Torre", ordering="torre__nombre")
     def torre_display(self, obj):
         # Antes mostraba "-" para una unidad sin torre -- ambiguo (¿no tiene
