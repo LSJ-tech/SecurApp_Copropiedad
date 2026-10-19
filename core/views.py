@@ -1,5 +1,4 @@
 import logging
-import uuid
 from io import BytesIO
 
 import qrcode
@@ -34,7 +33,7 @@ from .forms import CondominioForm, CrearCondominioForm, CrearMiembroForm, MiCamb
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin, condominio_activo_devquad
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
 from .models import REGION_CHOICES, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
-from .usuarios import generar_password_temporal, generar_username
+from .usuarios import generar_codigo_invitacion, generar_password_temporal, generar_username
 
 EMAIL_CONTACTO_DEVQUAD = "contacto@devquad.cl"
 CONTENT_TYPE_TEXTO_PLANO = "text/plain; charset=utf-8"
@@ -481,7 +480,7 @@ class CompartirInvitacionView(CondominioRequiredMixin, TemplateView):
 
 class RegenerarTokenResidentesView(SoloStaffMixin, CondominioRequiredMixin, View):
     def post(self, request):
-        self.condominio.token_registro_residentes = uuid.uuid4()
+        self.condominio.token_registro_residentes = generar_codigo_invitacion()
         self.condominio.save(update_fields=["token_registro_residentes"])
         messages.success(request, "Se generó un link nuevo — el anterior ya no sirve para registrarse.")
         return redirect("mi-condominio")

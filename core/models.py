@@ -1,10 +1,11 @@
 import datetime
-import uuid
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+from .usuarios import generar_codigo_invitacion
 
 REGION_CHOICES = [
     ("arica_parinacota", "Arica y Parinacota"),
@@ -88,9 +89,11 @@ class Condominio(models.Model):
         help_text="Banco, tipo de cuenta, número, RUT y email de la administración — se muestra a los "
         "residentes para que paguen los gastos comunes por transferencia (no es un pago online).",
     )
-    token_registro_residentes = models.UUIDField(
-        default=uuid.uuid4, unique=True, editable=False,
-        help_text="Identifica el link/QR público de autoregistro de residentes de este condominio.",
+    token_registro_residentes = models.CharField(
+        max_length=20, default=generar_codigo_invitacion, unique=True, editable=False,
+        help_text="Identifica el link/QR público de autoregistro de residentes de este condominio. "
+        "Código corto (no UUID) a propósito -- se comparte por WhatsApp/QR, un link más corto es "
+        "menos feo de ver y más fácil de copiar a mano si hace falta.",
     )
     etiqueta_torre = models.CharField(
         max_length=30, default="Torre",
