@@ -1377,6 +1377,28 @@ class CompartirInvitacionTests(TestCase):
         # quedan como %20 (el filtro |urlencode de Django no usa "+").
         self.assertContains(r, "tu%20junta%20de%20vecinos")
 
+    def test_el_mensaje_menciona_la_opcion_de_casa_si_el_condominio_tiene_torres(self):
+        """El link ya sirve para registrar una casa sin torre (ver
+        RegistroResidenteForm, caso mixto) -- pero si el mensaje de
+        invitación solo dice "elige tu depto", un vecino que vive en una
+        casa (como Andrés/Adela en Empart) no se entera de que el mismo
+        link también sirve para él."""
+        condominio_con_torre = Condominio.objects.create(nombre="Test Mixto Invitacion", plan="premium")
+        Torre.objects.create(condominio=condominio_con_torre, nombre="1")
+        membresia = crear_membresia(condominio_con_torre, "residente", username="invitar_mixto")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("compartir-invitacion"))
+        self.assertContains(r, "o%20tu%20casa")
+
+    def test_el_mensaje_no_menciona_casa_de_mas_si_el_condominio_no_tiene_torres(self):
+        """En un condominio de puras casas (sin ninguna torre) ya no hace
+        falta aclarar nada -- decirlo igual sería redundante/confuso."""
+        condominio_sin_torre = Condominio.objects.create(nombre="Test Puras Casas Invitacion", plan="premium")
+        membresia = crear_membresia(condominio_sin_torre, "residente", username="invitar_puras_casas")
+        self.client.force_login(membresia.user)
+        r = self.client.get(reverse("compartir-invitacion"))
+        self.assertNotContains(r, "o%20tu%20casa")
+
 
 class DirectorioVecinosTests(TestCase):
     """Directorio abierto a cualquier rol -- nombre y block/depto, sin

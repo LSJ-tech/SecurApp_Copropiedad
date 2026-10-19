@@ -425,6 +425,15 @@ def _contexto_invitacion(request, condominio):
     link = request.build_absolute_uri(
         reverse("registro-residente", kwargs={"token": condominio.token_registro_residentes})
     )
+    # Si el condominio tiene torres, el mismo link también sirve para una
+    # casa sin torre (ver RegistroResidenteForm, selector "sin torre") --
+    # sin esta aclaración, un vecino que vive en una casa (como Andrés/Adela
+    # en Empart) lee "elige tu depto" y no se entera de que el link igual
+    # es para él. En un condominio de puras casas no hace falta aclarar
+    # nada, ya está implícito.
+    texto_unidad = f"tu {condominio.etiqueta_unidad.lower()}"
+    if Torre.objects.filter(condominio=condominio).exists():
+        texto_unidad += f" (o tu casa, si no tienes {condominio.etiqueta_torre.lower()})"
     mensaje = (
         f"🏠 ¡Hola, vecino/a!\n\n"
         # "tu {etiqueta}" en vez de "nuestro/nuestra {etiqueta}" a propósito --
@@ -436,7 +445,7 @@ def _contexto_invitacion(request, condominio):
         f"✅ Activar el botón de pánico\n"
         f"✅ Ver avisos y alertas\n"
         f"✅ Revisar el directorio de vecinos\n\n"
-        f"Crea tu cuenta eligiendo tu {condominio.etiqueta_unidad.lower()} acá 👇\n"
+        f"Crea tu cuenta eligiendo {texto_unidad} acá 👇\n"
         f"{link}"
     )
     return {"link_autoregistro": link, "mensaje_whatsapp_invitacion": mensaje}
