@@ -62,12 +62,12 @@ class ConfirmacionContrasenaMixin(forms.Form):
         return cleaned
 
 
-class CrearCondominioForm(forms.ModelForm):
-    """Alta de un condominio/junta de vecinos nuevo desde el panel de
-    devquad (DevquadCondominiosView) -- reemplaza al viejo
-    RegistroCondominioView (público, con código de invitación): acá quien
-    lo crea ya está logueado como devquad, no hace falta crear una cuenta
-    nueva ni gatekeeping por código."""
+class RegionComunaMixin(forms.Form):
+    """Región/comuna con choices reales (no texto libre) + validación
+    cruzada -- usado por todo formulario que capture la ubicación de un
+    condominio/junta de vecinos o de un lead (CrearCondominioForm,
+    CondominioForm, SolicitudAccesoForm). Reutilizado a propósito en vez de
+    repetir los mismos dos campos y el mismo clean() en cada uno."""
 
     comuna = forms.ChoiceField(
         choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
@@ -78,6 +78,22 @@ class CrearCondominioForm(forms.ModelForm):
         widget=forms.Select(attrs={"class": "form-select"}),
     )
 
+    def clean(self):
+        cleaned = super().clean()
+        region = cleaned.get("region")
+        comuna = cleaned.get("comuna")
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise ValidationError("Esa comuna no pertenece a la región elegida.")
+        return cleaned
+
+
+class CrearCondominioForm(RegionComunaMixin, forms.ModelForm):
+    """Alta de un condominio/junta de vecinos nuevo desde el panel de
+    devquad (DevquadCondominiosView) -- reemplaza al viejo
+    RegistroCondominioView (público, con código de invitación): acá quien
+    lo crea ya está logueado como devquad, no hace falta crear una cuenta
+    nueva ni gatekeeping por código."""
+
     class Meta:
         model = Condominio
         fields = ["nombre", "etiqueta_organizacion", "direccion", "comuna", "region"]
@@ -86,14 +102,6 @@ class CrearCondominioForm(forms.ModelForm):
             "etiqueta_organizacion": forms.TextInput(attrs={"class": "form-control"}),
             "direccion": forms.TextInput(attrs={"class": "form-control"}),
         }
-
-    def clean(self):
-        cleaned = super().clean()
-        region = cleaned.get("region")
-        comuna = cleaned.get("comuna")
-        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
-            raise ValidationError("Esa comuna no pertenece a la región elegida.")
-        return cleaned
 
 
 class CrearMiembroForm(NormalizarNombreApellidoMixin, forms.Form):
@@ -274,11 +282,19 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         return _validar_email_unico(self.cleaned_data["email"])
 
 
-class CondominioForm(forms.ModelForm):
+class CondominioForm(RegionComunaMixin, forms.ModelForm):
+    """Editar el condominio ya creado, desde /mi-condominio/ -- antes esta
+    info (nombre, dirección, región/comuna) solo se podía corregir desde el
+    admin de Django, no había ninguna forma de editarla dentro del panel
+    una vez creado el condominio (ver CondominioUpdateView)."""
+
     class Meta:
         model = Condominio
-        fields = ["datos_transferencia"]
+        fields = ["nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "datos_transferencia"]
         widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control"}),
+            "etiqueta_organizacion": forms.TextInput(attrs={"class": "form-control"}),
+            "direccion": forms.TextInput(attrs={"class": "form-control"}),
             "datos_transferencia": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
         }
         labels = {
@@ -286,24 +302,21 @@ class CondominioForm(forms.ModelForm):
         }
         help_texts = {
             "datos_transferencia": "Banco, tipo de cuenta, número, RUT y email — se muestra a los residentes al pagar.",
+            # Texto propio en vez del help_text del modelo (ese está escrito
+            # para quien lee la definición del campo, no para quien está
+            # editando su propio condominio -- y de paso menciona "Mi
+            # condominio" como ejemplo, lo que confunde a una junta de
+            # vecinos que ve esa frase literal en su propio formulario).
+            "etiqueta_organizacion": "Cómo le dicen a esta organización (Condominio, Junta de vecinos, Comunidad, Villa...).",
         }
 
 
-class SolicitudAccesoForm(forms.ModelForm):
-    """Formulario público de la landing -- captura el interés de quien todavía no tiene código de invitación."""
-
-    # Mismo patrón que CrearCondominioForm: región/comuna con choices reales
-    # en vez de texto libre, para que los leads capturados acá ya queden con
-    # datos limpios (sin typos/mayúsculas sueltas) pensando en un futuro
-    # filtro/reporte por zona a medida que la app escale.
-    region = forms.ChoiceField(
-        choices=[("", "---------")] + REGION_CHOICES, required=False, label="Región",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    comuna = forms.ChoiceField(
-        choices=[("", "---------")] + comuna_choices_agrupadas(REGION_CHOICES), required=False, label="Comuna",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
+class SolicitudAccesoForm(RegionComunaMixin, forms.ModelForm):
+    """Formulario público de la landing -- captura el interés de quien
+    todavía no tiene código de invitación. Región/comuna con choices reales
+    (ver RegionComunaMixin), para que los leads capturados acá ya queden con
+    datos limpios (sin typos/mayúsculas sueltas) pensando en un futuro
+    filtro/reporte por zona a medida que la app escale."""
 
     class Meta:
         model = SolicitudAcceso
@@ -319,14 +332,6 @@ class SolicitudAccesoForm(forms.ModelForm):
             "nombre": "Nombre", "condominio": "Condominio o junta de vecinos",
             "telefono": "Teléfono", "email": "Email", "mensaje": "Mensaje",
         }
-
-    def clean(self):
-        cleaned = super().clean()
-        region = cleaned.get("region")
-        comuna = cleaned.get("comuna")
-        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
-            raise ValidationError("Esa comuna no pertenece a la región elegida.")
-        return cleaned
 
 
 class TorreForm(forms.ModelForm):

@@ -1871,3 +1871,66 @@ class MiCambiarContrasenaViewTests(TestCase):
         self.assertContains(r, "medidor_contrasena_vivo.js")
         self.assertContains(r, "initMedidorContrasenaVivo")
         self.assertContains(r, "<li>")  # ayudas_contrasena
+
+
+class CondominioUpdateViewTests(TestCase):
+    """/mi-condominio/ antes solo mostraba el QR de autoregistro -- ahora
+    también deja editar nombre/dirección/región/comuna/datos de
+    transferencia, que antes solo se podían corregir desde el admin."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(
+            nombre="Test Editar Condominio", plan="premium", direccion="Calle Vieja 1", comuna="Valparaíso", region="valparaiso",
+        )
+
+    def _login_devquad(self, username="editar_condominio_devquad"):
+        self.client.force_login(crear_devquad(username))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+
+    def test_get_muestra_los_datos_actuales_precargados(self):
+        self._login_devquad()
+        r = self.client.get(reverse("mi-condominio"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Calle Vieja 1")
+        self.assertContains(r, "Guardar")
+
+    def test_post_actualiza_el_condominio(self):
+        self._login_devquad()
+        r = self.client.post(reverse("mi-condominio"), {
+            "nombre": "Test Editar Condominio", "etiqueta_organizacion": "Junta de vecinos",
+            "direccion": "Calle Nueva 2", "region": "metropolitana", "comuna": "Providencia",
+            "datos_transferencia": "Banco Estado, cuenta 123",
+        })
+        self.assertRedirects(r, reverse("mi-condominio"))
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.direccion, "Calle Nueva 2")
+        self.assertEqual(self.condominio.region, "metropolitana")
+        self.assertEqual(self.condominio.comuna, "Providencia")
+        self.assertEqual(self.condominio.etiqueta_organizacion, "Junta de vecinos")
+        self.assertEqual(self.condominio.datos_transferencia, "Banco Estado, cuenta 123")
+
+    def test_comuna_que_no_calza_con_la_region_es_invalida(self):
+        self._login_devquad()
+        r = self.client.post(reverse("mi-condominio"), {
+            "nombre": "Test Editar Condominio", "etiqueta_organizacion": "Condominio",
+            "region": "valparaiso", "comuna": "Providencia",
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Esa comuna no pertenece a la región elegida.")
+        self.condominio.refresh_from_db()
+        self.assertEqual(self.condominio.comuna, "Valparaíso")  # no se tocó
+
+    def test_un_residente_no_puede_editar(self):
+        residente = crear_membresia(self.condominio, "residente", unidad=Unidad.objects.create(condominio=self.condominio, numero="1"))
+        self.client.force_login(residente.user)
+        r = self.client.post(reverse("mi-condominio"), {"nombre": "Hackeado"})
+        self.assertEqual(r.status_code, 302)
+        self.condominio.refresh_from_db()
+        self.assertNotEqual(self.condominio.nombre, "Hackeado")
+
+    def test_sigue_mostrando_el_qr_de_autoregistro(self):
+        self._login_devquad()
+        r = self.client.get(reverse("mi-condominio"))
+        self.assertContains(r, "Autoregistro de residentes")
+        self.assertContains(r, reverse("regenerar-token-residentes"))

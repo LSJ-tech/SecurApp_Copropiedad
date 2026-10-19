@@ -30,7 +30,7 @@ from django.views.generic import CreateView, FormView, ListView, TemplateView, U
 from django.views.generic.base import View
 
 from .comunas_chile import COMUNAS_POR_REGION
-from .forms import CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
+from .forms import CondominioForm, CrearCondominioForm, CrearMiembroForm, MiCambiarContrasenaForm, MiPerfilForm, RegistroResidenteForm, SolicitudAccesoForm, TorreForm, UnidadForm, _normalizar_nombre
 from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequiredMixin, SoloStaffMixin, condominio_activo_devquad
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
 from .models import REGION_CHOICES, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
@@ -811,16 +811,32 @@ class CrearMiembroView(SoloStaffMixin, CondominioRequiredMixin, FormView):
         return super().form_valid(form)
 
 
-class CondominioUpdateView(SoloStaffMixin, CondominioRequiredMixin, TemplateView):
-    """No edita nada acá -- es la página de devquad para el autoregistro de
-    residentes (QR/link)."""
+class CondominioUpdateView(SoloStaffMixin, CondominioRequiredMixin, UpdateView):
+    """Edita los datos del condominio ya creado (nombre, dirección, región/
+    comuna, datos de transferencia) y además muestra el autoregistro de
+    residentes (QR/link) -- antes esta página solo hacía lo segundo, no
+    había forma de corregir lo primero fuera del admin de Django."""
 
+    model = Condominio
+    form_class = CondominioForm
     template_name = "core/condominio_form.html"
+
+    def get_object(self, queryset=None):
+        return self.condominio
+
+    def get_success_url(self):
+        return reverse("mi-condominio")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["comunas_por_region"] = COMUNAS_POR_REGION
         context.update(_contexto_invitacion(self.request, self.condominio))
         return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, "Datos guardados.")
+        return response
 
 
 class TorreListView(SoloStaffMixin, CondominioFormMixin, ListView):

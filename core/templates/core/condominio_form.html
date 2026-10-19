@@ -1,9 +1,42 @@
 {% extends "core/base.html" %}
+{% load static %}
 {% block titulo %}Mi {{ condominio.etiqueta_organizacion|default:"Condominio"|lower }}{% endblock %}
 {% block contenido %}
 <h1 class="h4 mb-3">Mi {{ condominio.etiqueta_organizacion|default:"Condominio"|lower }}</h1>
 
+<h2 class="h5 mb-2">Datos</h2>
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
+    </div>
+</div>
+
 <h2 class="h5 mb-2">Autoregistro de residentes</h2>
 <p class="text-muted">Comparte este link o QR con tus vecinos — eligen {% if condominio.genero_unidad == "m" %}su propio{% else %}su propia{% endif %} {{ condominio.etiqueta_unidad|lower }} y crean su cuenta solos, sin que tengas que cargarlos uno por uno. Cualquier vecino también puede compartirlo desde <a href="{% url 'compartir-invitacion' %}">Invitar vecinos</a>.</p>
 {% include "core/includes/_invitacion_card.html" with mostrar_regenerar=True %}
+{% endblock %}
+{% block extra_js %}
+{{ comunas_por_region|json_script:"comunas-por-region-data" }}
+<script src="{% static 'core/js/cascada_region_comuna.js' %}"></script>
+<script>
+    initCascadaRegionComuna({
+        regionSelectId: "{{ form.region.id_for_label }}",
+        comunaSelectId: "{{ form.comuna.id_for_label }}",
+        comunasPorRegion: JSON.parse(document.getElementById("comunas-por-region-data").textContent),
+    });
+</script>
 {% endblock %}
