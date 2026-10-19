@@ -10,7 +10,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, condominio_de_la_api
 
-from .models import MINUTOS_AUTO_CIERRE, Alerta
+from .models import Alerta
 from .serializers import AlertaSerializer
 from .services import notificar_alerta, notificar_alerta_resuelta
 
@@ -35,9 +35,6 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         condominio = condominio_de_la_api(self.request)
         ids_red = condominio.ids_red_alertas
-        limite = timezone.now() - timedelta(minutes=MINUTOS_AUTO_CIERRE)
-        Alerta.objects.filter(condominio_id__in=ids_red, estado="activa", fecha_creacion__lt=limite).update(estado="auto_cerrada")
-
         qs = self.queryset.filter(condominio_id__in=ids_red)
         estado = self.request.query_params.get("estado")
         if estado == "recientes":

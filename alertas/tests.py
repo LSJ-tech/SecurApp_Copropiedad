@@ -81,8 +81,10 @@ class CrearAlertaDevquadTests(TestCase):
 
 class AutoCierreYResolucionAbiertaTests(TestCase):
     """Cualquier rol puede resolver una alerta (no solo directiva/conserjería,
-    ver TieneMembresia en vez de EsDirectivaOConserje), y una alerta activa
-    hace más de 30 min se autocierra sola al listarse."""
+    ver TieneMembresia en vez de EsDirectivaOConserje). Ya NO se autocierra
+    sola por tiempo -- se sacó a pedido explícito (quedaba "resuelta" sin
+    que nadie la hubiera atendido de verdad, dando una falsa sensación de
+    que la emergencia ya se manejó)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -144,13 +146,13 @@ class AutoCierreYResolucionAbiertaTests(TestCase):
         alerta.refresh_from_db()
         self.assertEqual(alerta.estado, "activa")
 
-    def test_alerta_vieja_se_autocierra_al_listar(self):
+    def test_una_alerta_vieja_sigue_activa_al_listar(self):
         alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
         Alerta.objects.filter(pk=alerta.pk).update(fecha_creacion=timezone.now() - timedelta(minutes=45))
         self.client.force_login(self.vecino.user)
         self.client.get(reverse("alerta-list"))
         alerta.refresh_from_db()
-        self.assertEqual(alerta.estado, "auto_cerrada")
+        self.assertEqual(alerta.estado, "activa")
 
 
 class NotificarAlertaTests(TestCase):

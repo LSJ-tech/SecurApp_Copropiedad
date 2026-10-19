@@ -21,10 +21,11 @@ ESTADO_CHOICES = [
     ("activa", "Activa"),
     ("resuelta", "Resuelta"),
     ("falsa_alarma", "Falsa alarma"),
+    # Ya no se genera sola (se sacó el cierre automático a los 30 min --
+    # daba una falsa sensación de que la emergencia ya se había atendido).
+    # Se deja el choice solo para las alertas viejas que ya quedaron así.
     ("auto_cerrada", "Cerrada automáticamente"),
 ]
-
-MINUTOS_AUTO_CIERRE = 30
 
 
 class Alerta(models.Model):
