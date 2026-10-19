@@ -62,7 +62,7 @@ Cada app de dominio (excepto `core`) sigue el mismo patrón: `models.py`, `seria
 
 ## Despliegue
 
-Mismo patrón que PataAgenda: `build.sh` + `render.yaml` para Render (Blueprint con web service + Postgres). Variables de entorno en `.env.example`.
+Mismo patrón que PataAgenda: `build.sh` + `render.yaml` para Render (Blueprint con web service). La base de datos es Postgres en **Supabase** (session pooler, no el pooler de transacciones) -- no la autoprovisiona Render, `DATABASE_URL` se setea a mano en el dashboard de Render (`sync: false` en `render.yaml`). El respaldo del webhook de Mercado Pago corre como GitHub Action programada (`.github/workflows/sincronizar_suscripciones.yml`, cada 4 horas) en vez de cron job de Render -- Render no tiene plan gratis para ese tipo de servicio; requiere los secrets `DATABASE_URL` y `MERCADOPAGO_ACCESS_TOKEN` en GitHub (Settings → Secrets and variables → Actions). Variables de entorno en `.env.example`.
 
 ## Roles
 

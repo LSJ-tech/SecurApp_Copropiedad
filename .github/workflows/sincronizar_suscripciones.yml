@@ -1,0 +1,33 @@
+name: Sincronizar suscripciones Mercado Pago
+
+# Respaldo del webhook de Mercado Pago (ver pagos/views.py) -- re-consulta
+# periódicamente el estado de cada suscripción/donación activa, igual que
+# el botón "Sincronizar con Mercado Pago" del admin, por si el webhook no
+# llegó para alguna transacción real. Antes corría como cron job de Render,
+# pero Render no tiene plan gratis para cron jobs -- se mueve acá (GitHub
+# Actions, gratis) conectándose directo a Supabase.
+
+on:
+  schedule:
+    - cron: "0 */4 * * *" # cada 4 horas
+  workflow_dispatch: {} # permite correrlo a mano desde la pestaña Actions
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7" # misma versión que PYTHON_VERSION en render.yaml (producción)
+
+      - name: Instalar dependencias (fijadas por hash)
+        run: |
+          pip install --require-hashes --only-binary :all: --no-binary http-ece -r requirements-ci-lock.txt
+
+      - name: Correr sincronizar_suscripciones
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
+        run: python manage.py sincronizar_suscripciones

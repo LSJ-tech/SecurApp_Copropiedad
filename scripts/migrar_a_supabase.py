@@ -72,9 +72,9 @@ def leer_env_migracion():
 
 def correr(args, database_url, descripcion):
     print(f"-- {descripcion}")
-    env = {**os.environ, "DATABASE_URL": database_url}
+    env = {**os.environ, "DATABASE_URL": database_url, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     resultado = subprocess.run(
-        [str(PYTHON), "manage.py", *args], cwd=RAIZ, env=env, capture_output=True, text=True,
+        [str(PYTHON), "manage.py", *args], cwd=RAIZ, env=env, capture_output=True, text=True, encoding="utf-8",
     )
     salida = (resultado.stdout or "") + (resultado.stderr or "")
     # Nunca imprimir el DATABASE_URL (lleva contraseña) aunque aparezca en
@@ -96,9 +96,15 @@ def contar_modelos(database_url, etiqueta):
         "    print(f'{ruta}: {Modelo.objects.count()}')\n"
     )
     print(f"-- Conteo de filas ({etiqueta})")
-    env = {**os.environ, "DATABASE_URL": database_url, "DJANGO_SETTINGS_MODULE": "config.settings"}
+    env = {
+        **os.environ,
+        "DATABASE_URL": database_url,
+        "DJANGO_SETTINGS_MODULE": "config.settings",
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8",
+    }
     resultado = subprocess.run(
-        [str(PYTHON), "-c", script], cwd=RAIZ, env=env, capture_output=True, text=True,
+        [str(PYTHON), "-c", script], cwd=RAIZ, env=env, capture_output=True, text=True, encoding="utf-8",
     )
     print(resultado.stdout or resultado.stderr)
     return resultado.stdout
