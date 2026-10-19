@@ -382,7 +382,10 @@ class AutoregistroCasasLibresTests(TestCase):
         self.assertIn("unidad", form.fields)
         self.assertIn("numero_unidad_libre", form.fields)
         self.assertIn("torre_unidad_libre", form.fields)
-        self.assertNotIn("calle_unidad_libre", form.fields)
+        # calle_unidad_libre SÍ sigue disponible en modo torres -- un
+        # condominio con torres puede además tener casas sueltas (ver
+        # AutoregistroMixtoTorresYCasasTests), no son modos excluyentes.
+        self.assertIn("calle_unidad_libre", form.fields)
         self.assertFalse(form.fields["unidad"].required)
         self.assertFalse(form.fields["numero_unidad_libre"].required)
         self.assertFalse(form.fields["torre_unidad_libre"].required)
@@ -596,6 +599,79 @@ class AutoregistroDeptoLibreConTorresTests(TestCase):
         self.assertContains(r, "si tu unidad no está en la lista")
         self.assertContains(r, 'id="torres-existentes"')
         self.assertContains(r, '<option value="1">')
+
+
+class AutoregistroMixtoTorresYCasasTests(TestCase):
+    """Un condominio puede tener torres Y casas sueltas al mismo tiempo
+    (ej. una junta de vecinos con algunos blocks y además una calle de
+    casas) -- no es "modo torres" o "modo casas" excluyentes, Unidad.torre
+    ya es opcional por unidad, no por condominio. El selector de torre
+    siempre ofrece "sin torre" (aunque todavía no exista ninguna casa
+    registrada -- el primer vecino sin torre tiene que poder inaugurar su
+    calle igual que puede hacerlo el segundo/tercero)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Mixto Torres y Casas", plan="premium")
+        cls.torre1 = Torre.objects.create(condominio=cls.condominio, nombre="1")
+
+    def _datos_base(self, **extra):
+        datos = {
+            "nombre": "Rosa", "apellido": "Mena", "email": "rosa_mixto@example.com",
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        }
+        datos.update(extra)
+        return datos
+
+    def test_pagina_ofrece_opcion_sin_torre_aunque_no_exista_ninguna_casa_todavia(self):
+        """Cold-start: cero casas registradas todavía, pero la opción debe
+        estar igual -- si dependiera de que ya exista una, nadie podría
+        ser el primero (ver AutoregistroCasasLibresTests, mismo criterio
+        aplicado acá al caso mixto)."""
+        r = self.client.get(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'value="sin-torre"')
+        self.assertContains(r, "vivo en una casa")
+
+    def test_registrarse_sin_torre_pero_con_calle_crea_una_casa_sin_torre(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(calle_unidad_libre="Los Aromos", numero_unidad_libre="7"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="7")
+        self.assertIsNone(unidad.torre)
+        self.assertEqual(unidad.calle, "Los Aromos")
+        user = User.objects.get(email="rosa_mixto@example.com")
+        self.assertEqual(user.membresia.unidad, unidad)
+
+    def test_registrarse_con_torre_sigue_funcionando_igual(self):
+        """El agregado de calle no debe romper el camino normal de torre."""
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(torre_unidad_libre="1", numero_unidad_libre="302"),
+        )
+        self.assertEqual(r.status_code, 302)
+        unidad = Unidad.objects.get(condominio=self.condominio, numero="302")
+        self.assertEqual(unidad.torre, self.torre1)
+
+    def test_sin_torre_ni_calle_no_se_puede_registrar(self):
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(numero_unidad_libre="9"),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Unidad.objects.filter(condominio=self.condominio, numero="9").exists())
+        self.assertFalse(User.objects.filter(email="rosa_mixto@example.com").exists())
+
+    def test_elegir_una_casa_sin_torre_ya_existente_de_la_lista(self):
+        casa = Unidad.objects.create(condominio=self.condominio, torre=None, numero="7", calle="Los Aromos")
+        r = self.client.post(
+            reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}),
+            self._datos_base(unidad=casa.pk),
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Unidad.objects.filter(condominio=self.condominio, numero="7").count(), 1)
 
 
 class CorreoBienvenidaTests(TestCase):

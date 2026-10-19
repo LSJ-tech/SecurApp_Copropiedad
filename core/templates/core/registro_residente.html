@@ -25,9 +25,7 @@
                             {% for t in torres %}
                             <option value="{{ t.pk }}">{{ condominio.etiqueta_torre }} {{ t.nombre }}</option>
                             {% endfor %}
-                            {% if hay_unidades_sin_torre %}
-                            <option value="sin-torre">Sin {{ condominio.etiqueta_torre|lower }}</option>
-                            {% endif %}
+                            <option value="sin-torre">— No tengo {{ condominio.etiqueta_torre|lower }}, vivo en una casa —</option>
                         </select>
                     </div>
                     <div class="mb-3">

@@ -201,7 +201,6 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             self.fields["numero_unidad_libre"].label = f"Y el número de tu {etiqueta}"
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
         else:
-            del self.fields["calle_unidad_libre"]
             # A diferencia de casas, acá la torre NO se escribe libre -- ya
             # existe de antes (la crea DevQuad/administración, ver
             # SoloStaffMixin) así que se elige de un desplegable real, nunca
@@ -220,6 +219,13 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
             self.fields["torre_unidad_libre"].widget.attrs["list"] = "torres-existentes"
             self.fields["numero_unidad_libre"].label = f"O escribe el número de tu {etiqueta} si no está en la lista"
             self.fields["numero_unidad_libre"].widget.attrs["list"] = "numeros-unidad-existentes"
+            # Un condominio con torres puede además tener casas sueltas sin
+            # ninguna torre (ver AutoregistroMixtoTorresYCasasTests) -- se
+            # deja disponible la misma vía libre que usa el modo casas puro,
+            # para que el primer vecino sin torre también pueda inaugurar su
+            # calle, no solo elegir una ya creada por otro.
+            self.fields["calle_unidad_libre"].label = "O, si vives en una casa sin torre, escribe el nombre de tu calle"
+            self.fields["calle_unidad_libre"].widget.attrs["list"] = "calles-existentes"
 
     def clean(self):
         cleaned = super().clean()
@@ -240,15 +246,27 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         else:
             etiqueta_torre = self.condominio.etiqueta_torre.lower()
             torre_texto = (cleaned.get("torre_unidad_libre") or "").strip()
-            if not torre_texto:
-                raise ValidationError(f"Escribe tu {etiqueta_torre}.")
-            # A diferencia de calle, acá SÍ hay que existir de antes -- la
-            # torre la crea administración/DevQuad (ver SoloStaffMixin), un
-            # residente no puede inventar una nueva por typo.
-            torre = Torre.objects.filter(condominio=self.condominio, nombre__iexact=torre_texto).first()
-            if torre is None:
-                raise ValidationError(f"No encontramos esa {etiqueta_torre} -- revisa que esté escrita igual que en la lista.")
-            unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
+            calle_texto = _normalizar_nombre((cleaned.get("calle_unidad_libre") or "").strip())
+            if torre_texto:
+                # A diferencia de calle, acá SÍ hay que existir de antes --
+                # la torre la crea administración/DevQuad (ver
+                # SoloStaffMixin), un residente no puede inventar una nueva
+                # por typo.
+                torre = Torre.objects.filter(condominio=self.condominio, nombre__iexact=torre_texto).first()
+                if torre is None:
+                    raise ValidationError(f"No encontramos esa {etiqueta_torre} -- revisa que esté escrita igual que en la lista.")
+                unidad, _creada = Unidad.objects.get_or_create(condominio=self.condominio, torre=torre, numero=numero)
+            elif calle_texto:
+                # Casa sin torre dentro de un condominio que sí tiene torres
+                # (ver AutoregistroMixtoTorresYCasasTests) -- mismo criterio
+                # que modo_casas: calle se puede inventar libre, torre no.
+                unidad, _creada = Unidad.objects.get_or_create(
+                    condominio=self.condominio, torre=None, numero=numero, calle=calle_texto,
+                )
+            else:
+                raise ValidationError(
+                    f"Escribe tu {etiqueta_torre}, o si vives en una casa sin {etiqueta_torre}, escribe el nombre de tu calle."
+                )
         cleaned["unidad"] = unidad
         return cleaned
 

@@ -380,15 +380,20 @@ class RegistroResidenteView(FormView):
         # se registra por texto libre (su depto/casa no está en la lista,
         # ver RegistroResidenteForm) vea los números ya usados antes de
         # escribir el suyo y no cree sin querer un casi-duplicado por una
-        # diferencia de tipeo. Las calles solo aplican en modo casas.
+        # diferencia de tipeo.
         context["numeros_unidad_existentes"] = list(unidades.values_list("numero", flat=True))
         if context["torres"].exists():
             # Para el datalist de "torre_unidad_libre" (ver RegistroResidenteForm)
             # -- es texto libre pero tiene que calzar exacto (sin mayúsculas/
             # minúsculas) con una torre ya creada, así que ayuda tenerlas a mano.
             context["torres_existentes"] = list(context["torres"].values_list("nombre", flat=True))
-        else:
-            context["calles_existentes"] = sorted(set(unidades.exclude(calle="").values_list("calle", flat=True)))
+        # Calles de las unidades sin torre -- aplica tanto en modo casas puro
+        # como en un condominio con torres que además tiene casas sueltas
+        # (ver AutoregistroMixtoTorresYCasasTests); por eso ya no depende de
+        # si el condominio tiene torres o no.
+        context["calles_existentes"] = sorted(set(
+            unidades.filter(torre__isnull=True).exclude(calle="").values_list("calle", flat=True)
+        ))
         return context
 
     def form_valid(self, form):
