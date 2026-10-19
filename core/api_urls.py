@@ -12,4 +12,8 @@ urlpatterns = [
     path("devquad/condominios/", api_views.DevquadCondominiosApiView.as_view(), name="api-devquad-condominios"),
     path("devquad/condominios/<int:pk>/entrar/", api_views.DevquadEntrarCondominioApiView.as_view(), name="api-devquad-entrar-condominio"),
     path("directorio/", api_views.DirectorioView.as_view(), name="api-directorio"),
+    path("condominio/", api_views.CondominioView.as_view(), name="api-condominio"),
+    path("condominio/regenerar-token/", api_views.RegenerarTokenApiView.as_view(), name="api-regenerar-token"),
+    path("invitacion/", api_views.InvitacionView.as_view(), name="api-invitacion"),
+    path("registro/<str:token>/", api_views.RegistroPublicoView.as_view(), name="api-registro"),
 ]

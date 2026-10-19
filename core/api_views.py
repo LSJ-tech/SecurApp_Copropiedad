@@ -9,16 +9,23 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Condominio, Membresia
+from django.contrib.auth.models import User
+from django.utils import timezone
+
+from .forms import RegistroResidenteForm
+from .models import Condominio, Membresia, Torre, Unidad
 from .permissions import EsDevquad, EsDevquadODelegado, TieneCondominioActivo, condominio_de_la_api
 from .serializers import (
     CambiarContrasenaSerializer,
+    CondominioEdicionSerializer,
     CondominioResumenSerializer,
     CustomTokenObtainPairSerializer,
     DirectorioMiembroSerializer,
     MembresiaSerializer,
     MiPerfilSerializer,
 )
+from .usuarios import generar_codigo_invitacion, generar_username
+from .views import _contexto_invitacion, enviar_correo_bienvenida
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -130,6 +137,104 @@ class DirectorioView(APIView):
             .order_by("_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "user__last_name")
         )
         return Response(DirectorioMiembroSerializer(qs, many=True).data)
+
+
+class CondominioView(APIView):
+    """Ver/editar el condominio activo -- equivalente a CondominioUpdateView
+    del panel web (sin la parte de QR/invitación, ver InvitacionView)."""
+
+    permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
+
+    @extend_schema(responses=CondominioEdicionSerializer)
+    def get(self, request):
+        return Response(CondominioEdicionSerializer(condominio_de_la_api(request)).data)
+
+    @extend_schema(request=CondominioEdicionSerializer, responses=CondominioEdicionSerializer)
+    def patch(self, request):
+        serializer = CondominioEdicionSerializer(condominio_de_la_api(request), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class RegenerarTokenApiView(APIView):
+    """Regenera el token de autoregistro -- equivalente a
+    RegenerarTokenResidentesView del panel web (invalida el link/QR
+    anterior)."""
+
+    permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
+
+    @extend_schema(responses=inline_serializer("RegenerarTokenResponse", {"token_registro_residentes": serializers.CharField()}))
+    def post(self, request):
+        condominio = condominio_de_la_api(request)
+        condominio.token_registro_residentes = generar_codigo_invitacion()
+        condominio.save(update_fields=["token_registro_residentes"])
+        return Response({"token_registro_residentes": condominio.token_registro_residentes})
+
+
+class InvitacionView(APIView):
+    """Link/mensaje de autoregistro para compartir -- equivalente a
+    CompartirInvitacionView del panel web (_contexto_invitacion ya arma el
+    dict con "link_autoregistro"/"mensaje_whatsapp_invitacion")."""
+
+    permission_classes = [IsAuthenticated, TieneCondominioActivo]
+
+    def get(self, request):
+        return Response(_contexto_invitacion(request, condominio_de_la_api(request)))
+
+
+class RegistroPublicoView(APIView):
+    """Autoregistro público de residente -- equivalente a
+    RegistroResidenteView del panel web, pero sin sesión: devuelve tokens
+    JWT en vez de loguear por cookie, para que la app móvil pueda seguir
+    autenticada apenas se crea la cuenta."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, token):
+        condominio = get_object_or_404(Condominio, token_registro_residentes=token)
+        torres = Torre.objects.filter(condominio=condominio).annotate(_len=Length("nombre")).order_by("_len", "nombre")
+        unidades = Unidad.objects.filter(condominio=condominio).select_related("torre").annotate(
+            _len=Length("numero"),
+        ).order_by("torre_id", "_len", "numero")
+        return Response({
+            "condominio": {
+                "nombre": condominio.nombre,
+                "etiqueta_organizacion": condominio.etiqueta_organizacion,
+                "etiqueta_torre": condominio.etiqueta_torre,
+                "etiqueta_unidad": condominio.etiqueta_unidad,
+                "genero_unidad": condominio.genero_unidad,
+            },
+            "torres": [{"id": t.pk, "nombre": t.nombre} for t in torres],
+            "unidades": [{"id": u.pk, "numero": u.numero, "torre_id": u.torre_id, "calle": u.calle} for u in unidades],
+            "modo_casas": not torres.exists(),
+        })
+
+    def post(self, request, token):
+        condominio = get_object_or_404(Condominio, token_registro_residentes=token)
+        form = RegistroResidenteForm(data=request.data, condominio=condominio)
+        if not form.is_valid():
+            return Response(form.errors, status=400)
+        datos = form.cleaned_data
+        username = generar_username(datos["nombre"], datos["apellido"])
+        user = User.objects.create_user(
+            username=username, password=datos["password1"], email=datos.get("email", ""),
+            first_name=datos["nombre"], last_name=datos["apellido"],
+        )
+        membresia = Membresia.objects.create(
+            user=user, condominio=condominio, unidad=datos["unidad"], rol="residente",
+            terminos_aceptados_en=timezone.now(),
+        )
+        if user.email:
+            enviar_correo_bienvenida(user, condominio)
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "username": username,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "membresia": MembresiaSerializer(membresia).data,
+        }, status=201)
 
 
 class CambiarContrasenaView(APIView):

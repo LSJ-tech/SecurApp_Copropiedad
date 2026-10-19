@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from .comunas_chile import COMUNAS_POR_REGION
 from .forms import _validar_email_unico
 from .models import Condominio, Membresia, Unidad
 
@@ -20,6 +21,27 @@ class UnidadResumenSerializer(serializers.ModelSerializer):
         fields = ["id", "numero"]
 
 
+class DirectorioMiembroSerializer(serializers.Serializer):
+    """Directorio simple -- solo nombre y block/depto, igual que
+    DirectorioVecinosView (core/views.py). A propósito NO es un
+    ModelSerializer: el shape (torre/unidad aplanados, calle+numero
+    combinados) no calza 1:1 con ningún modelo."""
+
+    nombre = serializers.SerializerMethodField()
+    torre = serializers.CharField(source="unidad.torre.nombre", read_only=True, default=None)
+    unidad = serializers.SerializerMethodField()
+
+    def get_nombre(self, obj):
+        return obj.user.get_full_name() or "Vecino/a"
+
+    def get_unidad(self, obj):
+        if obj.unidad_id is None:
+            return None
+        if obj.unidad.calle:
+            return f"{obj.unidad.calle} {obj.unidad.numero}"
+        return obj.unidad.numero
+
+
 class MembresiaSerializer(serializers.ModelSerializer):
     condominio = CondominioResumenSerializer(read_only=True)
     unidad = UnidadResumenSerializer(read_only=True)
@@ -28,6 +50,26 @@ class MembresiaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Membresia
         fields = ["rol", "condominio", "unidad", "nombre"]
+
+
+class CondominioEdicionSerializer(serializers.ModelSerializer):
+    """Ver/editar el condominio ya creado -- mismos campos que
+    CondominioForm (panel web /mi-condominio/), con la misma validación
+    cruzada región/comuna (ver RegionComunaMixin.clean())."""
+
+    class Meta:
+        model = Condominio
+        fields = [
+            "nombre", "etiqueta_organizacion", "direccion", "comuna", "region", "datos_transferencia",
+            "etiqueta_torre", "etiqueta_unidad", "genero_unidad",
+        ]
+
+    def validate(self, attrs):
+        region = attrs.get("region", getattr(self.instance, "region", ""))
+        comuna = attrs.get("comuna", getattr(self.instance, "comuna", ""))
+        if region and comuna and comuna not in COMUNAS_POR_REGION.get(region, []):
+            raise serializers.ValidationError({"comuna": "Esa comuna no pertenece a la región elegida."})
+        return attrs
 
 
 class MiPerfilSerializer(serializers.ModelSerializer):

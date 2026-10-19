@@ -2509,3 +2509,57 @@ class CondominioApiTests(TestCase):
         self.condominio.refresh_from_db()
         self.assertNotEqual(self.condominio.token_registro_residentes, token_anterior)
         self.assertEqual(r.json()["token_registro_residentes"], self.condominio.token_registro_residentes)
+
+
+class InvitacionApiTests(TestCase):
+    def test_devuelve_el_link_y_el_mensaje(self):
+        condominio = Condominio.objects.create(nombre="Test Invitacion Api", plan="premium")
+        unidad = Unidad.objects.create(condominio=condominio, numero="1")
+        residente = crear_membresia(condominio, "residente", unidad=unidad, username="invitacion_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("api-invitacion"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(condominio.token_registro_residentes, r.json()["link_autoregistro"])
+
+
+class RegistroPublicoApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Registro Publico Api", plan="premium")
+        cls.torre = Torre.objects.create(condominio=cls.condominio, nombre="1")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, torre=cls.torre, numero="101")
+
+    def test_get_devuelve_las_unidades_disponibles(self):
+        r = self.client.get(reverse("api-registro", args=[self.condominio.token_registro_residentes]))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        self.assertEqual(datos["condominio"]["nombre"], "Test Registro Publico Api")
+        self.assertEqual(len(datos["unidades"]), 1)
+
+    def test_token_invalido_da_404(self):
+        r = self.client.get(reverse("api-registro", args=["token-que-no-existe"]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_post_crea_la_cuenta_y_devuelve_tokens(self):
+        r = self.client.post(
+            reverse("api-registro", args=[self.condominio.token_registro_residentes]),
+            {
+                "nombre": "Pedro", "apellido": "Pérez", "email": "pedro.registro.api@example.com",
+                "unidad": self.unidad.pk, "password1": "ClaveSegura123", "password2": "ClaveSegura123",
+                "acepto_terminos": True,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 201)
+        datos = r.json()
+        self.assertTrue(datos["access"])
+        membresia = Membresia.objects.get(user__username=datos["username"])
+        self.assertEqual(membresia.condominio, self.condominio)
+        self.assertEqual(membresia.unidad, self.unidad)
+
+    def test_post_con_datos_invalidos_devuelve_400(self):
+        r = self.client.post(
+            reverse("api-registro", args=[self.condominio.token_registro_residentes]),
+            {"nombre": "Pedro"}, content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
