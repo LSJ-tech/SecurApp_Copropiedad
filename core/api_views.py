@@ -1,7 +1,8 @@
+from django.db import transaction
 from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
-from rest_framework import serializers, viewsets
+from rest_framework import mixins, serializers, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,7 +14,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .forms import RegistroResidenteForm
+from .forms import CrearMiembroForm, RegistroResidenteForm
 from .models import Condominio, Membresia, Torre, Unidad
 from .permissions import CondominioQuerysetMixin, EsDevquad, EsDevquadODelegado, TieneCondominioActivo, condominio_de_la_api
 from .serializers import (
@@ -22,12 +23,13 @@ from .serializers import (
     CondominioResumenSerializer,
     CustomTokenObtainPairSerializer,
     DirectorioMiembroSerializer,
+    MembresiaListSerializer,
     MembresiaSerializer,
     MiPerfilSerializer,
     TorreSerializer,
     UnidadSerializer,
 )
-from .usuarios import generar_codigo_invitacion, generar_username
+from .usuarios import generar_codigo_invitacion, generar_password_temporal, generar_username
 from .views import _contexto_invitacion, enviar_correo_bienvenida
 
 
@@ -288,3 +290,44 @@ class UnidadViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(condominio=condominio_de_la_api(self.request))
+
+
+class MembresiaViewSet(viewsets.GenericViewSet, mixins.ListModelMixin):
+    """Listar/crear miembros del condominio activo -- equivalente a
+    MiembroListView/CrearMiembroView del panel web. create() reusa
+    CrearMiembroForm directo (en vez de un serializer aparte) porque el
+    shape de entrada/salida no es el modelo Membresia 1:1: genera usuario
+    y contraseña temporal, igual que la vista HTML."""
+
+    serializer_class = MembresiaListSerializer
+    permission_classes = [IsAuthenticated, EsDevquad, TieneCondominioActivo]
+    pagination_class = PaginacionEstandar
+
+    def get_queryset(self):
+        condominio = condominio_de_la_api(self.request)
+        return (
+            Membresia.objects.filter(condominio=condominio)
+            .select_related("user", "unidad", "unidad__torre")
+            .annotate(_torre_len=Length("unidad__torre__nombre"), _num_len=Length("unidad__numero"))
+            .order_by("rol", "_torre_len", "unidad__torre__nombre", "_num_len", "unidad__numero", "user__last_name")
+        )
+
+    def create(self, request, *args, **kwargs):
+        condominio = condominio_de_la_api(request)
+        form = CrearMiembroForm(data=request.data, condominio=condominio)
+        if not form.is_valid():
+            return Response(form.errors, status=400)
+        datos = form.cleaned_data
+        username = generar_username(datos["nombre"], datos["apellido"])
+        password = generar_password_temporal()
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username, password=password,
+                first_name=datos["nombre"], last_name=datos["apellido"], email=datos.get("email", ""),
+            )
+            membresia = Membresia.objects.create(
+                user=user, condominio=condominio, rol=datos["rol"], unidad=datos.get("unidad"),
+            )
+        if user.email:
+            enviar_correo_bienvenida(user, condominio)
+        return Response({"id": membresia.pk, "username": username, "password_temporal": password}, status=201)

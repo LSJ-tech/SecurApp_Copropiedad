@@ -68,6 +68,23 @@ class DirectorioMiembroSerializer(serializers.Serializer):
         return obj.unidad.numero
 
 
+class MembresiaListSerializer(serializers.ModelSerializer):
+    """Listado de miembros del condominio activo -- equivalente a
+    MiembroListView del panel web (nombre, rol, unidad)."""
+
+    nombre = serializers.SerializerMethodField()
+    rol_display = serializers.CharField(source="get_rol_display", read_only=True)
+    unidad_numero = serializers.CharField(source="unidad.numero", read_only=True, default=None)
+    unidad_torre = serializers.CharField(source="unidad.torre.nombre", read_only=True, default=None)
+
+    class Meta:
+        model = Membresia
+        fields = ["id", "nombre", "rol", "rol_display", "unidad_numero", "unidad_torre"]
+
+    def get_nombre(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
 class MembresiaSerializer(serializers.ModelSerializer):
     condominio = CondominioResumenSerializer(read_only=True)
     unidad = UnidadResumenSerializer(read_only=True)

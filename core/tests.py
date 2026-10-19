@@ -2639,3 +2639,53 @@ class UnidadApiTests(TestCase):
         datos = r.json()
         self.assertIn("results", datos)
         self.assertEqual(len(datos["results"]), 50)
+
+
+class MembresiaApiTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Membresia Api", plan="premium")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, numero="1")
+
+    def _login_devquad(self):
+        devquad = crear_devquad("membresia_api_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+
+    def test_lista_los_miembros_del_condominio_activo(self):
+        crear_membresia(self.condominio, "residente", unidad=self.unidad, username="membresia_api_vecino", first_name="Rosa", last_name="Diaz")
+        self._login_devquad()
+        r = self.client.get(reverse("membresia-list"))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()["results"]
+        fila = next(f for f in datos if f["nombre"] == "Rosa Diaz")
+        self.assertEqual(fila["unidad_numero"], "1")
+
+    def test_crear_un_miembro_nuevo(self):
+        self._login_devquad()
+        r = self.client.post(
+            reverse("membresia-list"),
+            {"nombre": "Luis", "apellido": "Rojas", "email": "luis.membresia.api@example.com", "rol": "residente", "unidad": self.unidad.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 201)
+        datos = r.json()
+        self.assertTrue(datos["password_temporal"])
+        membresia = Membresia.objects.get(pk=datos["id"])
+        self.assertEqual(membresia.condominio, self.condominio)
+        self.assertEqual(membresia.unidad, self.unidad)
+
+    def test_crear_residente_sin_unidad_da_400(self):
+        self._login_devquad()
+        r = self.client.post(
+            reverse("membresia-list"),
+            {"nombre": "Luis", "apellido": "Rojas", "email": "luis2.membresia.api@example.com", "rol": "residente"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_un_residente_no_puede_listar_ni_crear(self):
+        residente = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="membresia_api_residente")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("membresia-list"))
+        self.assertEqual(r.status_code, 403)
