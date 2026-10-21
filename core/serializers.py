@@ -106,7 +106,7 @@ class MembresiaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Membresia
-        fields = ["rol", "condominio", "unidad", "nombre"]
+        fields = ["rol", "condominio", "unidad", "nombre", "telefono"]
 
 
 class CondominioEdicionSerializer(serializers.ModelSerializer):
@@ -142,11 +142,21 @@ class CondominioEdicionSerializer(serializers.ModelSerializer):
 class MiPerfilSerializer(serializers.ModelSerializer):
     """Editar los propios datos -- mismos campos y misma validación de email
     único que MiPerfilForm (panel web), para que ambos caminos se comporten
-    igual."""
+    igual. `telefono` vive en Membresia, no en User -- igual que
+    MiPerfilForm, se agrega como campo extra y se guarda a mano en
+    update()."""
+
+    telefono = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email"]
+        fields = ["first_name", "last_name", "email", "telefono"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        membresia = getattr(instance, "membresia", None)
+        data["telefono"] = membresia.telefono if membresia else ""
+        return data
 
     def validate_email(self, email):
         if not email:
@@ -155,6 +165,16 @@ class MiPerfilSerializer(serializers.ModelSerializer):
             return _validar_email_unico(email, excluir_user_id=self.instance.pk if self.instance else None)
         except DjangoValidationError as error:
             raise serializers.ValidationError(error.message)
+
+    def update(self, instance, validated_data):
+        telefono = validated_data.pop("telefono", None)
+        user = super().update(instance, validated_data)
+        if telefono is not None:
+            membresia = getattr(user, "membresia", None)
+            if membresia is not None:
+                membresia.telefono = telefono
+                membresia.save(update_fields=["telefono"])
+        return user
 
 
 class CambiarContrasenaSerializer(serializers.Serializer):

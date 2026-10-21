@@ -1045,6 +1045,24 @@ class ApiMiPerfilYCambiarContrasenaTests(TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
+    def test_get_me_incluye_el_telefono_de_la_membresia(self):
+        self.user.membresia.telefono = "+56911112222"
+        self.user.membresia.save(update_fields=["telefono"])
+        r = self.client.get(reverse("api-me"), **self._auth())
+        self.assertEqual(r.json()["telefono"], "+56911112222")
+
+    def test_patch_me_actualiza_el_telefono(self):
+        r = self.client.patch(reverse("api-me"), {"telefono": "+56933334444"}, content_type="application/json", **self._auth())
+        self.assertEqual(r.status_code, 200)
+        self.user.membresia.refresh_from_db()
+        self.assertEqual(self.user.membresia.telefono, "+56933334444")
+
+    def test_login_devuelve_el_telefono_en_membresia(self):
+        self.user.membresia.telefono = "+56911112222"
+        self.user.membresia.save(update_fields=["telefono"])
+        r = self.client.post(reverse("api-login"), {"username": "api_perfil_user", "password": "clave-segura-123"}, content_type="application/json")
+        self.assertEqual(r.json()["membresia"]["telefono"], "+56911112222")
+
     def test_cambiar_contrasena_requiere_autenticacion(self):
         r = self.client.post(reverse("api-cambiar-contrasena"), {}, content_type="application/json")
         self.assertEqual(r.status_code, 401)
