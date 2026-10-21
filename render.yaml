@@ -2,7 +2,7 @@ services:
   - type: web
     name: securapp-copropiedad
     env: python
-    plan: free  # Pasar a un plan pago cuando el servicio esté listo para producción real.
+    plan: starter  # $7/mes -- subido desde el dashboard el 2026-10-21, reflejado acá para que un Blueprint sync no lo devuelva a free.
     buildCommand: "./build.sh"
     startCommand: "gunicorn config.wsgi:application"
     envVars:
@@ -34,9 +34,8 @@ services:
 # Supabase) -- requiere los secrets DATABASE_URL y MERCADOPAGO_ACCESS_TOKEN
 # configurados en GitHub (Settings → Secrets and variables → Actions).
 
-# El bloque "databases:" que autoprovisionaba el Postgres de Render se
-# retiró a propósito tras migrar los datos reales a Supabase (ver
-# scripts/migrar_a_supabase.py). La base vieja de Render se deja viva unos
-# días como red de seguridad para un rollback instantáneo -- no se borra
-# acá, se borra a mano desde el dashboard cuando quede confirmado que
-# Supabase funciona bien en producción.
+# La base de datos vive en Supabase desde el 2026-10-18 (ver
+# scripts/migrar_a_supabase.py). El Postgres de Render que la precedía ya
+# se verificó estable -- si todavía sigue existiendo como recurso aparte
+# en el dashboard de Render, se puede borrar a mano (no se gestiona
+# desde este archivo).
