@@ -694,3 +694,47 @@ class AlertaLecturaModeloTests(TestCase):
         AlertaLectura.objects.create(alerta=alerta, membresia=autor)
         with self.assertRaises(IntegrityError):
             AlertaLectura.objects.create(alerta=alerta, membresia=autor)
+
+
+class MarcarVistoAlertaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Marcar Visto", plan="premium")
+
+    def setUp(self):
+        self.autor = crear_membresia(self.condominio, "residente", username="marcar_visto_autor")
+        self.vecino = crear_membresia(self.condominio, "residente", username="marcar_visto_vecino")
+        self.alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+
+    def test_un_vecino_puede_marcarla_como_vista(self):
+        from alertas.models import AlertaLectura
+
+        self.client.force_login(self.vecino.user)
+        r = self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(AlertaLectura.objects.filter(alerta=self.alerta, membresia=self.vecino).exists())
+
+    def test_marcarla_dos_veces_no_duplica(self):
+        from alertas.models import AlertaLectura
+
+        self.client.force_login(self.vecino.user)
+        self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(AlertaLectura.objects.filter(alerta=self.alerta, membresia=self.vecino).count(), 1)
+
+    def test_devquad_no_rompe_aunque_no_tenga_membresia(self):
+        self.client.force_login(crear_devquad("marcar_visto_devquad"))
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.status_code, 200)
+
+    def test_un_miembro_de_un_condominio_vecino_no_cuenta(self):
+        from alertas.models import AlertaLectura
+
+        vecino_otro_condominio = Condominio.objects.create(nombre="Test Marcar Visto Vecino Red", plan="premium")
+        self.condominio.condominios_vecinos.add(vecino_otro_condominio)
+        residente_vecino = crear_membresia(vecino_otro_condominio, "residente", username="marcar_visto_red")
+        self.client.force_login(residente_vecino.user)
+        r = self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(AlertaLectura.objects.filter(alerta=self.alerta, membresia=residente_vecino).exists())

@@ -10,7 +10,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, condominio_de_la_api
 
-from .models import Alerta
+from .models import Alerta, AlertaLectura
 from .serializers import AlertaSerializer
 from .services import notificar_alerta, notificar_alerta_resuelta
 
@@ -63,3 +63,11 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
         alerta.save()
         notificar_alerta_resuelta(alerta)
         return Response(AlertaSerializer(alerta).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, TieneCondominioActivo])
+    def marcar_visto(self, request, pk=None):
+        alerta = self.get_object()
+        membresia = getattr(request.user, "membresia", None)
+        if membresia is not None and membresia.condominio_id == alerta.condominio_id:
+            AlertaLectura.objects.get_or_create(alerta=alerta, membresia=membresia)
+        return Response(AlertaSerializer(alerta, context={"request": request}).data)
