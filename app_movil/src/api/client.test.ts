@@ -101,3 +101,19 @@ test("si la request se cuelga más de 8s, se cancela y se trata como ErrorDeRed"
   await promesa;
   jest.useRealTimers();
 });
+
+test("ErrorDeServidor carga el cuerpo de la respuesta (para mostrar mensajes de validación reales)", async () => {
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "acc1", refresh: "ref1" });
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: false,
+    status: 400,
+    json: async () => ({ email: ["Ya existe otra cuenta con ese correo."] }),
+  }) as any;
+  try {
+    await apiFetch("/api/v1/auth/me/", { method: "PATCH" });
+    throw new Error("no debería llegar acá");
+  } catch (error) {
+    expect(error).toBeInstanceOf(ErrorDeServidor);
+    expect((error as ErrorDeServidor).body).toEqual({ email: ["Ya existe otra cuenta con ese correo."] });
+  }
+});

@@ -15,9 +15,13 @@ export class ErrorDeRed extends Error {}
 /** El servidor SÍ respondió, pero con un error (4xx/5xx) -- no es
  * transitorio, reintentarlo a ciegas no lo va a arreglar. */
 export class ErrorDeServidor extends Error {
-  constructor(public status: number) {
+  constructor(public status: number, public body?: unknown) {
     super(`El servidor respondió ${status}.`);
   }
+}
+
+async function leerCuerpoSiSePuede(respuesta: Response): Promise<unknown> {
+  return respuesta.json().catch(() => undefined);
 }
 
 type ListenerSesionExpirada = () => void;
@@ -82,7 +86,7 @@ export async function apiFetch<T>(
 
   if (!requiereAuth) {
     const respuesta = await fetchConTimeout(path, { ...options, headers });
-    if (!respuesta.ok) throw new ErrorDeServidor(respuesta.status);
+    if (!respuesta.ok) throw new ErrorDeServidor(respuesta.status, await leerCuerpoSiSePuede(respuesta));
     return respuesta.json();
   }
 
@@ -105,6 +109,6 @@ export async function apiFetch<T>(
     });
   }
 
-  if (!respuesta.ok) throw new ErrorDeServidor(respuesta.status);
+  if (!respuesta.ok) throw new ErrorDeServidor(respuesta.status, await leerCuerpoSiSePuede(respuesta));
   return respuesta.json();
 }
