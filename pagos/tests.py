@@ -529,6 +529,71 @@ class SuscripcionRecurrenteAdminTests(TestCase):
         suscripcion.refresh_from_db()
         self.assertEqual(suscripcion.estado, "pendiente")
 
+    @patch("pagos.admin.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/admin"})
+    def test_accion_manda_recordatorio_a_una_donacion_pendiente(self, mock_obtener):
+        """Independiente de la ventana automática de 24-48h (ver
+        sincronizar_estado_suscripcion) -- para cuando devquad quiere
+        mandar el empujón a mano, sin esperar al cron ni a que calce con
+        esa ventana."""
+        membresia = crear_membresia(self.condominio, "residente", username="admin_recordatorio", first_name="Tomás")
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=membresia, tipo="donacion", monto=2000,
+            mercadopago_preapproval_id="pre-admin-recordatorio", estado="pendiente",
+        )
+        r = self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "enviar_recordatorio_donacion",
+            "_selected_action": [str(suscripcion.pk)],
+        }, follow=True)
+        self.assertContains(r, "Se mandó el recordatorio")
+        suscripcion.refresh_from_db()
+        self.assertIsNotNone(suscripcion.recordatorio_enviado_en)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [membresia.user.email])
+        self.assertIn("Tomás", mail.outbox[0].body)
+        self.assertIn("https://mp.test/autorizar/admin", mail.outbox[0].alternatives[0][0])
+
+    def test_accion_ignora_una_suscripcion_que_no_es_donacion(self):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, tipo="suscripcion", monto=19990,
+            mercadopago_preapproval_id="pre-admin-recordatorio-susc", estado="pendiente",
+        )
+        r = self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "enviar_recordatorio_donacion",
+            "_selected_action": [str(suscripcion.pk)],
+        }, follow=True)
+        self.assertContains(r, "se ignoraron")
+        self.assertEqual(len(mail.outbox), 0)
+        suscripcion.refresh_from_db()
+        self.assertIsNone(suscripcion.recordatorio_enviado_en)
+
+    def test_accion_ignora_una_donacion_que_no_esta_pendiente(self):
+        membresia = crear_membresia(self.condominio, "residente", username="admin_recordatorio_autorizada")
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=membresia, tipo="donacion", monto=2000,
+            mercadopago_preapproval_id="pre-admin-recordatorio-autorizada", estado="autorizada",
+        )
+        self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "enviar_recordatorio_donacion",
+            "_selected_action": [str(suscripcion.pk)],
+        })
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch("pagos.admin.obtener_preapproval_mercadopago", return_value=None)
+    def test_accion_recordatorio_avisa_si_mercadopago_no_responde(self, mock_obtener):
+        membresia = crear_membresia(self.condominio, "residente", username="admin_recordatorio_falla")
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=membresia, tipo="donacion", monto=2000,
+            mercadopago_preapproval_id="pre-admin-recordatorio-falla", estado="pendiente",
+        )
+        r = self.client.post("/admin/pagos/suscripcionrecurrente/", {
+            "action": "enviar_recordatorio_donacion",
+            "_selected_action": [str(suscripcion.pk)],
+        }, follow=True)
+        self.assertContains(r, "No se pudo consultar la suscripción recurrente")
+        self.assertEqual(len(mail.outbox), 0)
+        suscripcion.refresh_from_db()
+        self.assertIsNone(suscripcion.recordatorio_enviado_en)
+
 
 class SincronizarEstadoSuscripcionTests(TestCase):
     """sincronizar_estado_suscripcion (pagos/views.py) -- la misma lógica
