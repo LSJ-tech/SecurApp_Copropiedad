@@ -175,7 +175,7 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
     """Autoregistro público de un residente -- elige su propio depto de una lista, vía el link/QR del condominio."""
 
     field_order = [
-        "nombre", "apellido", "email", "unidad", "calle_unidad_libre", "torre_unidad_libre", "numero_unidad_libre",
+        "nombre", "apellido", "email", "telefono", "unidad", "calle_unidad_libre", "torre_unidad_libre", "numero_unidad_libre",
         "password1", "password2", "acepto_terminos",
     ]
 
@@ -185,6 +185,10 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
         label=LABEL_EMAIL,
         widget=forms.EmailInput(attrs={"class": "form-control"}),
         help_text="Te mandamos un correo de bienvenida.",
+    )
+    telefono = forms.CharField(
+        required=False, max_length=30, label="Tu teléfono (opcional)",
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
     )
     # empty_label explícito en español -- el default de Django 6.1
     # ("- Select an option -") no está traducido todavía en el catálogo de

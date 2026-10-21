@@ -406,7 +406,7 @@ class RegistroResidenteView(FormView):
         )
         Membresia.objects.create(
             user=user, condominio=self.condominio, unidad=datos["unidad"], rol="residente",
-            terminos_aceptados_en=timezone.now(),
+            terminos_aceptados_en=timezone.now(), telefono=datos.get("telefono", ""),
         )
         if user.email:
             enviar_correo_bienvenida(user, self.condominio)

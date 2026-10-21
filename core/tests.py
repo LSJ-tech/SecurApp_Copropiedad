@@ -799,6 +799,16 @@ class CorreoBienvenidaTests(TestCase):
         self.assertTrue(User.objects.filter(email="carla@example.com").exists())
         mock_send.assert_called_once()
 
+    def test_guarda_el_telefono_si_lo_escriben(self):
+        r = self.client.post(reverse("registro-residente", kwargs={"token": self.condominio.token_registro_residentes}), {
+            "nombre": "Nora", "apellido": "Lagos", "email": "nora@example.com", "unidad": self.unidad.pk,
+            "telefono": "+56911112222",
+            "password1": "unaClaveSegura123", "password2": "unaClaveSegura123", "acepto_terminos": True,
+        })
+        self.assertEqual(r.status_code, 302)
+        membresia = Membresia.objects.get(user__email="nora@example.com")
+        self.assertEqual(membresia.telefono, "+56911112222")
+
 
 class EmailUnicoTests(TestCase):
     """Un mismo email no puede quedar en dos cuentas -- se usa para el correo
@@ -2657,6 +2667,20 @@ class RegistroPublicoApiTests(TestCase):
             {"nombre": "Pedro"}, content_type="application/json",
         )
         self.assertEqual(r.status_code, 400)
+
+    def test_post_guarda_el_telefono_si_lo_mandan(self):
+        r = self.client.post(
+            reverse("api-registro", args=[self.condominio.token_registro_residentes]),
+            {
+                "nombre": "Pedro", "apellido": "Pérez", "email": "pedro.telefono.api@example.com",
+                "telefono": "+56911112222", "unidad": self.unidad.pk,
+                "password1": "ClaveSegura123", "password2": "ClaveSegura123", "acepto_terminos": True,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 201)
+        membresia = Membresia.objects.get(user__username=r.json()["username"])
+        self.assertEqual(membresia.telefono, "+56911112222")
 
     def test_si_falla_crear_la_membresia_no_queda_un_user_huerfano(self):
         """create_user() y Membresia.objects.create() tienen que ser
