@@ -15,13 +15,21 @@ function primerMensajeDeError(error: unknown): string {
 
 export default function PantallaPerfil() {
   const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Hallazgo Critical de la revisión final: si la carga inicial falla,
+  // el formulario NO se muestra (en vez de mostrarse vacío) -- guardar
+  // sobre un formulario vacío borraba nombre/apellido/correo/teléfono
+  // reales en el servidor, sin que nada lo avisara.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [guardadoOk, setGuardadoOk] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
 
-  useEffect(() => {
+  function cargar() {
+    setCargando(true);
+    setErrorCarga(null);
     obtenerMiPerfil()
       .then((perfil) => {
         setFirstName(perfil.first_name ?? "");
@@ -31,25 +39,41 @@ export default function PantallaPerfil() {
         setCargando(false);
       })
       .catch(() => {
-        setError("No se pudo cargar tu perfil.");
+        setErrorCarga("No se pudo cargar tu perfil.");
         setCargando(false);
       });
-  }, []);
+  }
+
+  useEffect(cargar, []);
 
   async function manejarGuardar() {
-    setError(null);
+    setErrorGuardado(null);
+    setGuardadoOk(false);
     try {
       await actualizarMiPerfil({ first_name: firstName, last_name: lastName, email, telefono });
+      setGuardadoOk(true);
     } catch (error) {
-      setError(primerMensajeDeError(error));
+      setErrorGuardado(primerMensajeDeError(error));
     }
   }
 
   if (cargando) return null;
 
+  if (errorCarga) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>{errorCarga}</Text>
+        <Pressable style={styles.boton} onPress={cargar}>
+          <Text style={styles.botonTexto}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {error && <Text style={styles.error}>{error}</Text>}
+      {errorGuardado && <Text style={styles.error}>{errorGuardado}</Text>}
+      {guardadoOk && <Text style={styles.exito}>Tus datos quedaron actualizados.</Text>}
       <TextInput style={styles.input} placeholder="Nombre" value={firstName} onChangeText={setFirstName} />
       <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
       <TextInput
@@ -73,4 +97,5 @@ const styles = StyleSheet.create({
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
   error: { color: "#b00020", textAlign: "center" },
+  exito: { color: colores.accent, textAlign: "center" },
 });

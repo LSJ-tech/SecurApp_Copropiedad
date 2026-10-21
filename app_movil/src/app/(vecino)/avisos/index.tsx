@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { crearAviso, listarAvisos, marcarLeido, AvisoOut } from "@/api/avisos";
@@ -11,6 +11,10 @@ export default function ListaAvisosScreen() {
   const [error, setError] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [cuerpo, setCuerpo] = useState("");
+  // Hallazgo Important de la revisión final: dos toques seguidos en
+  // "Publicar aviso" mandaban el aviso dos veces -- cada uno dispara un
+  // push a todo el condominio o torre (notificar_aviso).
+  const publicandoRef = useRef(false);
 
   useEffect(() => {
     listarAvisos()
@@ -27,6 +31,8 @@ export default function ListaAvisosScreen() {
   }, []);
 
   async function manejarPublicar() {
+    if (publicandoRef.current) return;
+    publicandoRef.current = true;
     try {
       const nuevo = await crearAviso({ titulo, cuerpo });
       setAvisos((previos) => [nuevo, ...previos]);
@@ -34,6 +40,8 @@ export default function ListaAvisosScreen() {
       setCuerpo("");
     } catch {
       setError("No se pudo publicar el aviso.");
+    } finally {
+      publicandoRef.current = false;
     }
   }
 
