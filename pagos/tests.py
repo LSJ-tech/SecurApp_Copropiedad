@@ -684,6 +684,74 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         sincronizar_estado_suscripcion(suscripcion)
         self.assertEqual(len(mail.outbox), 0)
 
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=True)
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending"})
+    def test_una_donacion_pendiente_hace_mas_de_48_horas_se_cancela_sola(self, mock_obtener, mock_cancelar):
+        """Si nadie autorizó NI canceló explícitamente, Mercado Pago deja el
+        preapproval en "pending" indefinidamente -- se da por abandonada y
+        se cancela de verdad (no solo local, para no dejar un preapproval
+        zombie que alguien autorice por sorpresa meses después)."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="donacion", monto=Decimal("2000"))
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=49),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+        self.assertIsNotNone(suscripcion.fecha_cancelacion)
+        mock_cancelar.assert_called_once_with(suscripcion)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending"})
+    def test_una_donacion_pendiente_hace_menos_de_48_horas_no_se_cancela(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="donacion", monto=Decimal("2000"))
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=1),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "pendiente")
+
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=False)
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending"})
+    def test_si_mercadopago_no_confirma_la_cancelacion_sigue_pendiente(self, mock_obtener, mock_cancelar):
+        """No se marca "cancelada" local si Mercado Pago no confirmó que
+        de verdad se canceló -- dejaría el preapproval vivo del lado de
+        Mercado Pago pero "cancelada" acá, mintiendo sobre el estado real."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="donacion", monto=Decimal("2000"))
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=49),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "pendiente")
+
+    @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=True)
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending"})
+    def test_una_suscripcion_de_condominio_pendiente_no_se_cancela_sola(self, mock_obtener, mock_cancelar):
+        """El auto-vencimiento a las 48h es solo para donaciones -- una
+        suscripción SaaS de condominio pendiente es una relación comercial
+        real, no se cancela sola sin que nadie la revise."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="suscripcion")
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=49),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "pendiente")
+        mock_cancelar.assert_not_called()
+
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
     def test_no_duplica_el_pago_si_ya_hay_uno_registrado(self, mock_obtener):
         """pausada -> autorizada (reactivación) no debe generar un segundo

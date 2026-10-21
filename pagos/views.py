@@ -143,6 +143,23 @@ def sincronizar_estado_suscripcion(suscripcion):
         if es_donacion_recien_autorizada:
             enviar_correo_gracias_donacion(suscripcion)
 
+    # Una donación "pendiente" que nadie autorizó NI canceló se queda así
+    # en Mercado Pago indefinidamente (no vence sola del otro lado) -- se
+    # da por abandonada pasadas 48h desde que se creó y se cancela de
+    # verdad en Mercado Pago (no solo local, para no dejar un preapproval
+    # zombie que alguien autorice por sorpresa meses después). Solo para
+    # donaciones: una suscripción SaaS de condominio pendiente es una
+    # relación comercial real, no se cancela sola sin que nadie la revise.
+    if (
+        suscripcion.tipo == "donacion"
+        and suscripcion.estado == "pendiente"
+        and timezone.now() - suscripcion.fecha_creacion > datetime.timedelta(hours=48)
+        and cancelar_suscripcion_recurrente(suscripcion)
+    ):
+        suscripcion.estado = "cancelada"
+        suscripcion.fecha_cancelacion = timezone.now()
+        suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
+
     # Mercado Pago solo pasa una autorización a "authorized" después de
     # cobrar la primera cuota con éxito (lo confirmamos nosotros mismos: la
     # pantalla "Pagaste $X" aparece apenas se autoriza). Si el webhook nunca
