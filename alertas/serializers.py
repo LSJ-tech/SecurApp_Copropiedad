@@ -27,8 +27,17 @@ class AlertaSerializer(serializers.ModelSerializer):
 
     def get_visto_por_count(self, obj) -> Optional[int]:
         """Visible solo para el propio autor de la alerta -- es reaseguro
-        personal ("ya vieron tu alerta"), no una métrica para cualquiera."""
+        personal ("ya vieron tu alerta"), no una métrica para cualquiera.
+        Usa la anotación del queryset (AlertaViewSet.queryset), no una
+        consulta por fila -- evita N+1 al listar."""
         request = self.context.get("request")
         if not (request and request.user.id == obj.autor.user_id):
             return None
-        return obj.lecturas.count()
+        count = getattr(obj, "visto_por_count_anotado", None)
+        if count is not None:
+            return count
+        # Instancia recién creada (CreateModelMixin serializa el objeto
+        # devuelto por .save(), no uno vuelto a traer por get_queryset() --
+        # no lleva la anotación). Siempre 0 en ese caso, pero se calcula
+        # igual en vez de asumirlo.
+        return obj.lecturas.filter(membresia__condominio_id=obj.condominio_id).count()

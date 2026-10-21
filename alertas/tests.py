@@ -714,6 +714,16 @@ class MarcarVistoAlertaTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertTrue(AlertaLectura.objects.filter(alerta=self.alerta, membresia=self.vecino).exists())
 
+    def test_el_autor_marcando_su_propia_alerta_tambien_cuenta(self):
+        """Decisión explícita: nada en el código excluye al propio autor
+        del conteo -- si marca su propia alerta como vista, cuenta igual
+        que cualquier otro vecino."""
+        from alertas.models import AlertaLectura
+
+        self.client.force_login(self.autor.user)
+        self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertTrue(AlertaLectura.objects.filter(alerta=self.alerta, membresia=self.autor).exists())
+
     def test_marcarla_dos_veces_no_duplica(self):
         from alertas.models import AlertaLectura
 
@@ -762,3 +772,70 @@ class VistoPorCountSerializerTests(TestCase):
         self.client.force_login(self.vecino.user)
         r = self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
         self.assertIsNone(r.json()["visto_por_count"])
+
+    def test_el_autor_ve_el_conteo_en_la_lista(self):
+        self.client.force_login(self.autor.user)
+        r = self.client.get(reverse("alerta-list"))
+        datos = r.json()["results"] if isinstance(r.json(), dict) else r.json()
+        fila = next(f for f in datos if f["id"] == self.alerta.pk)
+        self.assertEqual(fila["visto_por_count"], 1)
+
+    def test_el_autor_ve_el_conteo_al_resolver_su_propia_alerta(self):
+        self.client.force_login(self.autor.user)
+        r = self.client.patch(
+            reverse("alerta-resolver", kwargs={"pk": self.alerta.pk}),
+            data={"estado": "resuelta"}, content_type="application/json",
+        )
+        self.assertEqual(r.json()["visto_por_count"], 1)
+
+    def test_el_autor_ve_el_conteo_al_marcar_visto(self):
+        """setUp ya deja una lectura del vecino -- al marcar_visto el autor
+        suma una segunda, el conteo debe reflejar ambas."""
+        self.client.force_login(self.autor.user)
+        r = self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.json()["visto_por_count"], 2)
+
+    def test_el_conteo_no_hace_una_consulta_por_fila_en_la_lista(self):
+        """N+1: listar no debe hacer una consulta de lecturas por cada
+        alerta -- el conteo se arma con una anotación en el propio
+        queryset (ver AlertaViewSet.queryset), no con obj.lecturas.count()
+        fila por fila. Se revisa el SQL en vez del total de consultas
+        porque la vista ya tiene otro N+1 preexistente y sin relación
+        (condominio_nombre) que no es parte de este hallazgo."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+
+        for _ in range(5):
+            Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+        self.client.force_login(self.autor.user)
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(reverse("alerta-list"))
+
+        # Ninguna consulta debe tocar alertas_alertalectura por fuera del
+        # LEFT OUTER JOIN de la consulta principal (que trae todas las
+        # alertas de una sola vez).
+        consultas_solo_de_lecturas = [
+            q for q in ctx.captured_queries
+            if q["sql"].strip().upper().startswith("SELECT") and "FROM \"ALERTAS_ALERTALECTURA\"" in q["sql"].upper()
+        ]
+        self.assertEqual(consultas_solo_de_lecturas, [])
+
+    def test_el_conteo_no_incluye_lecturas_de_una_membresia_que_cambio_de_condominio(self):
+        """Si la Membresia que dejó la lectura se mudó después a otro
+        condominio, esa lectura vieja ya no debe sumar al conteo actual."""
+        self.vecino.condominio = Condominio.objects.create(nombre="Otro Condominio", plan="premium")
+        self.vecino.save()
+        self.client.force_login(self.autor.user)
+        r = self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.json()["visto_por_count"], 0)
+
+    def test_un_get_nunca_crea_una_lectura(self):
+        """El requisito es que "visto" sea siempre una acción explícita --
+        ni listar ni ver el detalle debe registrar una lectura sola."""
+        from alertas.models import AlertaLectura
+
+        otro_vecino = crear_membresia(self.condominio, "residente", username="visto_count_otro_vecino")
+        self.client.force_login(otro_vecino.user)
+        self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
+        self.client.get(reverse("alerta-list"))
+        self.assertFalse(AlertaLectura.objects.filter(alerta=self.alerta, membresia=otro_vecino).exists())

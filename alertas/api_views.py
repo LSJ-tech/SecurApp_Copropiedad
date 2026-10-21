@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Count, F, Q
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -27,7 +28,17 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
     del condominio, nunca devquad "en nombre de nadie"): ver perform_create.
     Ver/resolver sí las puede operar devquad (resuelta_por sí admite null)."""
 
-    queryset = Alerta.objects.select_related("autor__user", "autor__unidad", "resuelta_por__user", "resuelta_por__unidad")
+    queryset = Alerta.objects.select_related(
+        "autor__user", "autor__unidad", "resuelta_por__user", "resuelta_por__unidad"
+    ).annotate(
+        # Re-acotado a la membresía-del-lector-con-su-condominio-ACTUAL:
+        # si esa Membresia se mudó de condominio después de dejar la
+        # lectura, esa lectura vieja ya no debe sumar (ver
+        # AlertaSerializer.get_visto_por_count).
+        visto_por_count_anotado=Count(
+            "lecturas", filter=Q(lecturas__membresia__condominio_id=F("condominio_id"))
+        )
+    )
     serializer_class = AlertaSerializer
     permission_classes = [IsAuthenticated, TieneCondominioActivo]
     http_method_names = ["get", "post", "patch", "head", "options"]
@@ -62,12 +73,18 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
         alerta.fecha_resolucion = timezone.now()
         alerta.save()
         notificar_alerta_resuelta(alerta)
-        return Response(AlertaSerializer(alerta).data)
+        return Response(self.get_serializer(alerta).data)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, TieneCondominioActivo])
     def marcar_visto(self, request, pk=None):
         alerta = self.get_object()
         membresia = getattr(request.user, "membresia", None)
         if membresia is not None and membresia.condominio_id == alerta.condominio_id:
-            AlertaLectura.objects.get_or_create(alerta=alerta, membresia=membresia)
-        return Response(AlertaSerializer(alerta, context={"request": request}).data)
+            _, creada = AlertaLectura.objects.get_or_create(alerta=alerta, membresia=membresia)
+            if creada:
+                # La anotación de visto_por_count_anotado se calculó al
+                # traer `alerta` con get_object(), antes de esta lectura
+                # nueva -- hay que volver a traerla para que el conteo la
+                # incluya.
+                alerta = self.get_queryset().get(pk=alerta.pk)
+        return Response(self.get_serializer(alerta).data)
