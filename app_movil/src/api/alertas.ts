@@ -39,3 +39,15 @@ export function resolverAlerta(id: number, estado: "resuelta" | "falsa_alarma"):
     body: JSON.stringify({ estado }),
   });
 }
+
+export function obtenerAlerta(id: number): Promise<AlertaOut> {
+  return apiFetch<AlertaOut>(`/api/v1/alertas/${id}/`);
+}
+
+export function listarAlertas(estado?: string): Promise<AlertaOut[]> {
+  return apiFetch<AlertaOut[]>(estado ? `/api/v1/alertas/?estado=${estado}` : "/api/v1/alertas/");
+}
+
+export function marcarVisto(id: number): Promise<AlertaOut> {
+  return apiFetch<AlertaOut>(`/api/v1/alertas/${id}/marcar_visto/`, { method: "POST" });
+}
