@@ -408,7 +408,16 @@ class UnidadForm(forms.ModelForm):
 
 
 class MiPerfilForm(forms.ModelForm):
-    """Cualquier miembro (residente, directiva, conserjería) edita sus propios datos."""
+    """Cualquier miembro (residente, directiva, conserjería) edita sus propios datos.
+
+    `telefono` vive en Membresia, no en User -- se agrega acá como campo
+    extra (fuera de Meta) y se guarda a mano en save(), ModelForm no lo
+    resuelve solo porque no es un campo del modelo que edita este form."""
+
+    telefono = forms.CharField(
+        required=False, max_length=30, label="Teléfono",
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
+    )
 
     class Meta:
         model = User
@@ -419,6 +428,12 @@ class MiPerfilForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": "form-control"}),
         }
         labels = {"first_name": "Nombre", "last_name": "Apellido", "email": "Email"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        membresia = getattr(self.instance, "membresia", None)
+        if membresia is not None:
+            self.fields["telefono"].initial = membresia.telefono
 
     def clean_first_name(self):
         return _normalizar_nombre(self.cleaned_data["first_name"])
@@ -431,6 +446,15 @@ class MiPerfilForm(forms.ModelForm):
         if not email:
             return email
         return _validar_email_unico(email, excluir_user_id=self.instance.pk)
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            membresia = getattr(user, "membresia", None)
+            if membresia is not None:
+                membresia.telefono = self.cleaned_data["telefono"]
+                membresia.save(update_fields=["telefono"])
+        return user
 
 
 class MiCambiarContrasenaForm(PasswordChangeForm):
