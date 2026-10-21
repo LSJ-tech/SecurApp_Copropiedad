@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¡Gracias por tu donación!</title>
+<style>
+    {% include "core/emails/_estilos.html" %}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<table role="presentation" class="container">
+{% include "core/emails/_cabecera.html" %}
+    <tr><td class="body">
+        <h1>¡Gracias, {{ nombre }}! 💚</h1>
+        <p>Tu donación de <strong>${{ monto }}/mes</strong> ya quedó activa -- es un aporte directo para seguir mejorando {{ platform_name }} para tu comunidad y para muchas otras.</p>
+        <p>Puedes revisarla o cancelarla cuando quieras desde «Mis donaciones», dentro de tu cuenta.</p>
+        <div class="btn-wrap">
+            <a href="{{ mis_donaciones_url }}" class="btn">Ver mis donaciones</a>
+        </div>
+    </td></tr>
+{% include "core/emails/_pie.html" %}
+</table>
+</div>
+</body>
+</html>

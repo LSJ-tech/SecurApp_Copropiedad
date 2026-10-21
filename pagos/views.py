@@ -6,8 +6,10 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.mail import EmailMultiAlternatives
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -15,6 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
 from core.mixins import MENSAJE_SIN_CONDOMINIO, CondominioRequiredMixin
+from core.views import EMAIL_CONTACTO_DEVQUAD
 
 from .mercadopago_client import (
     cancelar_suscripcion_recurrente,
@@ -81,6 +84,42 @@ def _crear_pago_por_cobro(suscripcion, payment_id=""):
     return pago
 
 
+def enviar_correo_gracias_donacion(suscripcion):
+    """Se manda una sola vez, justo en la transición a "autorizada" (ver
+    sincronizar_estado_suscripcion) -- nunca bloquea esa sincronización si
+    Resend falla, el correo es un plus, no un requisito."""
+    membresia = suscripcion.membresia
+    if membresia is None or not membresia.user.email:
+        return
+    user = membresia.user
+    mis_donaciones_url = "https://securapp.devquad.cl/mis-donaciones/"
+    contexto = {
+        "platform_name": settings.PLATFORM_NAME,
+        "nombre": user.first_name or user.username,
+        "monto": suscripcion.monto,
+        "mis_donaciones_url": mis_donaciones_url,
+        "email_contacto": EMAIL_CONTACTO_DEVQUAD,
+    }
+    texto_plano = (
+        f"¡Gracias, {contexto['nombre']}!\n\n"
+        f"Tu donación de ${suscripcion.monto}/mes ya quedó activa -- es un aporte directo para seguir "
+        f"mejorando {settings.PLATFORM_NAME} para tu comunidad y para muchas otras.\n\n"
+        f"Puedes revisarla o cancelarla cuando quieras desde «Mis donaciones»: {mis_donaciones_url}\n\n"
+        f"Cualquier duda, escríbenos a {EMAIL_CONTACTO_DEVQUAD}."
+    )
+    try:
+        correo = EmailMultiAlternatives(
+            subject=f"¡Gracias por tu donación, {contexto['nombre']}!",
+            body=texto_plano,
+            from_email=None,
+            to=[user.email],
+        )
+        correo.attach_alternative(render_to_string("core/emails/donacion_gracias.html", contexto), "text/html")
+        correo.send()
+    except Exception:
+        logger.exception("No se pudo enviar el correo de agradecimiento de la donación #%s a %s.", suscripcion.pk, user.email)
+
+
 def sincronizar_estado_suscripcion(suscripcion):
     """Re-consulta el estado real de esta SuscripcionRecurrente en Mercado
     Pago y lo actualiza -- mismo código que usa el webhook al recibir un
@@ -94,12 +133,15 @@ def sincronizar_estado_suscripcion(suscripcion):
 
     nuevo_estado = ESTADO_PREAPPROVAL_A_ESTADO_SUSCRIPCION.get(detalle.get("status"))
     if nuevo_estado and nuevo_estado != suscripcion.estado:
+        es_donacion_recien_autorizada = nuevo_estado == "autorizada" and suscripcion.tipo == "donacion"
         suscripcion.estado = nuevo_estado
         if nuevo_estado == "cancelada" and not suscripcion.fecha_cancelacion:
             suscripcion.fecha_cancelacion = timezone.now()
             suscripcion.save(update_fields=["estado", "fecha_cancelacion"])
         else:
             suscripcion.save(update_fields=["estado"])
+        if es_donacion_recien_autorizada:
+            enviar_correo_gracias_donacion(suscripcion)
 
     # Mercado Pago solo pasa una autorización a "authorized" después de
     # cobrar la primera cuota con éxito (lo confirmamos nosotros mismos: la

@@ -5,6 +5,7 @@ from io import StringIO
 from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -632,6 +633,56 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         condominio.refresh_from_db()
         self.assertEqual(condominio.pagado_hasta, pagado_hasta_antes)
         self.assertEqual(condominio.plan, "basico")
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_manda_un_correo_de_gracias_cuando_se_autoriza_una_donacion(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Sync Donacion Correo", plan="basico")
+        membresia = crear_membresia(condominio, "residente", username="gracias_donacion", first_name="Nora")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", membresia=membresia,
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-sync-don-correo",
+        )
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [membresia.user.email])
+        self.assertIn("Nora", mail.outbox[0].body)
+        self.assertIn("Gracias", mail.outbox[0].subject)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_manda_correo_de_gracias_por_una_suscripcion_de_condominio(self, mock_obtener):
+        """Solo donaciones (persona -> DevQuad) mandan el agradecimiento --
+        la suscripcion SaaS (condominio -> DevQuad) no es una donación."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="suscripcion")
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_manda_correo_de_gracias_si_la_donacion_no_tiene_membresia(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="donacion", monto=Decimal("2000"))
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
+    def test_no_repite_el_correo_si_ya_estaba_autorizada(self, mock_obtener):
+        """Solo se manda en la TRANSICIÓN a autorizada, no cada vez que se
+        sincroniza una donación que ya estaba autorizada de antes (ej. el
+        cron periódico, que re-sincroniza todo lo no cancelado)."""
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Sync Donacion Repite", plan="basico")
+        membresia = crear_membresia(condominio, "residente", username="gracias_donacion_repite")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", membresia=membresia, estado="autorizada",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-sync-don-repite",
+        )
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
 
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
     def test_no_duplica_el_pago_si_ya_hay_uno_registrado(self, mock_obtener):
