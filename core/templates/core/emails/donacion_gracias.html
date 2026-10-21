@@ -14,7 +14,7 @@
 {% include "core/emails/_cabecera.html" %}
     <tr><td class="body">
         <h1>¡Gracias, {{ nombre }}! 💚</h1>
-        <p>Tu donación de <strong>${{ monto }}/mes</strong> ya quedó activa -- es un aporte directo para seguir mejorando {{ platform_name }} para tu comunidad y para muchas otras.</p>
+        <p>Tu donación de <strong>${{ monto|floatformat:0 }}/mes</strong> ya quedó activa -- es un aporte directo para seguir mejorando {{ platform_name }} para tu comunidad y para muchas otras.</p>
         <p>Puedes revisarla o cancelarla cuando quieras desde «Mis donaciones», dentro de tu cuenta.</p>
         <div class="btn-wrap">
             <a href="{{ mis_donaciones_url }}" class="btn">Ver mis donaciones</a>

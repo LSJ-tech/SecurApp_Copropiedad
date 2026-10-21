@@ -102,7 +102,7 @@ def enviar_correo_gracias_donacion(suscripcion):
     }
     texto_plano = (
         f"¡Gracias, {contexto['nombre']}!\n\n"
-        f"Tu donación de ${suscripcion.monto}/mes ya quedó activa -- es un aporte directo para seguir "
+        f"Tu donación de ${suscripcion.monto:.0f}/mes ya quedó activa -- es un aporte directo para seguir "
         f"mejorando {settings.PLATFORM_NAME} para tu comunidad y para muchas otras.\n\n"
         f"Puedes revisarla o cancelarla cuando quieras desde «Mis donaciones»: {mis_donaciones_url}\n\n"
         f"Cualquier duda, escríbenos a {EMAIL_CONTACTO_DEVQUAD}."
@@ -137,7 +137,7 @@ def enviar_correo_recordatorio_donacion(suscripcion, autorizar_url):
     }
     texto_plano = (
         f"Hola {contexto['nombre']},\n\n"
-        f"Notamos que empezaste a activar una donación de ${suscripcion.monto}/mes a {settings.PLATFORM_NAME}, "
+        f"Notamos que empezaste a activar una donación de ${suscripcion.monto:.0f}/mes a {settings.PLATFORM_NAME}, "
         f"pero te quedó faltando el último paso: autorizarla en Mercado Pago.\n\n"
         f"Si todavía quieres hacerla, termina de autorizarla acá: {autorizar_url}\n\n"
         f"Si no quieres seguir, no tienes que hacer nada -- no se te cobrará nada, y esta solicitud se cancela "

@@ -644,11 +644,14 @@ class SincronizarEstadoSuscripcionTests(TestCase):
             condominio=condominio, tipo="donacion", membresia=membresia,
             monto=Decimal("2000"), mercadopago_preapproval_id="pre-sync-don-correo",
         )
+        suscripcion.refresh_from_db()  # monto llega con decimal_places=2 desde la base, igual que en producción
         sincronizar_estado_suscripcion(suscripcion)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [membresia.user.email])
         self.assertIn("Nora", mail.outbox[0].body)
         self.assertIn("Gracias", mail.outbox[0].subject)
+        self.assertIn("$2000/mes", mail.outbox[0].body)
+        self.assertIn("$2000/mes", mail.outbox[0].alternatives[0][0])
 
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "authorized"})
     def test_no_manda_correo_de_gracias_por_una_suscripcion_de_condominio(self, mock_obtener):
@@ -705,6 +708,8 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         self.assertEqual(mail.outbox[0].to, [membresia.user.email])
         self.assertIn("Rosa", mail.outbox[0].body)
         self.assertIn("https://mp.test/autorizar/abc", mail.outbox[0].alternatives[0][0])
+        self.assertIn("$2000/mes", mail.outbox[0].body)
+        self.assertIn("$2000/mes", mail.outbox[0].alternatives[0][0])
 
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/abc"})
     def test_una_donacion_pendiente_hace_menos_de_24_horas_no_manda_recordatorio(self, mock_obtener):

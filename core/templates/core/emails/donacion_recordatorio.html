@@ -14,7 +14,7 @@
 {% include "core/emails/_cabecera.html" %}
     <tr><td class="body">
         <h1>Hola {{ nombre }}</h1>
-        <p>Notamos que empezaste a activar una donación de <strong>${{ monto }}/mes</strong> a {{ platform_name }}, pero te quedó faltando el último paso: autorizarla en Mercado Pago.</p>
+        <p>Notamos que empezaste a activar una donación de <strong>${{ monto|floatformat:0 }}/mes</strong> a {{ platform_name }}, pero te quedó faltando el último paso: autorizarla en Mercado Pago.</p>
         <p>Si todavía quieres hacerla, solo te falta eso:</p>
         <div class="btn-wrap">
             <a href="{{ autorizar_url }}" class="btn">Terminar de autorizar</a>
