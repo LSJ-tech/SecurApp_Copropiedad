@@ -35,6 +35,7 @@ export default function VecinoLayout() {
           drawerItemStyle: membresia?.rol !== "delegado" ? { display: "none" } : undefined,
         }}
       />
+      <Drawer.Screen name="invitar/index" options={{ title: "Invitar vecinos" }} />
       <Drawer.Screen
         name="alertas/[id]"
         options={{ title: "Detalle de alerta", drawerItemStyle: { display: "none" } }}
