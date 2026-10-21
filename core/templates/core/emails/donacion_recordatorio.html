@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Te falta un paso para tu donación</title>
+<style>
+    {% include "core/emails/_estilos.html" %}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<table role="presentation" class="container">
+{% include "core/emails/_cabecera.html" %}
+    <tr><td class="body">
+        <h1>Hola {{ nombre }}</h1>
+        <p>Notamos que empezaste a activar una donación de <strong>${{ monto }}/mes</strong> a {{ platform_name }}, pero te quedó faltando el último paso: autorizarla en Mercado Pago.</p>
+        <p>Si todavía quieres hacerla, solo te falta eso:</p>
+        <div class="btn-wrap">
+            <a href="{{ autorizar_url }}" class="btn">Terminar de autorizar</a>
+        </div>
+        <p>Si no quieres seguir, no tienes que hacer nada -- no se te cobrará nada, y esta solicitud se cancela sola en un par de días.</p>
+    </td></tr>
+{% include "core/emails/_pie.html" %}
+</table>
+</div>
+</body>
+</html>

@@ -684,6 +684,75 @@ class SincronizarEstadoSuscripcionTests(TestCase):
         sincronizar_estado_suscripcion(suscripcion)
         self.assertEqual(len(mail.outbox), 0)
 
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/abc"})
+    def test_una_donacion_pendiente_hace_mas_de_24_horas_manda_recordatorio(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Recordatorio Donacion", plan="basico")
+        membresia = crear_membresia(condominio, "residente", username="recordatorio_donacion", first_name="Rosa")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", membresia=membresia,
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-recordatorio",
+        )
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=25),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        suscripcion.refresh_from_db()
+        self.assertIsNotNone(suscripcion.recordatorio_enviado_en)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [membresia.user.email])
+        self.assertIn("Rosa", mail.outbox[0].body)
+        self.assertIn("https://mp.test/autorizar/abc", mail.outbox[0].alternatives[0][0])
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/abc"})
+    def test_una_donacion_pendiente_hace_menos_de_24_horas_no_manda_recordatorio(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Recordatorio Donacion Temprano", plan="basico")
+        membresia = crear_membresia(condominio, "residente", username="recordatorio_donacion_temprano")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", membresia=membresia,
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-recordatorio-temprano",
+        )
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=1),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/abc"})
+    def test_no_repite_el_recordatorio_si_ya_se_mando(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        condominio = Condominio.objects.create(nombre="Test Recordatorio Donacion Repetido", plan="basico")
+        membresia = crear_membresia(condominio, "residente", username="recordatorio_donacion_repetido")
+        suscripcion = self._suscripcion(
+            condominio=condominio, tipo="donacion", membresia=membresia,
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-recordatorio-repetido",
+        )
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=25),
+            recordatorio_enviado_en=timezone.now() - datetime.timedelta(hours=1),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending", "init_point": "https://mp.test/autorizar/abc"})
+    def test_no_manda_recordatorio_de_una_suscripcion_de_condominio(self, mock_obtener):
+        from pagos.views import sincronizar_estado_suscripcion
+
+        suscripcion = self._suscripcion(tipo="suscripcion")
+        SuscripcionRecurrente.objects.filter(pk=suscripcion.pk).update(
+            fecha_creacion=timezone.now() - datetime.timedelta(hours=25),
+        )
+        suscripcion.refresh_from_db()
+        sincronizar_estado_suscripcion(suscripcion)
+        self.assertEqual(len(mail.outbox), 0)
+
     @patch("pagos.views.cancelar_suscripcion_recurrente", return_value=True)
     @patch("pagos.views.obtener_preapproval_mercadopago", return_value={"status": "pending"})
     def test_una_donacion_pendiente_hace_mas_de_48_horas_se_cancela_sola(self, mock_obtener, mock_cancelar):

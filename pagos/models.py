@@ -39,6 +39,10 @@ class SuscripcionRecurrente(models.Model):
     estado = models.CharField(max_length=10, choices=ESTADO_SUSCRIPCION_RECURRENTE_CHOICES, default="pendiente")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_cancelacion = models.DateTimeField(null=True, blank=True)
+    recordatorio_enviado_en = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Cuándo se mandó el correo recordando autorizar una donación pendiente -- vacío si nunca se mandó. Evita repetirlo en cada sincronización.",
+    )
 
     class Meta:
         ordering = ["-fecha_creacion"]

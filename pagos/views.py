@@ -120,6 +120,43 @@ def enviar_correo_gracias_donacion(suscripcion):
         logger.exception("No se pudo enviar el correo de agradecimiento de la donación #%s a %s.", suscripcion.pk, user.email)
 
 
+def enviar_correo_recordatorio_donacion(suscripcion, autorizar_url):
+    """Se manda una sola vez (ver recordatorio_enviado_en), cuando una
+    donación lleva más de 24h en "pendiente" sin que nadie la autorice --
+    nunca bloquea la sincronización si Resend falla."""
+    membresia = suscripcion.membresia
+    if membresia is None or not membresia.user.email:
+        return
+    user = membresia.user
+    contexto = {
+        "platform_name": settings.PLATFORM_NAME,
+        "nombre": user.first_name or user.username,
+        "monto": suscripcion.monto,
+        "autorizar_url": autorizar_url,
+        "email_contacto": EMAIL_CONTACTO_DEVQUAD,
+    }
+    texto_plano = (
+        f"Hola {contexto['nombre']},\n\n"
+        f"Notamos que empezaste a activar una donación de ${suscripcion.monto}/mes a {settings.PLATFORM_NAME}, "
+        f"pero te quedó faltando el último paso: autorizarla en Mercado Pago.\n\n"
+        f"Si todavía quieres hacerla, termina de autorizarla acá: {autorizar_url}\n\n"
+        f"Si no quieres seguir, no tienes que hacer nada -- no se te cobrará nada, y esta solicitud se cancela "
+        f"sola en un par de días.\n\n"
+        f"Cualquier duda, escríbenos a {EMAIL_CONTACTO_DEVQUAD}."
+    )
+    try:
+        correo = EmailMultiAlternatives(
+            subject="Te falta un paso para tu donación",
+            body=texto_plano,
+            from_email=None,
+            to=[user.email],
+        )
+        correo.attach_alternative(render_to_string("core/emails/donacion_recordatorio.html", contexto), "text/html")
+        correo.send()
+    except Exception:
+        logger.exception("No se pudo enviar el recordatorio de donación pendiente #%s a %s.", suscripcion.pk, user.email)
+
+
 def sincronizar_estado_suscripcion(suscripcion):
     """Re-consulta el estado real de esta SuscripcionRecurrente en Mercado
     Pago y lo actualiza -- mismo código que usa el webhook al recibir un
@@ -142,6 +179,22 @@ def sincronizar_estado_suscripcion(suscripcion):
             suscripcion.save(update_fields=["estado"])
         if es_donacion_recien_autorizada:
             enviar_correo_gracias_donacion(suscripcion)
+
+    # Recordatorio a mitad de camino del plazo de 48h (ver más abajo) --
+    # solo donaciones, solo una vez (recordatorio_enviado_en), y solo
+    # dentro de la ventana 24h-48h (pasadas las 48h ya se cancela sola,
+    # no tiene sentido pedirle que termine de autorizar algo que se está
+    # por cancelar en la misma pasada).
+    antiguedad = timezone.now() - suscripcion.fecha_creacion
+    if (
+        suscripcion.tipo == "donacion"
+        and suscripcion.estado == "pendiente"
+        and suscripcion.recordatorio_enviado_en is None
+        and datetime.timedelta(hours=24) <= antiguedad < datetime.timedelta(hours=48)
+    ):
+        suscripcion.recordatorio_enviado_en = timezone.now()
+        suscripcion.save(update_fields=["recordatorio_enviado_en"])
+        enviar_correo_recordatorio_donacion(suscripcion, detalle.get("init_point", ""))
 
     # Una donación "pendiente" que nadie autorizó NI canceló se queda así
     # en Mercado Pago indefinidamente (no vence sola del otro lado) -- se
