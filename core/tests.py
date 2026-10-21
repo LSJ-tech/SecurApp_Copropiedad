@@ -1061,6 +1061,16 @@ class ApiMiPerfilYCambiarContrasenaTests(TestCase):
         r = self.client.get(reverse("api-me"), **self._auth())
         self.assertEqual(r.json()["telefono"], "+56911112222")
 
+    def test_get_me_incluye_first_name_last_name_y_email(self):
+        self.user.first_name = "Ana"
+        self.user.last_name = "Pérez"
+        self.user.save(update_fields=["first_name", "last_name"])
+        r = self.client.get(reverse("api-me"), **self._auth())
+        datos = r.json()
+        self.assertEqual(datos["first_name"], "Ana")
+        self.assertEqual(datos["last_name"], "Pérez")
+        self.assertEqual(datos["email"], "yo@example.com")
+
     def test_patch_me_actualiza_el_telefono(self):
         r = self.client.patch(reverse("api-me"), {"telefono": "+56933334444"}, content_type="application/json", **self._auth())
         self.assertEqual(r.status_code, 200)

@@ -64,7 +64,16 @@ class MeView(APIView):
         membresia = getattr(request.user, "membresia", None)
         if membresia is None:
             return Response({"detail": "Este usuario no tiene una membresía a ningún condominio."}, status=409)
-        return Response(MembresiaSerializer(membresia).data)
+        datos = MembresiaSerializer(membresia).data
+        # "nombre" ya viene concatenado (get_full_name) -- la app necesita
+        # first_name/last_name por separado para precargar el formulario
+        # de "Mi perfil" (ver MiPerfilSerializer, que sí los usa así).
+        datos.update({
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+        })
+        return Response(datos)
 
     @extend_schema(request=MiPerfilSerializer, responses=MiPerfilSerializer)
     def patch(self, request):
