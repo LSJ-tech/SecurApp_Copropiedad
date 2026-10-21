@@ -23,6 +23,7 @@ export default function VecinoLayout() {
     >
       <Drawer.Screen name="index" options={{ title: "Mi Barrio+" }} />
       <Drawer.Screen name="alertas/index" options={{ title: "Alertas" }} />
+      <Drawer.Screen name="avisos/index" options={{ title: "Avisos" }} />
       <Drawer.Screen
         name="alertas/[id]"
         options={{ title: "Detalle de alerta", drawerItemStyle: { display: "none" } }}
