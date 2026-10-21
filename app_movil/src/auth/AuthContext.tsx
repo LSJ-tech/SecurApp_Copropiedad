@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 import { login as loginApi, MembresiaOut } from "../api/auth";
+import { registrarDispositivoPush } from "../notificaciones/push";
 import { borrarTokens, guardarTokens, obtenerTokens } from "./storage";
 
 type Estado = "cargando" | "sin_sesion" | "sin_membresia" | "autenticado";
@@ -29,6 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await guardarTokens(resultado.access, resultado.refresh);
     setMembresia(resultado.membresia);
     setEstado(resultado.membresia ? "autenticado" : "sin_membresia");
+    if (resultado.membresia) {
+      // Sin await a propósito -- no bloquea el login si el permiso de
+      // push tarda o el usuario lo niega (ver registrarDispositivoPush).
+      // El catch es necesario: sin red o con el backend caído, esto no
+      // debe tirar un unhandled rejection ni, mucho menos, el login.
+      registrarDispositivoPush().catch(() => {});
+    }
   }
 
   async function cerrarSesion() {

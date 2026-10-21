@@ -1,8 +1,15 @@
+jest.mock("expo-notifications", () => ({
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+  requestPermissionsAsync: jest.fn(),
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: "ExponentPushToken[test]" }),
+}));
+
 import { act, render, screen, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { AuthProvider, useAuth } from "./AuthContext";
 import * as authApi from "../api/auth";
 import * as storage from "./storage";
+import * as dispositivosApi from "../api/dispositivos";
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -55,6 +62,39 @@ test("login exitoso con membresia pasa a autenticado", async () => {
   await act(() => auth!.iniciarSesion("ana", "clave"));
   await waitFor(() => expect(auth.estado).toBe("autenticado"));
   expect(auth!.membresia?.nombre).toBe("Ana");
+});
+
+test("login exitoso con membresia dispara el registro de push (sin bloquear la UI)", async () => {
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue(null);
+  jest.spyOn(storage, "guardarTokens").mockResolvedValue();
+  jest.spyOn(authApi, "login").mockResolvedValue({
+    access: "a",
+    refresh: "r",
+    membresia: {
+      nombre: "Ana",
+      rol: "residente",
+      condominio: { id: 1, nombre: "X" },
+      unidad: null,
+      telefono: "",
+    },
+  });
+  const registrarSpy = jest.spyOn(dispositivosApi, "registrarDispositivo").mockResolvedValue();
+  let auth: ReturnType<typeof useAuth>;
+  function Capturador() {
+    auth = useAuth();
+    return null;
+  }
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Capturador />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
+  await act(() => auth!.iniciarSesion("ana", "clave"));
+  await waitFor(() => expect(auth.estado).toBe("autenticado"));
+  expect(registrarSpy).toHaveBeenCalled();
 });
 
 test("login exitoso sin membresia (devquad) pasa a sin_membresia, no a autenticado", async () => {
