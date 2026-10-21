@@ -738,3 +738,27 @@ class MarcarVistoAlertaTests(TestCase):
         r = self.client.post(reverse("alerta-marcar-visto", kwargs={"pk": self.alerta.pk}))
         self.assertEqual(r.status_code, 200)
         self.assertFalse(AlertaLectura.objects.filter(alerta=self.alerta, membresia=residente_vecino).exists())
+
+
+class VistoPorCountSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Visto Por Count", plan="premium")
+
+    def setUp(self):
+        self.autor = crear_membresia(self.condominio, "residente", username="visto_count_autor")
+        self.vecino = crear_membresia(self.condominio, "residente", username="visto_count_vecino")
+        self.alerta = Alerta.objects.create(condominio=self.condominio, autor=self.autor, tipo="robo", estado="activa")
+        from alertas.models import AlertaLectura
+
+        AlertaLectura.objects.create(alerta=self.alerta, membresia=self.vecino)
+
+    def test_el_autor_ve_el_conteo(self):
+        self.client.force_login(self.autor.user)
+        r = self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
+        self.assertEqual(r.json()["visto_por_count"], 1)
+
+    def test_otro_vecino_no_ve_el_conteo(self):
+        self.client.force_login(self.vecino.user)
+        r = self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
+        self.assertIsNone(r.json()["visto_por_count"])
