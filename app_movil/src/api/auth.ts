@@ -6,6 +6,9 @@ export type MembresiaOut = {
   unidad: { numero: string; [k: string]: unknown } | null;
   nombre: string;
   telefono: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
 };
 
 export type LoginOut = {
@@ -26,6 +29,20 @@ export function login(username: string, password: string): Promise<LoginOut> {
  * da 409 si no tiene Membresia (cuenta devquad, ver MeView). */
 export function obtenerMiPerfil(): Promise<MembresiaOut> {
   return apiFetch<MembresiaOut>("/api/v1/auth/me/");
+}
+
+export type MiPerfilEdicion = {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  telefono?: string;
+};
+
+export function actualizarMiPerfil(datos: Partial<MiPerfilEdicion>): Promise<MiPerfilEdicion> {
+  return apiFetch<MiPerfilEdicion>("/api/v1/auth/me/", {
+    method: "PATCH",
+    body: JSON.stringify(datos),
+  });
 }
 
 /** Pone el refresh en la lista negra del servidor -- sin esto, cerrar
