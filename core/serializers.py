@@ -146,7 +146,7 @@ class MiPerfilSerializer(serializers.ModelSerializer):
     MiPerfilForm, se agrega como campo extra y se guarda a mano en
     update()."""
 
-    telefono = serializers.CharField(required=False, allow_blank=True)
+    telefono = serializers.CharField(required=False, allow_blank=True, max_length=30)
 
     class Meta:
         model = User
@@ -165,6 +165,15 @@ class MiPerfilSerializer(serializers.ModelSerializer):
             return _validar_email_unico(email, excluir_user_id=self.instance.pk if self.instance else None)
         except DjangoValidationError as error:
             raise serializers.ValidationError(error.message)
+
+    def validate_telefono(self, telefono):
+        # Devquad (is_staff, sin Membresia propia) también usa este
+        # endpoint para editar nombre/apellido/email -- sin esto, un
+        # PATCH con telefono se aceptaba (200) y el valor se perdía en
+        # silencio (no hay Membresia donde guardarlo).
+        if getattr(self.instance, "membresia", None) is None:
+            raise serializers.ValidationError("Tu cuenta no tiene membresía a ningún condominio.")
+        return telefono
 
     def update(self, instance, validated_data):
         telefono = validated_data.pop("telefono", None)

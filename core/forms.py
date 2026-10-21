@@ -438,6 +438,11 @@ class MiPerfilForm(forms.ModelForm):
         membresia = getattr(self.instance, "membresia", None)
         if membresia is not None:
             self.fields["telefono"].initial = membresia.telefono
+        else:
+            # Devquad (is_staff, sin Membresia propia) también entra a Mi
+            # perfil -- sin esto, el campo aparecía, el POST lo aceptaba y
+            # el valor se perdía en silencio (no hay dónde guardarlo).
+            del self.fields["telefono"]
 
     def clean_first_name(self):
         return _normalizar_nombre(self.cleaned_data["first_name"])

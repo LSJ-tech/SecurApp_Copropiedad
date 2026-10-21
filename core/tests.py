@@ -1067,6 +1067,32 @@ class ApiMiPerfilYCambiarContrasenaTests(TestCase):
         self.user.membresia.refresh_from_db()
         self.assertEqual(self.user.membresia.telefono, "+56933334444")
 
+    def test_patch_me_con_telefono_demasiado_largo_da_400(self):
+        """Membresia.telefono es CharField(max_length=30) -- sin el mismo
+        límite acá, un valor largo pasa la validación del serializer y
+        explota con un error de base de datos (DataError en Postgres) al
+        guardar, no un 400 legible."""
+        r = self.client.patch(
+            reverse("api-me"), {"telefono": "1" * 31}, content_type="application/json", **self._auth(),
+        )
+        self.assertEqual(r.status_code, 400)
+        self.user.membresia.refresh_from_db()
+        self.assertEqual(self.user.membresia.telefono, "")
+
+    def test_un_devquad_sin_membresia_no_puede_patchear_telefono(self):
+        devquad = crear_devquad("api_perfil_devquad_tel")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.patch(reverse("api-me"), {"telefono": "+56911112222"}, content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_un_devquad_sin_membresia_puede_patchear_el_resto_del_perfil(self):
+        devquad = crear_devquad("api_perfil_devquad_tel2")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.patch(reverse("api-me"), {"first_name": "Nuevo"}, content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+
     def test_login_devuelve_el_telefono_en_membresia(self):
         self.user.membresia.telefono = "+56911112222"
         self.user.membresia.save(update_fields=["telefono"])
@@ -2934,3 +2960,14 @@ class MiPerfilTelefonoTests(TestCase):
         self.assertRedirects(r, reverse("mi-perfil"))
         self.membresia.refresh_from_db()
         self.assertEqual(self.membresia.telefono, "")
+
+    def test_un_devquad_sin_membresia_no_ve_el_campo_telefono(self):
+        """Devquad (is_staff, sin Membresia propia) también puede entrar a
+        Mi perfil -- sin esto, el campo aparece, el POST lo acepta, dice
+        "Tus datos quedaron actualizados" y el valor se pierde en
+        silencio (no hay Membresia donde guardarlo)."""
+        devquad = crear_devquad("mi_perfil_tel_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.get(reverse("mi-perfil"))
+        self.assertNotContains(r, 'name="telefono"')
