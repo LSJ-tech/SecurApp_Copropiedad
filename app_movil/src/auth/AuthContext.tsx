@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-import { login as loginApi, MembresiaOut } from "../api/auth";
+import { login as loginApi, logout as logoutApi, obtenerMiPerfil, MembresiaOut } from "../api/auth";
+import { alSesionExpirada, ErrorDeServidor } from "../api/client";
 import { registrarDispositivoPush } from "../notificaciones/push";
 import { borrarTokens, guardarTokens, obtenerTokens } from "./storage";
 
@@ -20,9 +21,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [membresia, setMembresia] = useState<MembresiaOut | null>(null);
 
   useEffect(() => {
-    obtenerTokens().then((tokens) => {
-      setEstado(tokens ? "autenticado" : "sin_sesion");
+    let vigente = true;
+
+    (async () => {
+      let tokens: { access: string; refresh: string } | null = null;
+      try {
+        tokens = await obtenerTokens();
+      } catch {
+        tokens = null;
+      }
+      if (!tokens) {
+        if (vigente) setEstado("sin_sesion");
+        return;
+      }
+      // No basta con que haya tokens guardados -- hay que confirmar
+      // contra el backend quién es (hallazgo I1: una cuenta devquad que
+      // cierra y reabre la app no debe caer en la pantalla de pánico con
+      // membresia=null, tiene que caer en sin-membresia de verdad).
+      try {
+        const perfil = await obtenerMiPerfil();
+        if (!vigente) return;
+        setMembresia(perfil);
+        setEstado("autenticado");
+        registrarDispositivoPush().catch(() => {});
+      } catch (error) {
+        if (!vigente) return;
+        if (error instanceof ErrorDeServidor && error.status === 409) {
+          setEstado("sin_membresia");
+        } else {
+          // Sesión realmente vencida, o un error de red/timeout al
+          // confirmar -- en ningún caso se debe quedar en "cargando"
+          // para siempre (pantalla en blanco).
+          setEstado("sin_sesion");
+        }
+      }
+    })();
+
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    alSesionExpirada(() => {
+      setMembresia(null);
+      setEstado("sin_sesion");
     });
+    return () => alSesionExpirada(null);
   }, []);
 
   async function iniciarSesion(username: string, password: string) {
@@ -40,6 +85,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function cerrarSesion() {
+    // Sin esto, el refresh seguía siendo válido en el servidor hasta
+    // por 30 días (REFRESH_TOKEN_LIFETIME) después de un "logout" --
+    // un teléfono perdido podía seguir refrescando la sesión.
+    const tokens = await obtenerTokens();
+    if (tokens) {
+      // Sin red, no hay forma de avisarle al backend -- pero el
+      // residente tiene que poder salir de su propia sesión igual.
+      await logoutApi(tokens.refresh).catch(() => {});
+    }
     await borrarTokens();
     setMembresia(null);
     setEstado("sin_sesion");

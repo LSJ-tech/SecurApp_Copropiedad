@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
+import { configurarManejadorDeNotificaciones, obtenerAlertaIdDeNotificacionFria } from "@/notificaciones/push";
 
 function GuardDeRutas() {
   const { estado } = useAuth();
@@ -35,10 +36,29 @@ function GuardDeRutas() {
     return () => suscripcion.remove();
   }, [router]);
 
+  // Hallazgo I7 de la revisión final: con la app cerrada (el caso más
+  // común en una emergencia real), el listener de arriba no alcanza --
+  // hay que preguntar explícitamente si la app se abrió tocando una
+  // notificación. Una sola vez por sesión de la app (la ref evita que
+  // un segundo render, ej. al cambiar de estado de auth, repita la
+  // navegación).
+  const yaRevisoNotificacionFria = useRef(false);
+  useEffect(() => {
+    if (Platform.OS === "web" || estado !== "autenticado" || yaRevisoNotificacionFria.current) return;
+    yaRevisoNotificacionFria.current = true;
+    obtenerAlertaIdDeNotificacionFria().then((alertaId) => {
+      if (alertaId) router.push(`/alertas/${alertaId}`);
+    });
+  }, [estado, router]);
+
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    configurarManejadorDeNotificaciones();
+  }, []);
+
   return (
     <AuthProvider>
       <GuardDeRutas />

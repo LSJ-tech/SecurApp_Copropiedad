@@ -1,8 +1,18 @@
+import { useEffect } from "react";
 import { Drawer } from "expo-router/drawer";
 
+import { iniciarProcesamientoAutomatico } from "@/alertas/colaEnvio";
 import { colores } from "@/theme/colores";
 
 export default function VecinoLayout() {
+  useEffect(() => {
+    // Solo mientras hay sesión de residente (este layout no renderiza
+    // si no) -- una alerta encolada le pertenece a quien la mandó
+    // (hallazgo C1 de la revisión final: antes nada llamaba nunca a
+    // procesarCola() en producción).
+    return iniciarProcesamientoAutomatico();
+  }, []);
+
   return (
     <Drawer
       screenOptions={{
@@ -13,6 +23,10 @@ export default function VecinoLayout() {
     >
       <Drawer.Screen name="index" options={{ title: "Mi Barrio+" }} />
       <Drawer.Screen name="alertas/index" options={{ title: "Alertas" }} />
+      <Drawer.Screen
+        name="alertas/[id]"
+        options={{ title: "Detalle de alerta", drawerItemStyle: { display: "none" } }}
+      />
     </Drawer>
   );
 }

@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import * as authApi from "../api/auth";
 import * as storage from "./storage";
 import * as dispositivosApi from "../api/dispositivos";
+import { apiFetch, ErrorDeRed, ErrorDeServidor } from "../api/client";
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -120,7 +121,48 @@ test("login exitoso sin membresia (devquad) pasa a sin_membresia, no a autentica
 
 test("cerrarSesion borra los tokens guardados y vuelve a sin_sesion", async () => {
   jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    nombre: "Ana",
+    rol: "residente",
+    condominio: { id: 1, nombre: "X" },
+    unidad: null,
+    telefono: "",
+  });
   const borrarSpy = jest.spyOn(storage, "borrarTokens").mockResolvedValue();
+  let auth: ReturnType<typeof useAuth>;
+  function Capturador() {
+    auth = useAuth();
+    return null;
+  }
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Capturador />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => expect(auth.estado).toBe("autenticado"));
+  const logoutSpy = jest.spyOn(authApi, "logout").mockResolvedValue();
+  await act(() => auth!.cerrarSesion());
+  expect(logoutSpy).toHaveBeenCalledWith("r");
+  expect(borrarSpy).toHaveBeenCalled();
+  await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
+});
+
+test("cerrarSesion borra los tokens locales igual aunque el logout contra el servidor falle (sin red)", async () => {
+  // El refresh queda sin invalidar en el servidor en ese caso
+  // (riesgo aceptado: sin red no hay forma de avisarle al backend),
+  // pero el residente tiene que poder salir de su propia sesión igual.
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    nombre: "Ana",
+    rol: "residente",
+    condominio: { id: 1, nombre: "X" },
+    unidad: null,
+    telefono: "",
+  });
+  const borrarSpy = jest.spyOn(storage, "borrarTokens").mockResolvedValue();
+  jest.spyOn(authApi, "logout").mockRejectedValue(new ErrorDeRed("sin red"));
   let auth: ReturnType<typeof useAuth>;
   function Capturador() {
     auth = useAuth();
@@ -137,4 +179,84 @@ test("cerrarSesion borra los tokens guardados y vuelve a sin_sesion", async () =
   await act(() => auth!.cerrarSesion());
   expect(borrarSpy).toHaveBeenCalled();
   await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
+});
+
+test("con tokens guardados, confirma la membresia real contra /auth/me/ al montar (no asume autenticado a ciegas)", async () => {
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  const perfilSpy = jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    nombre: "Ana",
+    rol: "residente",
+    condominio: { id: 1, nombre: "X" },
+    unidad: null,
+    telefono: "",
+  });
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Sonda />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => screen.getByText("autenticado:Ana"));
+  expect(perfilSpy).toHaveBeenCalled();
+});
+
+test("con tokens guardados pero sin membresia (409, cuenta devquad), cae en sin_membresia al reabrir la app", async () => {
+  // Hallazgo I1 de la revisión final: antes, reabrir la app con una
+  // cuenta devquad caía en la pantalla de pánico (autenticado con
+  // membresia=null) en vez de sin-membresia.
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(authApi, "obtenerMiPerfil").mockRejectedValue(new ErrorDeServidor(409));
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Sonda />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => screen.getByText("sin_membresia:-"));
+});
+
+test("si confirmar la sesion al montar falla por un error de red, no se queda en cargando para siempre", async () => {
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(authApi, "obtenerMiPerfil").mockRejectedValue(new ErrorDeRed("sin red"));
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Sonda />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => screen.getByText("sin_sesion:-"));
+});
+
+test("cuando se dispara el listener de sesion expirada, pasa a sin_sesion y limpia la membresia", async () => {
+  // Hallazgo C3: antes, SesionExpiradaError se lanzaba y se perdía --
+  // nadie en la UI reaccionaba, así que el estado seguía "autenticado"
+  // con tokens que ya no servían.
+  jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    nombre: "Ana",
+    rol: "residente",
+    condominio: { id: 1, nombre: "X" },
+    unidad: null,
+    telefono: "",
+  });
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Sonda />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => screen.getByText("autenticado:Ana"));
+
+  // Dispara el mecanismo real (no un hook de test aparte): una request
+  // cualquiera que reciba 401 dos veces seguidas (access vencido Y el
+  // refresh también falla) es justo lo que hace que client.ts avise.
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) }) as any;
+  await act(async () => {
+    await apiFetch("/api/v1/alertas/").catch(() => {});
+  });
+  await waitFor(() => screen.getByText("sin_sesion:-"));
 });

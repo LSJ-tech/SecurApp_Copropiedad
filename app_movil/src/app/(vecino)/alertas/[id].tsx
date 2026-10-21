@@ -8,20 +8,36 @@ import { colores } from "@/theme/colores";
 export default function DetalleAlertaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [alerta, setAlerta] = useState<AlertaOut | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
-    obtenerAlerta(Number(id)).then(setAlerta);
+    // Hallazgo I8 de la revisión final: sin .catch, un 404, un error de
+    // red o una sesión expirada dejaban la pantalla en blanco (return
+    // null) para siempre -- nunca se enteraba nadie.
+    obtenerAlerta(Number(id))
+      .then(setAlerta)
+      .catch(() => setError("No se pudo cargar la alerta."));
   }, [id]);
 
   useEffect(() => {
     cargar();
   }, [cargar]);
 
-  if (!alerta) return null;
+  if (!alerta) {
+    return (
+      <View style={styles.container}>
+        {error && <Text style={styles.error}>{error}</Text>}
+      </View>
+    );
+  }
 
   async function manejarMarcarVisto() {
-    const actualizada = await marcarVisto(Number(id));
-    setAlerta(actualizada);
+    try {
+      const actualizada = await marcarVisto(Number(id));
+      setAlerta(actualizada);
+    } catch {
+      setError("No se pudo marcar como visto.");
+    }
   }
 
   return (
@@ -40,6 +56,7 @@ export default function DetalleAlertaScreen() {
           <Text style={styles.botonTexto}>Marcar como visto</Text>
         </Pressable>
       )}
+      {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
 }
@@ -50,4 +67,5 @@ const styles = StyleSheet.create({
   linea: { fontSize: 16, color: colores.primary },
   boton: { marginTop: 16, backgroundColor: colores.primary, borderRadius: 8, padding: 12, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
+  error: { color: "#b00020", textAlign: "center" },
 });

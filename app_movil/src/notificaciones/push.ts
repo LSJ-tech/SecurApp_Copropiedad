@@ -20,3 +20,28 @@ export async function registrarDispositivoPush(): Promise<void> {
   const { data: token } = await Notifications.getExpoPushTokenAsync();
   await registrarDispositivo(token, Platform.OS as "ios" | "android");
 }
+
+/** Sin esto, Expo no muestra nada si la notificación llega con la app
+ * abierta (hallazgo I7 de la revisión final) -- se llama una vez al
+ * arrancar la app. */
+export function configurarManejadorDeNotificaciones(): void {
+  if (Platform.OS === "web") return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+/** Con la app cerrada (el caso más común en una emergencia real),
+ * addNotificationResponseReceivedListener no alcanza -- ese evento no
+ * se dispara para la notificación que recién abrió la app (hallazgo I7
+ * de la revisión final). */
+export async function obtenerAlertaIdDeNotificacionFria(): Promise<number | null> {
+  const respuesta = await Notifications.getLastNotificationResponseAsync();
+  const alertaId = respuesta?.notification.request.content.data?.alerta_id;
+  return typeof alertaId === "number" ? alertaId : null;
+}
