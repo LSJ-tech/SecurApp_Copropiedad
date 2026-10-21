@@ -221,6 +221,7 @@ class Membresia(models.Model):
         null=True, blank=True,
         help_text="Cuándo esta persona aceptó los Términos de Uso y la Política de Privacidad. Vacío = todavía no los ha aceptado.",
     )
+    telefono = models.CharField(max_length=30, blank=True, default="", help_text="Para contacto directo -- opcional.")
 
     def __str__(self):
         return f"{self.user} ({self.get_rol_display()} de {self.condominio})"

@@ -2852,3 +2852,43 @@ class MoverMiembroApiTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(r.status_code, 404)
+
+
+class MembresiaTelefonoTests(TestCase):
+    def test_telefono_es_opcional_y_vacio_por_defecto(self):
+        condominio = Condominio.objects.create(nombre="Test Telefono Default", plan="premium")
+        membresia = crear_membresia(condominio, "residente", unidad=Unidad.objects.create(condominio=condominio, numero="1"))
+        self.assertEqual(membresia.telefono, "")
+
+
+class MiPerfilTelefonoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Mi Perfil Telefono", plan="premium")
+        cls.unidad = Unidad.objects.create(condominio=cls.condominio, numero="1")
+
+    def setUp(self):
+        self.membresia = crear_membresia(self.condominio, "residente", unidad=self.unidad, username="mi_perfil_tel", email="tel@example.com")
+        self.client.force_login(self.membresia.user)
+
+    def test_get_precarga_el_telefono_actual(self):
+        self.membresia.telefono = "+56911112222"
+        self.membresia.save(update_fields=["telefono"])
+        r = self.client.get(reverse("mi-perfil"))
+        self.assertContains(r, "+56911112222")
+
+    def test_post_actualiza_el_telefono(self):
+        r = self.client.post(reverse("mi-perfil"), {
+            "first_name": "Mi", "last_name": "Perfil", "email": "tel@example.com", "telefono": "+56933334444",
+        })
+        self.assertRedirects(r, reverse("mi-perfil"))
+        self.membresia.refresh_from_db()
+        self.assertEqual(self.membresia.telefono, "+56933334444")
+
+    def test_post_sin_telefono_lo_deja_vacio_no_falla(self):
+        r = self.client.post(reverse("mi-perfil"), {
+            "first_name": "Mi", "last_name": "Perfil", "email": "tel@example.com", "telefono": "",
+        })
+        self.assertRedirects(r, reverse("mi-perfil"))
+        self.membresia.refresh_from_db()
+        self.assertEqual(self.membresia.telefono, "")
