@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -681,3 +682,15 @@ class NumeroEmergenciaListViewPropuestasContextTests(TestCase):
         self.client.force_login(self.residente.user)
         r = self.client.get(reverse("numeros-emergencia"))
         self.assertEqual(list(r.context["mis_propuestas"]), [propia])
+
+
+class AlertaLecturaModeloTests(TestCase):
+    def test_no_se_puede_registrar_dos_veces_la_misma_lectura(self):
+        condominio = Condominio.objects.create(nombre="Test Alerta Lectura Modelo", plan="premium")
+        autor = crear_membresia(condominio, "residente", username="lectura_modelo_autor")
+        alerta = Alerta.objects.create(condominio=condominio, autor=autor, tipo="robo", estado="activa")
+        from alertas.models import AlertaLectura
+
+        AlertaLectura.objects.create(alerta=alerta, membresia=autor)
+        with self.assertRaises(IntegrityError):
+            AlertaLectura.objects.create(alerta=alerta, membresia=autor)

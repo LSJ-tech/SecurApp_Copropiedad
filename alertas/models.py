@@ -145,3 +145,21 @@ class PropuestaNumeroEmergencia(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.get_estado_display()})"
+
+
+class AlertaLectura(models.Model):
+    """Quién vio cada alerta -- base de "visto por X vecinos", visible
+    solo para el propio autor (ver AlertaSerializer.get_visto_por_count).
+    Se registra con una acción explícita (marcar_visto), nunca pasiva."""
+
+    alerta = models.ForeignKey(Alerta, on_delete=models.CASCADE, related_name="lecturas")
+    membresia = models.ForeignKey(Membresia, on_delete=models.CASCADE, related_name="alertas_vistas")
+    fecha_lectura = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["alerta", "membresia"], name="lectura_unica_por_alerta_y_membresia"),
+        ]
+
+    def __str__(self):
+        return f"{self.membresia} vio la alerta #{self.alerta_id}"
