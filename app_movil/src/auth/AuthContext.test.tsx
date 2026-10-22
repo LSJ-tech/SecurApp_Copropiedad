@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import * as authApi from "../api/auth";
 import * as storage from "./storage";
 import * as dispositivosApi from "../api/dispositivos";
+import * as devquadApi from "../api/devquad";
 import { apiFetch, ErrorDeRed, ErrorDeServidor } from "../api/client";
 
 afterEach(() => {
@@ -98,7 +99,7 @@ test("login exitoso con membresia dispara el registro de push (sin bloquear la U
   expect(registrarSpy).toHaveBeenCalled();
 });
 
-test("login exitoso sin membresia (devquad) pasa a sin_membresia, no a autenticado", async () => {
+test("login exitoso sin membresia (devquad) pasa a devquad_sin_condominio, no a autenticado", async () => {
   jest.spyOn(storage, "obtenerTokens").mockResolvedValue(null);
   jest.spyOn(storage, "guardarTokens").mockResolvedValue();
   jest.spyOn(authApi, "login").mockResolvedValue({ access: "a", refresh: "r", membresia: null });
@@ -116,7 +117,79 @@ test("login exitoso sin membresia (devquad) pasa a sin_membresia, no a autentica
   });
   await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
   await act(() => auth!.iniciarSesion("devquad", "clave"));
-  await waitFor(() => expect(auth.estado).toBe("sin_membresia"));
+  await waitFor(() => expect(auth.estado).toBe("devquad_sin_condominio"));
+});
+
+test("elegirCondominio guarda los tokens nuevos y pasa a devquad_con_condominio", async () => {
+  // Primera llamada (al montar, sin sesión guardada) -> null; cualquier
+  // llamada posterior (la que hace elegirCondominio) -> los tokens que
+  // iniciarSesion acaba de guardar.
+  jest
+    .spyOn(storage, "obtenerTokens")
+    .mockResolvedValueOnce(null)
+    .mockResolvedValue({ access: "a", refresh: "r" });
+  const guardarSpy = jest.spyOn(storage, "guardarTokens").mockResolvedValue();
+  jest.spyOn(authApi, "login").mockResolvedValue({ access: "a", refresh: "r", membresia: null });
+  jest.spyOn(devquadApi, "entrarCondominio").mockResolvedValue({
+    access: "a2",
+    refresh: "r2",
+    condominio: { id: 5, nombre: "Empart", plan: "premium", puede_operar: true },
+  });
+  let auth: ReturnType<typeof useAuth>;
+  function Capturador() {
+    auth = useAuth();
+    return null;
+  }
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Capturador />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
+  await act(() => auth!.iniciarSesion("devquad", "clave"));
+  await waitFor(() => expect(auth.estado).toBe("devquad_sin_condominio"));
+  await act(() => auth!.elegirCondominio(5));
+  expect(guardarSpy).toHaveBeenCalledWith("a2", "r2");
+  expect(auth!.estado).toBe("devquad_con_condominio");
+  expect(auth!.condominioActivo).toEqual({ id: 5, nombre: "Empart" });
+});
+
+test("volverAElegirCondominio vuelve a devquad_sin_condominio sin tocar los tokens", async () => {
+  jest
+    .spyOn(storage, "obtenerTokens")
+    .mockResolvedValueOnce(null)
+    .mockResolvedValue({ access: "a", refresh: "r" });
+  jest.spyOn(storage, "guardarTokens").mockResolvedValue();
+  const borrarSpy = jest.spyOn(storage, "borrarTokens").mockResolvedValue();
+  jest.spyOn(authApi, "login").mockResolvedValue({ access: "a", refresh: "r", membresia: null });
+  jest.spyOn(devquadApi, "entrarCondominio").mockResolvedValue({
+    access: "a2",
+    refresh: "r2",
+    condominio: { id: 5, nombre: "Empart", plan: "premium", puede_operar: true },
+  });
+  let auth: ReturnType<typeof useAuth>;
+  function Capturador() {
+    auth = useAuth();
+    return null;
+  }
+  await act(async () => {
+    render(
+      <AuthProvider>
+        <Capturador />
+      </AuthProvider>
+    );
+  });
+  await waitFor(() => expect(auth.estado).toBe("sin_sesion"));
+  await act(() => auth!.iniciarSesion("devquad", "clave"));
+  await act(() => auth!.elegirCondominio(5));
+  await waitFor(() => expect(auth.estado).toBe("devquad_con_condominio"));
+  await act(async () => {
+    auth!.volverAElegirCondominio();
+  });
+  expect(auth!.estado).toBe("devquad_sin_condominio");
+  expect(borrarSpy).not.toHaveBeenCalled();
 });
 
 test("cerrarSesion borra los tokens guardados y vuelve a sin_sesion", async () => {
@@ -201,10 +274,10 @@ test("con tokens guardados, confirma la membresia real contra /auth/me/ al monta
   expect(perfilSpy).toHaveBeenCalled();
 });
 
-test("con tokens guardados pero sin membresia (409, cuenta devquad), cae en sin_membresia al reabrir la app", async () => {
-  // Hallazgo I1 de la revisión final: antes, reabrir la app con una
-  // cuenta devquad caía en la pantalla de pánico (autenticado con
-  // membresia=null) en vez de sin-membresia.
+test("con tokens guardados pero sin membresia (409, cuenta devquad), cae en devquad_sin_condominio al reabrir la app", async () => {
+  // Hallazgo I1 de la revisión final (Tanda 1): antes, reabrir la app con
+  // una cuenta devquad caía en la pantalla de pánico (autenticado con
+  // membresia=null) en vez de un estado devquad real.
   jest.spyOn(storage, "obtenerTokens").mockResolvedValue({ access: "a", refresh: "r" });
   jest.spyOn(authApi, "obtenerMiPerfil").mockRejectedValue(new ErrorDeServidor(409));
   await act(async () => {
@@ -214,7 +287,7 @@ test("con tokens guardados pero sin membresia (409, cuenta devquad), cae en sin_
       </AuthProvider>
     );
   });
-  await waitFor(() => screen.getByText("sin_membresia:-"));
+  await waitFor(() => screen.getByText("devquad_sin_condominio:-"));
 });
 
 test("si confirmar la sesion al montar falla por un error de red, no se queda en cargando para siempre", async () => {
