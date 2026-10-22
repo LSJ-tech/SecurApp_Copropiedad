@@ -53,9 +53,11 @@ function GuardDeRutas() {
   useEffect(() => {
     if (Platform.OS === "web" || estado !== "autenticado" || yaRevisoNotificacionFria.current) return;
     yaRevisoNotificacionFria.current = true;
-    obtenerAlertaIdDeNotificacionFria().then((alertaId) => {
-      if (alertaId) router.push(`/alertas/${alertaId}`);
-    });
+    obtenerAlertaIdDeNotificacionFria()
+      .then((alertaId) => {
+        if (alertaId) router.push(`/alertas/${alertaId}`);
+      })
+      .catch(() => {});
   }, [estado, router]);
 
   return <Stack screenOptions={{ headerShown: false }} />;

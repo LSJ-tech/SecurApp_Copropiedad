@@ -36,6 +36,22 @@ jobs:
           coverage run manage.py test
           coverage xml
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: app_movil/package-lock.json
+
+      - name: Correr tests de la app móvil con coverage
+        # Sin esto, Sonar nunca ve cobertura real de app_movil/ (TS/TSX) --
+        # cuenta cada línea nueva como 0% cubierta aunque el suite de Jest
+        # (115 tests) la cubra de verdad, hundiendo new_coverage sin que
+        # refleje el estado real del código.
+        working-directory: app_movil
+        run: |
+          npm ci
+          npx jest --coverage --watchAll=false
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:

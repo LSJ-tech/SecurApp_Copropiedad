@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setEstado("sin_sesion");
         }
       }
-    })();
+    })().catch(() => {});
 
     return () => {
       vigente = false;

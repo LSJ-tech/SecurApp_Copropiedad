@@ -91,9 +91,9 @@ export async function procesarCola(): Promise<void> {
  * final: antes, nada llamaba nunca a procesarCola() en producción).
  * Devuelve una función para dejar de escuchar (usada al desmontar). */
 export function iniciarProcesamientoAutomatico(): () => void {
-  procesarCola();
+  procesarCola().catch(() => {});
   const suscripcion = AppState.addEventListener("change", (estado) => {
-    if (estado === "active") procesarCola();
+    if (estado === "active") procesarCola().catch(() => {});
   });
   return () => suscripcion.remove();
 }

@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+# jest --coverage (consumido por CI para subir lcov.info a SonarCloud,
+# no se commitea)
+coverage/
+
 # Expo
 .expo/
 dist/
