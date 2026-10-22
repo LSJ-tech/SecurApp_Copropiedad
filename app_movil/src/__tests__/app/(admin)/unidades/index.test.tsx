@@ -21,6 +21,20 @@ test("lista las unidades y permite crear una nueva sin torre", async () => {
   expect(crearSpy).toHaveBeenCalledWith({ numero: "102" });
 });
 
+test("muestra la torre de cada unidad para distinguir numeros duplicados entre torres distintas (hallazgo Important: Empart real tiene numeros repetidos entre torres)", async () => {
+  jest.spyOn(torresApi, "listarTorres").mockResolvedValue([
+    { id: 1, nombre: "Torre A" },
+    { id: 2, nombre: "Torre B" },
+  ]);
+  jest.spyOn(unidadesApi, "listarUnidades").mockResolvedValue([
+    { id: 1, numero: "101", calle: "", torre: 1, alicuota: null },
+    { id: 2, numero: "101", calle: "", torre: 2, alicuota: null },
+  ]);
+  await render(<UnidadesScreen />);
+  await screen.findByText("101 · Torre A");
+  await screen.findByText("101 · Torre B");
+});
+
 test("si la torre elegida no pertenece al condominio, muestra el mensaje real del backend", async () => {
   // Texto exacto confirmado contra el backend real (UnidadSerializer.validate,
   // core/serializers.py) -- no es un mensaje inventado para el test.

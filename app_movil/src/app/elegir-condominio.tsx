@@ -6,7 +6,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { colores } from "@/theme/colores";
 
 export default function ElegirCondominioScreen() {
-  const { elegirCondominio } = useAuth();
+  const { elegirCondominio, cerrarSesion } = useAuth();
   const [condominios, setCondominios] = useState<CondominioResumen[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Entrar dos veces al mismo condominio no duplica nada del lado del
@@ -37,6 +37,16 @@ export default function ElegirCondominioScreen() {
     <View style={styles.container}>
       <Text style={styles.titulo}>Elegí un condominio</Text>
       {error && <Text style={styles.error}>{error}</Text>}
+      {/* Hallazgo Important de la revisión final: al borrar
+          sin-membresia.tsx, devquad se quedó sin ninguna forma de
+          cerrar sesión -- un teléfono prestado/compartido no podía
+          salir. También resuelve el caso borde de elegirCondominio
+          quedando "atascado" si el refresh usado quedó invalidado a
+          mitad de camino (cerrarSesion siempre limpia los tokens
+          locales, aunque el aviso al servidor falle). */}
+      <Pressable onPress={cerrarSesion} style={styles.cerrarSesion}>
+        <Text style={styles.cerrarSesionTexto}>Cerrar sesión</Text>
+      </Pressable>
       <FlatList
         data={condominios}
         keyExtractor={(item) => String(item.id)}
@@ -56,4 +66,6 @@ const styles = StyleSheet.create({
   fila: { padding: 14, borderBottomWidth: 1, borderBottomColor: "#eee" },
   nombre: { fontWeight: "600" },
   error: { color: "#b00020", textAlign: "center", marginBottom: 8 },
+  cerrarSesion: { alignSelf: "flex-end", marginBottom: 16 },
+  cerrarSesionTexto: { color: colores.slate, textDecorationLine: "underline" },
 });

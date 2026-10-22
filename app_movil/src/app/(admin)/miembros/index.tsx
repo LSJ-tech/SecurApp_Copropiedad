@@ -3,6 +3,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "r
 
 import { crearMiembro, listarMiembros, CrearMiembroResultado, Miembro } from "@/api/miembros";
 import { listarUnidades, Unidad } from "@/api/unidades";
+import { listarTorres, Torre } from "@/api/torres";
 import { primerMensajeDeError } from "@/api/erroresFormulario";
 import { colores } from "@/theme/colores";
 
@@ -14,6 +15,7 @@ const ROLES: { valor: "residente" | "delegado"; etiqueta: string }[] = [
 export default function MiembrosScreen() {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
+  const [torres, setTorres] = useState<Torre[]>([]);
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
@@ -31,7 +33,16 @@ export default function MiembrosScreen() {
       .then(setMiembros)
       .catch(() => setError("No se pudieron cargar los miembros."));
     listarUnidades().then(setUnidades).catch(() => {});
+    listarTorres().then(setTorres).catch(() => {});
   }, []);
+
+  // Hallazgo Important de la revisión final: Empart (cliente real) repite
+  // números de unidad entre torres distintas -- sin el nombre de la torre
+  // son indistinguibles en el selector.
+  function etiquetaDeUnidad(unidad: Unidad): string {
+    const torreNombre = torres.find((t) => t.id === unidad.torre)?.nombre;
+    return torreNombre ? `${unidad.numero} · ${torreNombre}` : unidad.numero;
+  }
 
   async function manejarCrear() {
     setError(null);
@@ -87,7 +98,7 @@ export default function MiembrosScreen() {
           ))}
         </View>
         <Pressable style={styles.selector} onPress={() => setSelectorAbierto(true)}>
-          <Text>{unidadElegida?.numero ?? "Sin unidad"}</Text>
+          <Text>{unidadElegida ? etiquetaDeUnidad(unidadElegida) : "Sin unidad"}</Text>
         </Pressable>
         <Pressable style={styles.boton} onPress={manejarCrear}>
           <Text style={styles.botonTexto}>Crear miembro</Text>
@@ -108,7 +119,7 @@ export default function MiembrosScreen() {
                     setSelectorAbierto(false);
                   }}
                 >
-                  <Text>{item.numero}</Text>
+                  <Text>{etiquetaDeUnidad(item)}</Text>
                 </Pressable>
               )}
             />

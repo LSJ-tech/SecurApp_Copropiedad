@@ -71,11 +71,17 @@ export default function UnidadesScreen() {
       <FlatList
         data={unidades}
         keyExtractor={(u) => String(u.id)}
-        renderItem={({ item }) => (
-          <View style={styles.fila}>
-            <Text>{item.numero}</Text>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          // Hallazgo Important de la revisión final: Empart (cliente real)
+          // repite números de unidad entre torres distintas -- sin el
+          // nombre de la torre son indistinguibles en la lista.
+          const torreNombre = torres.find((t) => t.id === item.torre)?.nombre;
+          return (
+            <View style={styles.fila}>
+              <Text>{torreNombre ? `${item.numero} · ${torreNombre}` : item.numero}</Text>
+            </View>
+          );
+        }}
       />
     </View>
   );

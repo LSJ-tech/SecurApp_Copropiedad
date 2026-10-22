@@ -44,3 +44,12 @@ test("si elegirCondominio falla, muestra un error y deja reintentar (no queda en
   await fireEvent.press(screen.getByText("Empart"));
   expect(elegirSpy).toHaveBeenCalledTimes(2);
 });
+
+test("tiene un boton para cerrar sesion (hallazgo Important: al borrar sin-membresia.tsx, devquad se quedo sin ninguna forma de salir)", async () => {
+  jest.spyOn(devquadApi, "listarCondominiosDevquad").mockResolvedValue([]);
+  const cerrarSpy = jest.fn().mockResolvedValue(undefined);
+  jest.spyOn(authContext, "useAuth").mockReturnValue({ elegirCondominio: jest.fn(), cerrarSesion: cerrarSpy } as any);
+  await render(<ElegirCondominioScreen />);
+  await fireEvent.press(await screen.findByText(/cerrar sesión/i));
+  expect(cerrarSpy).toHaveBeenCalled();
+});
