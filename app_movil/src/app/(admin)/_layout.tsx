@@ -29,6 +29,7 @@ export default function AdminLayout() {
     >
       <Drawer.Screen name="condominio/index" options={{ title: "Mi condominio" }} />
       <Drawer.Screen name="torres/index" options={{ title: "Torres" }} />
+      <Drawer.Screen name="unidades/index" options={{ title: "Unidades" }} />
     </Drawer>
   );
 }
