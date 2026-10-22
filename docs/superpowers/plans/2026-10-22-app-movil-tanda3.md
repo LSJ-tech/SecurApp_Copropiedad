@@ -102,8 +102,7 @@ app_movil/src/
     _layout.tsx            (modificar -- enruta devquad_sin_condominio/devquad_con_condominio)
     (admin)/
       _layout.tsx           (nuevo -- Drawer separado, D-07)
-      index.tsx             (nuevo -- redirige a condominio/index)
-      condominio/index.tsx  (nuevo -- Mi condominio)
+      condominio/index.tsx  (nuevo -- Mi condominio; landing del modo administrador)
       torres/index.tsx      (nuevo)
       unidades/index.tsx    (nuevo)
       miembros/index.tsx    (nuevo)
@@ -240,7 +239,7 @@ git push
 **Files:**
 - Create: `app_movil/src/app/elegir-condominio.tsx`
 - Delete: `app_movil/src/app/sin-membresia.tsx`
-- Modify: `app_movil/src/app/_layout.tsx` (el guard redirige a `/elegir-condominio` en vez de `/sin-membresia`, y a `/(admin)` cuando `devquad_con_condominio`)
+- Modify: `app_movil/src/app/_layout.tsx` (el guard redirige a `/elegir-condominio` en vez de `/sin-membresia`, y a `/condominio` cuando `devquad_con_condominio`)
 - Create: `app_movil/src/__tests__/app/elegir-condominio.test.tsx`
 
 **Interfaces:**
@@ -308,7 +307,9 @@ Lista simple (`FlatList`, nombre + plan), cada fila llama `elegirCondominio(item
 
 - [ ] **Step 5: Borrar `sin-membresia.tsx`, actualizar el guard de `_layout.tsx`**
 
-En `GuardDeRutas`, reemplazar las referencias a `"sin_membresia"`/`"/sin-membresia"` por `"devquad_sin_condominio"`/`"/elegir-condominio"`; agregar que `"devquad_con_condominio"` redirige a `"/(admin)"` (la ruta de la Tarea 3) si no está ya ahí.
+En `GuardDeRutas`, reemplazar las referencias a `"sin_membresia"`/`"/sin-membresia"` por `"devquad_sin_condominio"`/`"/elegir-condominio"`; agregar que `"devquad_con_condominio"` redirige a `"/condominio"` (la pantalla de Mi condominio, Tarea 4 -- que hace de landing del modo administrador) si no está ya en una ruta de `(admin)`.
+
+**Ruling de diseño ya verificado (no a criterio de quien implemente):** `(admin)/` NO tiene un `index.tsx` propio. Se probó directo (`npx expo start --web` con un `(admin)/index.tsx` de prueba) y Expo Router resuelve `(admin)/index.tsx` y `(vecino)/index.tsx` a la MISMA ruta `/` sin ningún error ni warning -- uno de los dos gana en silencio y el otro queda inalcanzable. Por eso el guard redirige directo a `/condominio` (`(admin)/condominio/index.tsx`, que vive un nivel más adentro y no colisiona con nada), nunca a `/` ni a `/(admin)`.
 
 - [ ] **Step 6: Suite completa + verificación manual + commit**
 
@@ -328,16 +329,13 @@ git push
 
 **Files:**
 - Create: `app_movil/src/app/(admin)/_layout.tsx`
-- Create: `app_movil/src/app/(admin)/index.tsx`
 
 **Interfaces:**
 - Consumes: `useAuth().condominioActivo`, `useAuth().volverAElegirCondominio` (Tarea 1).
 
 - [ ] **Step 1: Implementar (sin test automático -- composición de navegación, mismo criterio que `(vecino)/_layout.tsx` en la Tanda 1)**
 
-`(admin)/_layout.tsx`: un Drawer separado (D-07, no reusa el de `(vecino)/`), con el nombre del `condominioActivo` en el header, y una entrada "Cambiar condominio" que llama `volverAElegirCondominio()`. Rutas: `condominio/index`, `torres/index`, `unidades/index`, `miembros/index`.
-
-`(admin)/index.tsx`: redirige a `condominio/index` apenas monta (`router.replace`) -- no hay una pantalla de "inicio" propia para el modo administrador en esta tanda, "Mi condominio" hace de landing.
+`(admin)/_layout.tsx`: un Drawer separado (D-07, no reusa el de `(vecino)/`), con el nombre del `condominioActivo` en el header, y una entrada "Cambiar condominio" que llama `volverAElegirCondominio()`. Rutas: `condominio/index`, `torres/index`, `unidades/index`, `miembros/index`. No hay ningún `index.tsx` en la raíz de `(admin)/` (ver el Ruling ya verificado de la Tarea 2 -- colisionaría con `(vecino)/index.tsx` en la ruta `/`); "Mi condominio" (`condominio/index`, Tarea 4) hace de landing, y el guard de `_layout.tsx` ya redirige ahí directo.
 
 - [ ] **Step 2: Suite completa + verificación manual + commit**
 

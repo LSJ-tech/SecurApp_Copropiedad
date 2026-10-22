@@ -14,13 +14,20 @@ function GuardDeRutas() {
   useEffect(() => {
     if (estado === "cargando") return;
     const enLogin = segmentos[0] === "login";
-    const enSinMembresia = segmentos[0] === "sin-membresia";
+    const enElegirCondominio = segmentos[0] === "elegir-condominio";
+    const enAdmin = segmentos[0] === "(admin)";
 
     if (estado === "sin_sesion" && !enLogin) {
       router.replace("/login");
-    } else if (estado === "sin_membresia" && !enSinMembresia) {
-      router.replace("/sin-membresia");
-    } else if (estado === "autenticado" && (enLogin || enSinMembresia)) {
+    } else if (estado === "devquad_sin_condominio" && !enElegirCondominio) {
+      router.replace("/elegir-condominio");
+    } else if (estado === "devquad_con_condominio" && !enAdmin) {
+      // (admin)/ no tiene index.tsx propio -- colisionaría con
+      // (vecino)/index.tsx en la ruta "/" (verificado en la Tarea 2 de
+      // la Tanda 3). "Mi condominio" hace de landing del modo
+      // administrador.
+      router.replace("/condominio");
+    } else if (estado === "autenticado" && (enLogin || enElegirCondominio || enAdmin)) {
       router.replace("/");
     }
   }, [estado, segmentos, router]);
