@@ -26,6 +26,9 @@ export default function AdminLayout() {
           </Pressable>
         ),
       }}
-    />
+    >
+      <Drawer.Screen name="condominio/index" options={{ title: "Mi condominio" }} />
+      <Drawer.Screen name="torres/index" options={{ title: "Torres" }} />
+    </Drawer>
   );
 }

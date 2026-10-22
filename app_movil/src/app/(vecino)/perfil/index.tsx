@@ -2,16 +2,8 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { actualizarMiPerfil, obtenerMiPerfil } from "@/api/auth";
-import { ErrorDeServidor } from "@/api/client";
+import { primerMensajeDeError } from "@/api/erroresFormulario";
 import { colores } from "@/theme/colores";
-
-function primerMensajeDeError(error: unknown): string {
-  if (error instanceof ErrorDeServidor && error.body && typeof error.body === "object") {
-    const primero = Object.values(error.body as Record<string, unknown>)[0];
-    if (Array.isArray(primero) && typeof primero[0] === "string") return primero[0];
-  }
-  return "No se pudo guardar. Probá de nuevo.";
-}
 
 export default function PantallaPerfil() {
   const [cargando, setCargando] = useState(true);
