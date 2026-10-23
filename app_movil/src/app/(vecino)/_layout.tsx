@@ -36,6 +36,7 @@ export default function VecinoLayout() {
         }}
       />
       <Drawer.Screen name="invitar/index" options={{ title: "Invitar vecinos" }} />
+      <Drawer.Screen name="donar/index" options={{ title: "Donar" }} />
       <Drawer.Screen
         name="alertas/[id]"
         options={{ title: "Detalle de alerta", drawerItemStyle: { display: "none" } }}

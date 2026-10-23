@@ -11,3 +11,15 @@ export function primerMensajeDeError(error: unknown): string {
   }
   return "No se pudo guardar. Probá de nuevo.";
 }
+
+/** Mensaje de un ErrorDeServidor.body con shape {"detail": "..."} -- el
+ * que usan los endpoints que no son un form de Django (LogoutView,
+ * DevquadEntrarCondominioApiView, pagos/api_views.py, etc.), distinto
+ * del shape {campo: [mensajes]} que espera primerMensajeDeError. */
+export function mensajeDetalleDeError(error: unknown, porDefecto: string): string {
+  if (error instanceof ErrorDeServidor && error.body && typeof error.body === "object") {
+    const detalle = (error.body as Record<string, unknown>).detail;
+    if (typeof detalle === "string") return detalle;
+  }
+  return porDefecto;
+}
