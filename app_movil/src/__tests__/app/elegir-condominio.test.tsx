@@ -3,7 +3,7 @@ jest.mock("expo-notifications", () => ({
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
-  getLastNotificationResponseAsync: jest.fn(),
+  getLastNotificationResponse: jest.fn(),
 }));
 
 import { render, fireEvent, screen } from "@testing-library/react-native";

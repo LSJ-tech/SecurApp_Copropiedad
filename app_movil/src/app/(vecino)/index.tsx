@@ -6,7 +6,6 @@ import { SelectorTipoAlerta } from "@/components/SelectorTipoAlerta";
 import { VentanaCancelar } from "@/components/VentanaCancelar";
 import { enviarAlerta } from "@/alertas/enviarAlerta";
 import { obtenerUbicacionActual } from "@/ubicacion/gps";
-import { colores } from "@/theme/colores";
 
 export default function PantallaPanico() {
   const [tipo, setTipo] = useState("otro");

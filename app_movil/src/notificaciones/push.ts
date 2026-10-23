@@ -27,21 +27,27 @@ export async function registrarDispositivoPush(): Promise<void> {
 export function configurarManejadorDeNotificaciones(): void {
   if (Platform.OS === "web") return;
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+    // El tipo de handleNotification exige devolver una Promise -- sin
+    // await real adentro, Promise.resolve() cumple el tipo sin el
+    // `async` que Sonar marca como innecesario (S7503).
+    handleNotification: () =>
+      Promise.resolve({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
   });
 }
 
 /** Con la app cerrada (el caso más común en una emergencia real),
  * addNotificationResponseReceivedListener no alcanza -- ese evento no
  * se dispara para la notificación que recién abrió la app (hallazgo I7
- * de la revisión final). */
-export async function obtenerAlertaIdDeNotificacionFria(): Promise<number | null> {
-  const respuesta = await Notifications.getLastNotificationResponseAsync();
+ * de la revisión final). getLastNotificationResponse (sin "Async") es
+ * el reemplazo no deprecado -- ya es síncrono, getLastNotificationResponseAsync
+ * solo envolvía el mismo valor en una Promise. */
+export function obtenerAlertaIdDeNotificacionFria(): number | null {
+  const respuesta = Notifications.getLastNotificationResponse();
   const alertaId = respuesta?.notification.request.content.data?.alerta_id;
   return typeof alertaId === "number" ? alertaId : null;
 }

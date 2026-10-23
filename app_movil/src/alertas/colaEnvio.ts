@@ -69,7 +69,10 @@ export async function procesarCola(): Promise<void> {
         // bloquear a los que vienen detrás para siempre (hallazgo I2).
       }
 
-      await conTurno(async () => {
+      // Secuencial a propósito, no se puede paralelizar -- cada vuelta
+      // tiene que esperar a que la anterior termine de sacar su item de
+      // la cola antes de leer cuál es la nueva cabeza.
+      await conTurno(async () => { // NOSONAR (S9382): ver comentario arriba
         // Siempre se saca el primero: nada más que esta función saca
         // items de la cola (procesando=true evita 2 procesarCola a la
         // vez), así que el que sigue siendo cabeza es el que se acaba

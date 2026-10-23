@@ -9,7 +9,7 @@ type Props = {
   onCambiar: (tipo: string) => void;
 };
 
-export function SelectorTipoAlerta({ valor, onCambiar }: Props) {
+export function SelectorTipoAlerta({ valor, onCambiar }: Readonly<Props>) {
   const [abierto, setAbierto] = useState(false);
   const actual = TIPOS_ALERTA.find((t) => t.valor === valor);
 

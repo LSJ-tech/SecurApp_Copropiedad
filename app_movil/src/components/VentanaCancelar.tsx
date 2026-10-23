@@ -11,7 +11,7 @@ type Props = {
   onCancelada: () => void;
 };
 
-export function VentanaCancelar({ alertaId, onCancelada }: Props) {
+export function VentanaCancelar({ alertaId, onCancelada }: Readonly<Props>) {
   const [visible, setVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Ref, no estado: tiene que bloquear el segundo toque ya mismo, sin

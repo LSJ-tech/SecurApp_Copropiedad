@@ -10,7 +10,7 @@ type Props = {
   tipoSeleccionado: string;
 };
 
-export function BotonPanico({ onConfirmar, tipoSeleccionado }: Props) {
+export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function manejarPressIn() {

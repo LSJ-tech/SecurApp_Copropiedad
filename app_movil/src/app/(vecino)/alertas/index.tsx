@@ -5,6 +5,15 @@ import { useRouter } from "expo-router";
 import { listarAlertas, AlertaOut } from "@/api/alertas";
 import { colores } from "@/theme/colores";
 
+function Fila({ item, onPress }: Readonly<{ item: AlertaOut; onPress: () => void }>) {
+  return (
+    <Pressable style={styles.fila} onPress={onPress}>
+      <Text style={styles.filaTitulo}>{item.tipo_display}</Text>
+      <Text style={styles.filaSubtitulo}>{item.estado_display}</Text>
+    </Pressable>
+  );
+}
+
 export default function ListaAlertasScreen() {
   const router = useRouter();
   const [activas, setActivas] = useState<AlertaOut[]>([]);
@@ -22,22 +31,21 @@ export default function ListaAlertasScreen() {
       .catch(() => setError("No se pudieron cargar las alertas."));
   }, []);
 
-  function Fila({ item }: { item: AlertaOut }) {
-    return (
-      <Pressable style={styles.fila} onPress={() => router.push(`/alertas/${item.id}`)}>
-        <Text style={styles.filaTitulo}>{item.tipo_display}</Text>
-        <Text style={styles.filaSubtitulo}>{item.estado_display}</Text>
-      </Pressable>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.seccion}>Activas</Text>
-      <FlatList data={activas} keyExtractor={(a) => String(a.id)} renderItem={Fila} />
+      <FlatList
+        data={activas}
+        keyExtractor={(a) => String(a.id)}
+        renderItem={({ item }) => <Fila item={item} onPress={() => router.push(`/alertas/${item.id}`)} />}
+      />
       <Text style={styles.seccion}>Historial</Text>
-      <FlatList data={historial} keyExtractor={(a) => String(a.id)} renderItem={Fila} />
+      <FlatList
+        data={historial}
+        keyExtractor={(a) => String(a.id)}
+        renderItem={({ item }) => <Fila item={item} onPress={() => router.push(`/alertas/${item.id}`)} />}
+      />
     </View>
   );
 }

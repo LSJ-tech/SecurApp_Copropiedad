@@ -38,7 +38,7 @@ function GuardDeRutas() {
     if (Platform.OS === "web") return;
     const suscripcion = Notifications.addNotificationResponseReceivedListener((respuesta) => {
       const alertaId = respuesta.notification.request.content.data?.alerta_id;
-      if (alertaId) router.push(`/alertas/${alertaId}`);
+      if (typeof alertaId === "number") router.push(`/alertas/${alertaId}`);
     });
     return () => suscripcion.remove();
   }, [router]);
@@ -53,11 +53,8 @@ function GuardDeRutas() {
   useEffect(() => {
     if (Platform.OS === "web" || estado !== "autenticado" || yaRevisoNotificacionFria.current) return;
     yaRevisoNotificacionFria.current = true;
-    obtenerAlertaIdDeNotificacionFria()
-      .then((alertaId) => {
-        if (alertaId) router.push(`/alertas/${alertaId}`);
-      })
-      .catch(() => {});
+    const alertaId = obtenerAlertaIdDeNotificacionFria();
+    if (alertaId) router.push(`/alertas/${alertaId}`);
   }, [estado, router]);
 
   return <Stack screenOptions={{ headerShown: false }} />;

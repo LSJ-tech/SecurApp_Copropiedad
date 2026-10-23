@@ -8,7 +8,7 @@ jest.mock("expo-notifications", () => ({
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
-  getLastNotificationResponseAsync: jest.fn(),
+  getLastNotificationResponse: jest.fn(),
 }));
 
 afterEach(() => {
@@ -65,18 +65,18 @@ test("en Web, configurarManejadorDeNotificaciones no hace nada", () => {
   expect(Notifications.setNotificationHandler).not.toHaveBeenCalled();
 });
 
-test("obtenerAlertaIdDeNotificacionFria devuelve el alerta_id si la app se abrió tocando una notificación", async () => {
+test("obtenerAlertaIdDeNotificacionFria devuelve el alerta_id si la app se abrió tocando una notificación", () => {
   // Hallazgo I7: con la app cerrada (lo más común en una emergencia
   // real), solo addNotificationResponseReceivedListener no alcanza --
   // ese evento no se dispara para la notificación que recién abrió la
-  // app, hay que preguntarle a getLastNotificationResponseAsync.
-  (Notifications.getLastNotificationResponseAsync as jest.Mock).mockResolvedValue({
+  // app, hay que preguntarle a getLastNotificationResponse.
+  (Notifications.getLastNotificationResponse as jest.Mock).mockReturnValue({
     notification: { request: { content: { data: { tipo: "alerta", alerta_id: 42 } } } },
   });
-  await expect(obtenerAlertaIdDeNotificacionFria()).resolves.toBe(42);
+  expect(obtenerAlertaIdDeNotificacionFria()).toBe(42);
 });
 
-test("obtenerAlertaIdDeNotificacionFria devuelve null si la app no se abrió desde una notificación", async () => {
-  (Notifications.getLastNotificationResponseAsync as jest.Mock).mockResolvedValue(null);
-  await expect(obtenerAlertaIdDeNotificacionFria()).resolves.toBeNull();
+test("obtenerAlertaIdDeNotificacionFria devuelve null si la app no se abrió desde una notificación", () => {
+  (Notifications.getLastNotificationResponse as jest.Mock).mockReturnValue(null);
+  expect(obtenerAlertaIdDeNotificacionFria()).toBeNull();
 });

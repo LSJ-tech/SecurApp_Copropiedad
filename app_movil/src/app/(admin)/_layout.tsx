@@ -4,6 +4,14 @@ import { Drawer } from "expo-router/drawer";
 import { useAuth } from "@/auth/AuthContext";
 import { colores } from "@/theme/colores";
 
+function BotonCambiarCondominio({ onCambiar }: Readonly<{ onCambiar: () => void }>) {
+  return (
+    <Pressable onPress={onCambiar} style={{ marginRight: 16 }}>
+      <Text style={{ color: "#fff", fontWeight: "600" }}>Cambiar</Text>
+    </Pressable>
+  );
+}
+
 export default function AdminLayout() {
   const { condominioActivo, volverAElegirCondominio } = useAuth();
 
@@ -20,11 +28,7 @@ export default function AdminLayout() {
         // rutas que existen de verdad como archivo (D-07 tampoco exige
         // que esté en el menú, solo que el modo administrador no
         // comparta navegación con el drawer del vecino).
-        headerRight: () => (
-          <Pressable onPress={volverAElegirCondominio} style={{ marginRight: 16 }}>
-            <Text style={{ color: "#fff", fontWeight: "600" }}>Cambiar</Text>
-          </Pressable>
-        ),
+        headerRight: () => <BotonCambiarCondominio onCambiar={volverAElegirCondominio} />,
       }}
     >
       <Drawer.Screen name="condominio/index" options={{ title: "Mi condominio" }} />

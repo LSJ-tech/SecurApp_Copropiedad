@@ -52,25 +52,23 @@ async function fetchConTimeout(path: string, options: RequestInit): Promise<Resp
 let refrescoEnVuelo: Promise<{ access: string; refresh: string } | null> | null = null;
 
 async function refrescarTokens(refresh: string): Promise<{ access: string; refresh: string } | null> {
-  if (!refrescoEnVuelo) {
-    refrescoEnVuelo = (async () => {
-      try {
-        const respuesta = await fetchConTimeout("/api/v1/auth/refresh/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh }),
-        });
-        if (!respuesta.ok) return null;
-        const datos = await respuesta.json();
-        // El backend rota el refresh en cada uso (ROTATE_REFRESH_TOKENS +
-        // BLACKLIST_AFTER_ROTATION, config/settings.py) -- el que vino en
-        // esta respuesta es el único que sigue siendo válido.
-        return { access: datos.access as string, refresh: datos.refresh as string };
-      } finally {
-        refrescoEnVuelo = null;
-      }
-    })();
-  }
+  refrescoEnVuelo ??= (async () => {
+    try {
+      const respuesta = await fetchConTimeout("/api/v1/auth/refresh/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      });
+      if (!respuesta.ok) return null;
+      const datos = await respuesta.json();
+      // El backend rota el refresh en cada uso (ROTATE_REFRESH_TOKENS +
+      // BLACKLIST_AFTER_ROTATION, config/settings.py) -- el que vino en
+      // esta respuesta es el único que sigue siendo válido.
+      return { access: datos.access as string, refresh: datos.refresh as string };
+    } finally {
+      refrescoEnVuelo = null;
+    }
+  })();
   return refrescoEnVuelo;
 }
 

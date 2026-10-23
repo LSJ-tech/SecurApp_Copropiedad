@@ -11,6 +11,7 @@ from .models import REGION_CHOICES, Condominio, SolicitudAcceso, Torre, Unidad
 LABEL_TU_NOMBRE = "Tu nombre"
 LABEL_EMAIL = "Email"
 LABEL_EMAIL_OPCIONAL = "Email (opcional)"
+PLACEHOLDER_TELEFONO = "+56 9 ..."
 
 
 def _normalizar_nombre(texto):
@@ -188,7 +189,7 @@ class RegistroResidenteForm(NormalizarNombreApellidoMixin, ConfirmacionContrasen
     )
     telefono = forms.CharField(
         required=False, max_length=30, label="Tu teléfono (opcional)",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": PLACEHOLDER_TELEFONO}),
     )
     # empty_label explícito en español -- el default de Django 6.1
     # ("- Select an option -") no está traducido todavía en el catálogo de
@@ -376,7 +377,7 @@ class SolicitudAccesoForm(RegionComunaMixin, forms.ModelForm):
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": LABEL_TU_NOMBRE}),
             "condominio": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombre del condominio o junta de vecinos"}),
-            "telefono": forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
+            "telefono": forms.TextInput(attrs={"class": "form-control", "placeholder": PLACEHOLDER_TELEFONO}),
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": LABEL_EMAIL_OPCIONAL}),
             "mensaje": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Cuéntanos un poco de tu comunidad (opcional)"}),
         }
@@ -420,7 +421,7 @@ class MiPerfilForm(forms.ModelForm):
 
     telefono = forms.CharField(
         required=False, max_length=30, label="Teléfono",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+56 9 ..."}),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": PLACEHOLDER_TELEFONO}),
     )
 
     class Meta:

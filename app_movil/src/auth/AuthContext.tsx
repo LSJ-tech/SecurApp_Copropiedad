@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
 import { login as loginApi, logout as logoutApi, obtenerMiPerfil, MembresiaOut } from "../api/auth";
 import { alSesionExpirada, ErrorDeServidor } from "../api/client";
@@ -25,7 +25,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [estado, setEstado] = useState<Estado>("cargando");
   const [membresia, setMembresia] = useState<MembresiaOut | null>(null);
   const [condominioActivo, setCondominioActivo] = useState<{ id: number; nombre: string } | null>(null);
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => alSesionExpirada(null);
   }, []);
 
-  async function iniciarSesion(username: string, password: string) {
+  const iniciarSesion = useCallback(async (username: string, password: string) => {
     const resultado = await loginApi(username, password);
     await guardarTokens(resultado.access, resultado.refresh);
     setMembresia(resultado.membresia);
@@ -92,25 +92,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // debe tirar un unhandled rejection ni, mucho menos, el login.
       registrarDispositivoPush().catch(() => {});
     }
-  }
+  }, []);
 
-  async function elegirCondominio(id: number) {
+  const elegirCondominio = useCallback(async (id: number) => {
     const tokens = await obtenerTokens();
     if (!tokens) throw new Error("No hay sesión activa.");
     const resultado = await entrarCondominio(id, tokens.refresh);
     await guardarTokens(resultado.access, resultado.refresh);
     setCondominioActivo({ id: resultado.condominio.id, nombre: resultado.condominio.nombre });
     setEstado("devquad_con_condominio");
-  }
+  }, []);
 
-  function volverAElegirCondominio() {
+  const volverAElegirCondominio = useCallback(() => {
     // No borra tokens -- devquad sigue con la misma sesión, solo elige
     // otro condominio (entrarCondominio emite un refresh nuevo cada vez).
     setCondominioActivo(null);
     setEstado("devquad_sin_condominio");
-  }
+  }, []);
 
-  async function cerrarSesion() {
+  const cerrarSesion = useCallback(async () => {
     // Sin esto, el refresh seguía siendo válido en el servidor hasta
     // por 30 días (REFRESH_TOKEN_LIFETIME) después de un "logout" --
     // un teléfono perdido podía seguir refrescando la sesión.
@@ -124,20 +124,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMembresia(null);
     setCondominioActivo(null);
     setEstado("sin_sesion");
-  }
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      estado,
+      membresia,
+      condominioActivo,
+      iniciarSesion,
+      cerrarSesion,
+      elegirCondominio,
+      volverAElegirCondominio,
+    }),
+    [estado, membresia, condominioActivo, iniciarSesion, cerrarSesion, elegirCondominio, volverAElegirCondominio]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        estado,
-        membresia,
-        condominioActivo,
-        iniciarSesion,
-        cerrarSesion,
-        elegirCondominio,
-        volverAElegirCondominio,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -45,7 +45,10 @@ export async function listarMiembros(): Promise<Miembro[]> {
   const todos: Miembro[] = [];
   let ruta: string | null = "/api/v1/miembros/";
   while (ruta) {
-    const pagina = await apiFetch<PaginaDRF<Miembro>>(ruta);
+    // Secuencial a propósito (S9382): la URL de la página siguiente
+    // viene en la respuesta de ESTA página -- no se puede pedir la
+    // página 2 sin esperar antes la página 1.
+    const pagina: PaginaDRF<Miembro> = await apiFetch<PaginaDRF<Miembro>>(ruta); // NOSONAR
     todos.push(...pagina.results);
     ruta = pagina.next ? rutaDePagina(pagina.next) : null;
   }

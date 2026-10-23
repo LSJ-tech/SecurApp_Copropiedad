@@ -23,7 +23,7 @@ export async function obtenerUbicacionActual(): Promise<{ latitud: number; longi
   // pendiente o un GPS en frío (10-30s+) nunca puede demorar el envío
   // real de la alerta (hallazgo C4 de la revisión final).
   const permiso = await conLimite(Location.requestForegroundPermissionsAsync());
-  if (!permiso || permiso.status !== "granted") return null;
+  if (permiso?.status !== "granted") return null;
 
   const posicion = await conLimite(Location.getCurrentPositionAsync());
   if (!posicion) return null;
