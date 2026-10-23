@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Pressable, Text } from "react-native";
 import { Drawer } from "expo-router/drawer";
 
@@ -14,6 +15,10 @@ function BotonCambiarCondominio({ onCambiar }: Readonly<{ onCambiar: () => void 
 
 export default function AdminLayout() {
   const { condominioActivo, volverAElegirCondominio } = useAuth();
+  const headerRight = useCallback(
+    () => <BotonCambiarCondominio onCambiar={volverAElegirCondominio} />,
+    [volverAElegirCondominio]
+  );
 
   return (
     <Drawer
@@ -28,7 +33,7 @@ export default function AdminLayout() {
         // rutas que existen de verdad como archivo (D-07 tampoco exige
         // que esté en el menú, solo que el modo administrador no
         // comparta navegación con el drawer del vecino).
-        headerRight: () => <BotonCambiarCondominio onCambiar={volverAElegirCondominio} />,
+        headerRight,
       }}
     >
       <Drawer.Screen name="condominio/index" options={{ title: "Mi condominio" }} />
