@@ -23,6 +23,9 @@ services:
       # Configurar antes de aceptar clientes reales (ver README):
       # RESEND_API_KEY, DEFAULT_FROM_EMAIL (sin RESEND_API_KEY los correos solo se imprimen en logs)
       # MERCADOPAGO_ACCESS_TOKEN (sin ella no aparece el botón de pago en línea)
+      # MERCADOPAGO_WEBHOOK_SECRET (panel de Mercado Pago, sección Webhooks --
+      # sin ella el webhook sigue funcionando, pero sin verificar x-signature;
+      # ver pagos/views.py _firma_webhook_valida)
 
 # El respaldo del webhook de Mercado Pago (re-consulta periódica de
 # suscripciones/donaciones activas, ver pagos/views.py) ya NO corre como

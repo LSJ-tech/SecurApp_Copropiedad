@@ -13,7 +13,7 @@ urlpatterns = [
     path("devquad/condominios/salir/", views.DevquadSalirCondominioView.as_view(), name="devquad-salir-condominio"),
     path("solicitar-acceso/", views.SolicitarAccesoView.as_view(), name="solicitar-acceso"),
     path("unirme/<str:token>/", views.RegistroResidenteView.as_view(), name="registro-residente"),
-    path("login/", auth_views.LoginView.as_view(template_name="core/login.html"), name="login"),
+    path("login/", views.LoginThrottledView.as_view(template_name="core/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path(
         "contrasena/recuperar/",

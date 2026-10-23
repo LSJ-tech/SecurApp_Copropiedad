@@ -14,7 +14,7 @@ drf-spectacular==0.30.0
 requests==2.34.2
 django-anymail[resend]==15.2
 qrcode==8.2
-Pillow==12.3.0
+Pillow==13.0.0
 pywebpush==2.5.0
 reportlab==5.0.1
 openpyxl==3.1.5

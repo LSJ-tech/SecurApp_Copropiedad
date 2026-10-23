@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models.functions import Length
 from django.shortcuts import get_object_or_404
@@ -32,11 +33,43 @@ from .serializers import (
     UnidadSerializer,
 )
 from .usuarios import generar_codigo_invitacion, generar_password_temporal, generar_username
-from .views import _contexto_invitacion, enviar_correo_bienvenida
+from .views import _contexto_invitacion, _ip_del_cliente, enviar_correo_bienvenida
+
+MAX_INTENTOS_LOGIN_API = 5
+VENTANA_BLOQUEO_LOGIN_API_SEGUNDOS = 15 * 60  # 15 minutos
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    """Hallazgo de seguridad real: el login de la app móvil (JWT) no tenía
+    ningún límite de intentos -- a diferencia de las contraseñas
+    temporales/códigos de invitación (generados con secrets.choice,
+    altísima entropía), una contraseña elegida por una persona es mucho
+    más débil y SÍ es realista de fuerza-bruta sin un freno. Mismo
+    mecanismo que el login web (core/views.py LoginThrottledView): cuenta
+    solo los intentos FALLIDOS por IP, se resetea con uno exitoso -- un
+    throttle genérico de DRF (AnonRateThrottle) cuenta TODA request, exitosa
+    o no, lo que bloquearía a alguien por loguearse varias veces seguidas
+    sin haber fallado nunca."""
+
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        clave = f"login_api_intentos:{_ip_del_cliente(request)}"
+        if cache.get(clave, 0) >= MAX_INTENTOS_LOGIN_API:
+            return Response({"detail": "Demasiados intentos. Esperá unos minutos."}, status=429)
+
+        try:
+            # Credenciales malas no devuelven un Response con status!=200 --
+            # TokenObtainPairView.post() levanta InvalidToken/AuthenticationFailed
+            # de verdad (lo convierte en 401 recién en el dispatch de DRF),
+            # así que hay que capturarla para contar el fallo antes de
+            # dejarla seguir su curso normal.
+            respuesta = super().post(request, *args, **kwargs)
+        except Exception:
+            cache.set(clave, cache.get(clave, 0) + 1, VENTANA_BLOQUEO_LOGIN_API_SEGUNDOS)
+            raise
+        cache.delete(clave)
+        return respuesta
 
 
 class LogoutView(APIView):

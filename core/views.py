@@ -9,9 +9,11 @@ from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import password_validators_help_texts
+from django.contrib.auth.views import LoginView
 from django.contrib.auth.views import PasswordChangeView
 from django.contrib.auth.views import PasswordResetConfirmView as _PasswordResetConfirmView
 from django.contrib.staticfiles.finders import find as find_static
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives, send_mail
 from django.core.validators import validate_email
@@ -24,7 +26,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.html import escape
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 from django.views.generic.base import View
 
@@ -34,6 +36,53 @@ from .mixins import MENSAJE_SIN_CONDOMINIO, CondominioFormMixin, CondominioRequi
 from .mixins import DEVQUAD_CONDOMINIO_SESSION_KEY
 from .models import REGION_CHOICES, Condominio, Membresia, SolicitudEliminacion, Torre, Unidad
 from .usuarios import generar_codigo_invitacion, generar_password_temporal, generar_username
+
+
+MAX_INTENTOS_LOGIN = 5
+VENTANA_BLOQUEO_LOGIN_SEGUNDOS = 15 * 60  # 15 minutos
+
+
+def _ip_del_cliente(request):
+    """IP real de quien hace la request -- Render termina TLS en su proxy
+    y reenvía por HTTP interno (ver SECURE_PROXY_SSL_HEADER en settings.py),
+    así que REMOTE_ADDR es la IP del proxy de Render, no la del visitante
+    real (usarla sola haría que TODOS los visitantes comparan un mismo
+    contador, y una sola persona fallando el login bloquearía a cualquier
+    otro). X-Forwarded-For trae la cadena completa de proxies -- Render
+    agrega la IP que observó como el ÚLTIMO valor antes de reenviar, así
+    que es el único que no se puede falsear desde el cliente (los
+    anteriores sí, si alguien manda su propio X-Forwarded-For)."""
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
+    if xff:
+        return xff.split(",")[-1].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+class LoginThrottledView(LoginView):
+    """Hallazgo de seguridad real: el login no tenía ningún límite de
+    intentos -- a diferencia de las contraseñas temporales/códigos de
+    invitación (generados con secrets.choice, altísima entropía), una
+    contraseña elegida por una persona es mucho más débil y SÍ es
+    realista de fuerza-bruta sin un freno. Bloquea por IP, no por usuario
+    -- así no hace falta que el atacante ya sepa un username/email válido
+    para bloquear a alguien más (eso sería un DoS de cuenta ajena)."""
+
+    def _clave_cache(self, request):
+        return f"login_intentos:{_ip_del_cliente(request)}"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method == "POST" and cache.get(self._clave_cache(request), 0) >= MAX_INTENTOS_LOGIN:
+            return render(request, "core/login_bloqueado.html", status=429)
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        clave = self._clave_cache(self.request)
+        cache.set(clave, cache.get(clave, 0) + 1, VENTANA_BLOQUEO_LOGIN_SEGUNDOS)
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        cache.delete(self._clave_cache(self.request))
+        return super().form_valid(form)
 
 EMAIL_CONTACTO_DEVQUAD = "contacto@devquad.cl"
 CONTENT_TYPE_TEXTO_PLANO = "text/plain; charset=utf-8"
@@ -110,10 +159,14 @@ def enviar_correo_eliminacion_confirmada(solicitud):
 
 
 @staff_member_required
-@require_GET
+@require_POST
 def probar_correo(request):
-    """Diagnóstico manual: confirma que RESEND_API_KEY está bien configurada en el hosting."""
-    destino = request.GET.get("destino", "")
+    """Diagnóstico manual: confirma que RESEND_API_KEY está bien configurada
+    en el hosting. POST, no GET -- hallazgo de seguridad real: mandaba un
+    correo a cualquier ?destino= elegido por quien hiciera la request, y el
+    middleware de CSRF de Django nunca revisa GET (un link/imagen armado
+    por un atacante podía disparar spam desde la sesión de un devquad)."""
+    destino = request.POST.get("destino", "")
     try:
         validate_email(destino)
     except ValidationError:
@@ -128,13 +181,14 @@ def probar_correo(request):
 
 
 @staff_member_required
-@require_GET
+@require_POST
 def normalizar_nombres_existentes(request):
     """Uso único: los formularios de registro/alta ya normalizan nombre y
     apellido desde ahora (ver _normalizar_nombre en core/forms.py), pero eso
     no corrige lo que ya quedó guardado en producción con mayúsculas/
     minúsculas inconsistentes (ej. "juan perez", "JUAN PEREZ"). Idempotente:
-    correrla de nuevo no cambia nada que ya esté bien."""
+    correrla de nuevo no cambia nada que ya esté bien. POST, no GET --
+    muta datos, y el middleware de CSRF de Django nunca revisa GET."""
     cambiados = []
     for user in User.objects.exclude(first_name="", last_name=""):
         nuevo_first = _normalizar_nombre(user.first_name) if user.first_name else user.first_name
@@ -212,12 +266,14 @@ def _condominio_empart_o_error():
 
 
 @staff_member_required
-@require_GET
+@require_POST
 def corregir_etiqueta_unidad_empart(request):
     """Uso único: la etiqueta_unidad de Población Empart quedó guardada como
     "Departamentos" (plural) en vez de "Departamento" (singular) -- el resto
     del sistema agrega la "s" solo cuando corresponde, así que en plural
-    quedaba duplicada ("Departamentoss", "Nuevo departamentos"). Idempotente."""
+    quedaba duplicada ("Departamentoss", "Nuevo departamentos"). Idempotente.
+    POST, no GET -- muta datos, y el middleware de CSRF de Django nunca
+    revisa GET."""
     condominio, error = _condominio_empart_o_error()
     if error:
         return error
@@ -235,7 +291,7 @@ def corregir_etiqueta_unidad_empart(request):
 
 
 @staff_member_required
-@require_GET
+@require_POST
 def cargar_torres_empart(request):
     """
     Uso único: completa el condominio real de Empart en producción con sus
@@ -245,6 +301,9 @@ def cargar_torres_empart(request):
 
     Busca por "Empart" dentro del nombre (no exacto) -- el nombre real del
     condominio cambió a "Población Empart" después de que esto se escribió.
+
+    POST, no GET -- muta datos, y el middleware de CSRF de Django nunca
+    revisa GET.
     """
     condominio, error = _condominio_empart_o_error()
     if error:
@@ -274,9 +333,12 @@ def cargar_torres_empart(request):
 
 
 @staff_member_required
-@require_GET
+@require_POST
 def agregar_departamentos_1_2_empart(request):
     """
+    POST, no GET -- muta datos, y el middleware de CSRF de Django nunca
+    revisa GET.
+
     Uso único: agrega los departamentos "1" y "2" (plantas bajas, fuera del
     esquema piso+posición de los otros 320) a cada uno de los 16 blocks del
     condominio real de Empart en producción. Idempotente (get_or_create) --

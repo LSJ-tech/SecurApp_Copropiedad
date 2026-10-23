@@ -341,12 +341,20 @@ class NormalizarNombresExistentesTests(TestCase):
         self.client.logout()
         normal = User.objects.create_user(username="nn_normal")
         self.client.force_login(normal)
-        r = self.client.get(reverse("normalizar-nombres"))
+        r = self.client.post(reverse("normalizar-nombres"))
         self.assertEqual(r.status_code, 302)
+
+    def test_rechaza_get_aunque_sea_staff(self):
+        """Hallazgo de seguridad: esta vista MUTA datos pero vivía detrás de
+        un GET -- el middleware de CSRF de Django nunca revisa GET, así que
+        un link/imagen armado por un atacante podía disparar la acción con
+        la sesión de un devquad logueado, sin que él lo pidiera."""
+        r = self.client.get(reverse("normalizar-nombres"))
+        self.assertEqual(r.status_code, 405)
 
     def test_corrige_nombres_mal_capitalizados(self):
         user = User.objects.create_user(username="nn_mal", first_name="juan", last_name="PEREZ")
-        r = self.client.get(reverse("normalizar-nombres"))
+        r = self.client.post(reverse("normalizar-nombres"))
         self.assertEqual(r.status_code, 200)
         self.assertIn("nn_mal", r.content.decode())
         user.refresh_from_db()
@@ -355,13 +363,13 @@ class NormalizarNombresExistentesTests(TestCase):
 
     def test_no_toca_lo_que_ya_esta_bien(self):
         User.objects.create_user(username="nn_bien", first_name="Juan", last_name="Perez")
-        r = self.client.get(reverse("normalizar-nombres"))
+        r = self.client.post(reverse("normalizar-nombres"))
         self.assertIn("Ningún nombre necesitaba normalizarse", r.content.decode())
 
     def test_es_idempotente(self):
         User.objects.create_user(username="nn_doble", first_name="juan", last_name="perez")
-        self.client.get(reverse("normalizar-nombres"))
-        r2 = self.client.get(reverse("normalizar-nombres"))
+        self.client.post(reverse("normalizar-nombres"))
+        r2 = self.client.post(reverse("normalizar-nombres"))
         self.assertIn("Ningún nombre necesitaba normalizarse", r2.content.decode())
 
 
@@ -941,6 +949,11 @@ class ApiAuthTests(TestCase):
         cls.condominio = Condominio.objects.create(nombre="Test Api Auth", plan="premium")
 
     def setUp(self):
+        # Sin esto, el contador de intentos fallidos del login (keyed por
+        # IP) se arrastra de un test al otro -- todos pegan al mismo
+        # endpoint "desde la misma IP" (el test client).
+        from django.core.cache import cache
+        cache.clear()
         self.user = User.objects.create_user(username="api_auth_user", password="clave-segura-123")
         self.membresia = Membresia.objects.create(
             user=self.user, condominio=self.condominio, rol="residente", terminos_aceptados_en=timezone.now(),
@@ -964,6 +977,27 @@ class ApiAuthTests(TestCase):
     def test_login_con_clave_incorrecta_falla(self):
         r = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-mala"})
         self.assertEqual(r.status_code, 401)
+
+    def test_login_se_bloquea_tras_demasiados_intentos_fallidos(self):
+        """Mismo hallazgo que LoginFuerzaBrutaTests, del lado de la API JWT
+        (app móvil) -- sin esto, una contraseña débil era de fuerza-bruta
+        sin ningún freno."""
+        from core.api_views import MAX_INTENTOS_LOGIN_API
+
+        for _ in range(MAX_INTENTOS_LOGIN_API):
+            self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-mala"})
+        r = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-segura-123"})
+        self.assertEqual(r.status_code, 429)
+
+    def test_logins_exitosos_seguidos_no_se_bloquean(self):
+        """El contador cuenta solo fallos -- varios logins exitosos
+        seguidos (ej. varios dispositivos, o la app reintentando) nunca
+        deben bloquearse."""
+        from core.api_views import MAX_INTENTOS_LOGIN_API
+
+        for _ in range(MAX_INTENTOS_LOGIN_API + 3):
+            r = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-segura-123"})
+            self.assertEqual(r.status_code, 200)
 
     def test_me_requiere_autenticacion(self):
         r = self.client.get(reverse("api-me"))
@@ -1785,6 +1819,52 @@ class LoginConUsuarioOCorreoTests(TestCase):
 
     def test_formulario_de_login_real_acepta_el_correo(self):
         r = self.client.post(reverse("login"), {"username": "login_residente@example.com", "password": "ClaveDelUsuario123"})
+        self.assertRedirects(r, reverse("inicio"))
+
+
+class LoginFuerzaBrutaTests(TestCase):
+    """Hallazgo de seguridad real: el login (web y API) no tenía ningún
+    límite de intentos -- a diferencia de las contraseñas temporales/
+    códigos de invitación (generados con secrets.choice, altísima entropía),
+    una contraseña elegida por una persona es mucho más débil y SÍ es
+    realista de fuerza-bruta sin un freno."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Fuerza Bruta", plan="premium")
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.membresia = crear_membresia(
+            self.condominio, "residente", username="fbruta_residente",
+            email="fbruta@example.com", password="ClaveDelUsuario123",
+        )
+
+    def test_bloquea_despues_de_varios_intentos_fallidos_desde_la_misma_ip(self):
+        from core.views import MAX_INTENTOS_LOGIN
+
+        for _ in range(MAX_INTENTOS_LOGIN):
+            r = self.client.post(reverse("login"), {"username": "fbruta_residente", "password": "mal"})
+            self.assertEqual(r.status_code, 200)  # form_invalid normal, todavía no bloqueado
+
+        # El intento siguiente, aunque la contraseña ahora SÍ sea correcta,
+        # tiene que quedar bloqueado -- si no bloqueara por IP y no por
+        # intento válido/inválido, una contraseña correcta lo esquivaría.
+        r = self.client.post(reverse("login"), {"username": "fbruta_residente", "password": "ClaveDelUsuario123"})
+        self.assertEqual(r.status_code, 429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_un_login_exitoso_resetea_el_contador(self):
+        from core.views import MAX_INTENTOS_LOGIN
+
+        for _ in range(MAX_INTENTOS_LOGIN - 1):
+            self.client.post(reverse("login"), {"username": "fbruta_residente", "password": "mal"})
+        r = self.client.post(reverse("login"), {"username": "fbruta_residente", "password": "ClaveDelUsuario123"})
+        self.assertRedirects(r, reverse("inicio"))
+
+        self.client.logout()
+        r = self.client.post(reverse("login"), {"username": "fbruta_residente", "password": "ClaveDelUsuario123"})
         self.assertRedirects(r, reverse("inicio"))
 
 
@@ -3021,3 +3101,78 @@ class MiPerfilTelefonoTests(TestCase):
         self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
         r = self.client.get(reverse("mi-perfil"))
         self.assertNotContains(r, 'name="telefono"')
+
+
+class UserAdminEscalacionDePrivilegiosTests(TestCase):
+    """Hallazgo de seguridad real: el UserAdmin de Django (core/admin.py)
+    no restringía por campo is_superuser/is_staff/user_permissions/groups
+    -- son los mismos del formulario estándar de Django, que NO los
+    protege más allá del permiso genérico auth.change_user. Cualquier
+    staff con ese permiso (otorgado vía un Group -- GroupAdmin está
+    registrado a propósito en este proyecto) podía auto-otorgarse
+    superuser editando su propio registro de User."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Group, Permission
+
+        self.staff_limitado = User.objects.create_user(username="staff_limitado", is_staff=True)
+        permiso = Permission.objects.get(codename="change_user")
+        grupo = Group.objects.create(name="Soporte")
+        grupo.permissions.add(permiso)
+        self.staff_limitado.groups.add(grupo)
+        self.client.force_login(self.staff_limitado)
+
+    def _datos_post(self, **extra):
+        # MembresiaInlineParaUsuario (core/admin.py) agrega un formset en la
+        # misma página -- sin sus campos de management (aunque esté vacío),
+        # el formset completo (y con él, el User) no valida nada y el POST
+        # no guarda un campo NI el otro, dando un falso verde sin que el
+        # fix tenga nada que ver.
+        datos = {
+            "username": "staff_limitado", "is_staff": "on", "is_superuser": "on",
+            "date_joined_0": "2026-01-01", "date_joined_1": "00:00:00",
+            "membresia-TOTAL_FORMS": "0", "membresia-INITIAL_FORMS": "0",
+            "membresia-MIN_NUM_FORMS": "0", "membresia-MAX_NUM_FORMS": "1",
+        }
+        datos.update(extra)
+        return datos
+
+    def test_staff_sin_ser_superuser_no_puede_auto_otorgarse_superuser(self):
+        url = reverse("admin:auth_user_change", args=[self.staff_limitado.pk])
+        r = self.client.post(url, self._datos_post())
+        self.assertEqual(r.status_code, 302)  # confirma que el form sí guardó algo
+        self.staff_limitado.refresh_from_db()
+        self.assertFalse(self.staff_limitado.is_superuser)
+
+    def test_un_superuser_de_verdad_si_puede_otorgar_superuser(self):
+        """No romper lo legítimo -- un superuser real sigue pudiendo
+        ascender a otra cuenta."""
+        superuser = User.objects.create_superuser(username="si_superuser", password="x")
+        self.client.force_login(superuser)
+        url = reverse("admin:auth_user_change", args=[self.staff_limitado.pk])
+        r = self.client.post(url, self._datos_post(username="staff_limitado"))
+        self.assertEqual(r.status_code, 302)
+        self.staff_limitado.refresh_from_db()
+        self.assertTrue(self.staff_limitado.is_superuser)
+
+
+class SchemaYDocsExigenSesionTests(TestCase):
+    """Hallazgo de seguridad real: drf-spectacular sirve /api/schema/ y
+    /api/docs/ con AllowAny por defecto (propio de la librería) -- cualquiera
+    sin loguearse podía ver el mapa completo de la API (cada endpoint, cada
+    campo de cada serializer), sin que eso herede el IsAuthenticated que
+    exige el resto de la API."""
+
+    def test_schema_anonimo_rechazado(self):
+        r = self.client.get(reverse("schema"))
+        self.assertEqual(r.status_code, 401)
+
+    def test_docs_anonimo_rechazado(self):
+        r = self.client.get(reverse("swagger-ui"))
+        self.assertEqual(r.status_code, 401)
+
+    def test_schema_autenticado_funciona(self):
+        User.objects.create_user(username="sch_user", password="x")
+        self.client.login(username="sch_user", password="x")
+        r = self.client.get(reverse("schema"))
+        self.assertEqual(r.status_code, 200)

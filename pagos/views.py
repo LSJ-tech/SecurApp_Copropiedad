@@ -1,4 +1,6 @@
 import datetime
+import hashlib
+import hmac
 import json
 import logging
 from decimal import Decimal
@@ -338,6 +340,30 @@ class MisDonacionesView(CondominioRequiredMixin, TemplateView):
         return context
 
 
+def _firma_webhook_valida(request, recurso_id):
+    """Verifica el header x-signature según el algoritmo documentado por
+    Mercado Pago: manifest = "id:<id>;request-id:<x-request-id>;ts:<ts>;",
+    HMAC-SHA256 con MERCADOPAGO_WEBHOOK_SECRET. Sin esa llave configurada
+    (todavía no se agregó a Render), no hay nada que verificar -- se deja
+    pasar igual que siempre (nunca se confía en el webhook de todas formas,
+    ver _manejar_cobro/_manejar_cambio_preapproval; esto es defensa en
+    profundidad, no la única barrera, así que no romper producción por una
+    llave que aún no existe)."""
+    secreto = settings.MERCADOPAGO_WEBHOOK_SECRET
+    if not secreto:
+        return True
+
+    firma = request.headers.get("x-signature", "")
+    partes = dict(p.split("=", 1) for p in firma.split(",") if "=" in p)
+    ts, v1 = partes.get("ts"), partes.get("v1")
+    if not ts or not v1:
+        return False
+
+    manifest = f"id:{recurso_id};request-id:{request.headers.get('x-request-id', '')};ts:{ts};"
+    esperado = hmac.new(secreto.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(esperado, v1)
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class WebhookMercadoPagoView(View):
     """Mercado Pago llama acá server-a-server. Nunca se confía en el cuerpo
@@ -357,6 +383,14 @@ class WebhookMercadoPagoView(View):
         recurso_id = (datos.get("data") or {}).get("id") or request.GET.get("id") or request.GET.get("data.id")
         if not recurso_id:
             return HttpResponse(status=200)
+
+        # El id que firma Mercado Pago es el de la query string (data.id/id),
+        # en minúsculas si tiene letras -- según su propia documentación,
+        # no necesariamente el mismo valor que el del cuerpo del POST.
+        id_para_firma = request.GET.get("data.id") or request.GET.get("id") or str(recurso_id)
+        if not _firma_webhook_valida(request, str(id_para_firma).lower()):
+            logger.warning("Webhook de Mercado Pago con x-signature inválida o ausente, ignorado (id=%r).", recurso_id)
+            return HttpResponse(status=403)
 
         tipo_notificacion = datos.get("type") or request.GET.get("type") or request.GET.get("topic") or ""
 

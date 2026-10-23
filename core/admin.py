@@ -490,6 +490,23 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     list_filter = (*BaseUserAdmin.list_filter, SinCondominioFilter)
     inlines = [MembresiaInlineParaUsuario]
 
+    def get_form(self, request, obj=None, **kwargs):
+        """Hallazgo de seguridad real: BaseUserAdmin.get_form (Django) SÍ
+        deshabilita is_superuser/is_staff/user_permissions/groups para un
+        staff sin ser superuser, pero el MRO de este UserAdmin (ModelAdmin
+        de django-unfold va después en la herencia) termina resolviendo
+        otra implementación de get_form que no aplica esa restricción --
+        confirmado con un POST real: un staff con permiso auth.change_user
+        (otorgado vía un Group, GroupAdmin está registrado a propósito acá)
+        podía marcarse is_superuser a sí mismo. Se vuelve a aplicar acá
+        explícito, sin depender de qué clase del MRO gane."""
+        form = super().get_form(request, obj, **kwargs)
+        if not request.user.is_superuser:
+            for campo in ("is_superuser", "is_staff", "user_permissions", "groups"):
+                if campo in form.base_fields:
+                    form.base_fields[campo].disabled = True
+        return form
+
 
 @admin.register(Group)
 class GroupAdmin(BaseGroupAdmin, ModelAdmin):

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import dj_database_url
 from django.contrib import messages
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
 from django.urls import reverse_lazy
 
@@ -18,9 +19,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # con valores por defecto que mantienen el runserver local funcionando sin
 # configurar nada -- mismo patrón que peluqueria_mascota/peluqueria/settings.py.
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or get_random_secret_key()
-
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+
+# Hallazgo de seguridad: con DEBUG=False (producción) nunca hay que
+# arrancar con una SECRET_KEY generada al vuelo -- cambiaría en cada
+# reinicio/worker de gunicorn (invalidando sesiones/CSRF al azar según
+# qué worker atienda cada request) y, peor, dejaría temporalmente activa
+# una llave predecible por nadie-la-auditó. Mejor fallar fuerte ahora que
+# arrancar "andando" con un agujero. En desarrollo (DEBUG=True) sí se
+# genera una al vuelo, para no exigir configurar nada local.
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = get_random_secret_key()
+    else:
+        raise ImproperlyConfigured(
+            "Falta DJANGO_SECRET_KEY. En producción (DJANGO_DEBUG=False) esto es "
+            "obligatorio -- no hay un valor por defecto seguro."
+        )
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
 if 'test' in sys.argv:
@@ -175,6 +191,14 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@mibarrioplus
 # de retiro del cobro de suscripción en la memoria del proyecto.
 MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
 
+# Secreto de firma del webhook (distinto del access token) -- Mercado Pago
+# lo muestra en el panel de la integración, sección Webhooks. Sin
+# configurar, el webhook sigue funcionando igual que hoy (nunca se confía
+# en su cuerpo para aprobar nada, ver pagos/views.py WebhookMercadoPagoView
+# -- esto es defensa en profundidad, no la única barrera), pero cualquiera
+# puede dispararlo con IDs inventados. Configurarla cierra eso.
+MERCADOPAGO_WEBHOOK_SECRET = os.environ.get('MERCADOPAGO_WEBHOOK_SECRET', '')
+
 
 # Web Push para la PWA (botón de pánico, avisos) -- par de llaves VAPID,
 # generadas una sola vez con `manage.py generar_vapid_keys`. Sin configurar,
@@ -201,6 +225,12 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Render termina TLS en su proxy y reenvía por HTTP interno (un solo
+    # salto) -- sin esto, el throttle de login (ver core.api_views.
+    # ThrottleLoginApi) agruparía a TODOS los visitantes bajo la misma IP
+    # (la del proxy de Render en REMOTE_ADDR), y una sola persona fallando
+    # el login bloquearía a cualquier otra.
+    'NUM_PROXIES': 1,
 }
 
 SIMPLE_JWT = {
@@ -214,6 +244,14 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'Mi Barrio+ API',
     'DESCRIPTION': 'API para la app móvil de residentes (alertas, avisos, directorio de vecinos, dispositivos push).',
     'VERSION': '1.0.0',
+    # Hallazgo de seguridad real: drf-spectacular sirve /api/schema/ y
+    # /api/docs/ con AllowAny por defecto (propio de la librería, no hereda
+    # el IsAuthenticated del resto de la API) -- cualquiera sin loguearse
+    # podía ver el mapa completo de la API (cada endpoint, cada campo de
+    # cada serializer). No es tan grave como exponer datos reales, pero es
+    # una ayuda gratis de reconocimiento para un atacante, e inconsistente
+    # con que todo lo demás exige sesión.
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAuthenticated'],
 }
 
 

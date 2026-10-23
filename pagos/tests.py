@@ -226,6 +226,70 @@ class WebhookMercadoPagoTests(TestCase):
         self.assertIsNotNone(suscripcion.fecha_cancelacion)
 
 
+class WebhookFirmaTests(TestCase):
+    """Hallazgo de seguridad real: el webhook nunca verificó x-signature --
+    nunca permitió aprobar un pago falso (siempre se re-consulta a Mercado
+    Pago antes, ver _manejar_cobro), pero sí dejaba que cualquiera disparara
+    requests reales hacia la API de Mercado Pago (y ruido en los logs de
+    error) mandando IDs inventados sin estar autenticado para nada. Esto es
+    defensa en profundidad, no la única barrera."""
+
+    def _firma(self, secreto, recurso_id, request_id, ts):
+        import hashlib
+        import hmac
+
+        manifest = f"id:{recurso_id};request-id:{request_id};ts:{ts};"
+        return hmac.new(secreto.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+
+    @override_settings(MERCADOPAGO_WEBHOOK_SECRET="")
+    def test_sin_secreto_configurado_sigue_funcionando_igual_que_hoy(self):
+        """No romper producción -- la llave todavía no está configurada en
+        Render. Mismo comportamiento de siempre: nunca se confía en el
+        webhook de todas formas, el secreto es una capa extra, no la única."""
+        with patch("pagos.views.obtener_pago_mercadopago", return_value=None):
+            r = self.client.post(
+                reverse("pago-webhook"),
+                data=json.dumps({"type": "payment", "data": {"id": "pay-sin-secreto"}}),
+                content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
+
+    @override_settings(MERCADOPAGO_WEBHOOK_SECRET="el-secreto-de-prueba")
+    def test_firma_valida_deja_pasar(self):
+        firma = self._firma("el-secreto-de-prueba", "pay-firma-ok", "req-1", "1700000000")
+        with patch("pagos.views.obtener_pago_mercadopago", return_value=None):
+            r = self.client.post(
+                reverse("pago-webhook") + "?data.id=pay-firma-ok",
+                data=json.dumps({"type": "payment", "data": {"id": "pay-firma-ok"}}),
+                content_type="application/json",
+                headers={"x-signature": f"ts=1700000000,v1={firma}", "x-request-id": "req-1"},
+            )
+        self.assertEqual(r.status_code, 200)
+
+    @override_settings(MERCADOPAGO_WEBHOOK_SECRET="el-secreto-de-prueba")
+    def test_firma_invalida_se_rechaza_sin_tocar_nada(self):
+        with patch("pagos.views.obtener_pago_mercadopago") as mock_obtener:
+            r = self.client.post(
+                reverse("pago-webhook") + "?data.id=pay-firma-mala",
+                data=json.dumps({"type": "payment", "data": {"id": "pay-firma-mala"}}),
+                content_type="application/json",
+                headers={"x-signature": "ts=1700000000,v1=firma-inventada", "x-request-id": "req-2"},
+            )
+        self.assertEqual(r.status_code, 403)
+        mock_obtener.assert_not_called()
+
+    @override_settings(MERCADOPAGO_WEBHOOK_SECRET="el-secreto-de-prueba")
+    def test_sin_header_de_firma_se_rechaza(self):
+        with patch("pagos.views.obtener_pago_mercadopago") as mock_obtener:
+            r = self.client.post(
+                reverse("pago-webhook") + "?data.id=pay-sin-firma",
+                data=json.dumps({"type": "payment", "data": {"id": "pay-sin-firma"}}),
+                content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 403)
+        mock_obtener.assert_not_called()
+
+
 class WebhookMercadoPagoRamasFaltantesTests(TestCase):
     """Las ramas de salida temprana del webhook -- nunca se confía en el
     cuerpo del POST, así que cualquiera de estos casos debe responder
