@@ -354,7 +354,7 @@ def _firma_webhook_valida(request, recurso_id):
         return True
 
     firma = request.headers.get("x-signature", "")
-    partes = dict(p.split("=", 1) for p in firma.split(",") if "=" in p)
+    partes = {k: v for k, v in (p.split("=", 1) for p in firma.split(",") if "=" in p)}
     ts, v1 = partes.get("ts"), partes.get("v1")
     if not ts or not v1:
         return False

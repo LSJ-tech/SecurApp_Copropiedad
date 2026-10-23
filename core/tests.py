@@ -2049,6 +2049,14 @@ class PaginasPublicasRenderizanTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Números de emergencia")
 
+    def test_landing_respeta_prefers_reduced_motion(self):
+        """Hallazgo real de accesibilidad: .hero-badge y .hero-badge-pulso
+        tienen animaciones infinitas (flotar, pulso-anillo) sin ningún
+        respeto por prefers-reduced-motion -- puede marear a gente con
+        trastornos vestibulares (WCAG 2.3.3)."""
+        r = self.client.get(reverse("inicio"))
+        self.assertContains(r, "prefers-reduced-motion: reduce")
+
     def test_terminos_renderiza(self):
         r = self.client.get(reverse("terminos"))
         self.assertEqual(r.status_code, 200)

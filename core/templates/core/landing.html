@@ -238,6 +238,11 @@
         @keyframes pulso-anillo { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.9); opacity: 0; } }
         @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         @media (max-width: 991px) { .hero-badge { display: none; } }
+        /* Hallazgo de accesibilidad: estas dos animan sin parar nunca --
+           puede marear a gente con trastornos vestibulares (WCAG 2.3.3). */
+        @media (prefers-reduced-motion: reduce) {
+            .hero-badge, .hero-badge-pulso::before { animation: none; }
+        }
 
         /* Sección oscura con blobs decorativos, para el mockup del producto */
         .seccion-producto {
