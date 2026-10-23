@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Linking from "expo-linking";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { cancelarDonacion, crearDonacion, obtenerMiDonacion, MiDonacion } from "@/api/donaciones";
 import { mensajeDetalleDeError } from "@/api/erroresFormulario";
@@ -10,18 +10,39 @@ import { colores } from "@/theme/colores";
 // (pagos/views.py MONTO_DONACION).
 const MONTO_DONACION_TEXTO = "$2.000";
 
+// Mismo criterio que usan los propios endpoints del backend (pagos/api_views.py):
+// donar/cancelar aceptan "pendiente" o "autorizada" -- cualquier otro
+// estado (o ninguna donación) es elegible para donar de nuevo. Hallazgo
+// Critical de la revisión final: antes se decidía solo por "¿hay
+// donacion_actual?", así que una donación cancelada o pausada dejaba a
+// la persona viendo "Cancelar" para siempre, sin forma de volver a donar.
+const ESTADOS_CANCELABLES = ["pendiente", "autorizada"];
+
 export default function DonarScreen() {
   const [datos, setDatos] = useState<MiDonacion | null>(null);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
   function cargar() {
+    setErrorCarga(null);
     obtenerMiDonacion()
       .then(setDatos)
-      .catch(() => setError("No se pudo cargar tu donación."));
+      .catch(() => setErrorCarga("No se pudo cargar tu donación."));
   }
 
   useEffect(cargar, []);
+
+  useEffect(() => {
+    // Volver del navegador externo (tras autorizar en Mercado Pago) pasa
+    // por acá -- sin esto, la pantalla se queda con los datos de antes
+    // de donar hasta que se reinicie la app entera (hallazgo Important
+    // de la revisión final).
+    const suscripcion = AppState.addEventListener("change", (estado) => {
+      if (estado === "active") cargar();
+    });
+    return () => suscripcion.remove();
+  }, []);
 
   async function manejarDonar() {
     setError(null);
@@ -52,16 +73,29 @@ export default function DonarScreen() {
     }
   }
 
+  if (errorCarga) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>{errorCarga}</Text>
+        <Pressable style={styles.boton} onPress={cargar}>
+          <Text style={styles.botonTexto}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (!datos) return null;
+
+  const esCancelable = datos.donacion_actual && ESTADOS_CANCELABLES.includes(datos.donacion_actual.estado);
 
   return (
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
-      {datos.donacion_actual ? (
+      {esCancelable ? (
         <>
           <Text style={styles.titulo}>Tu donación</Text>
-          <Text>Estado: {datos.donacion_actual.estado}</Text>
-          <Text>Monto mensual: ${datos.donacion_actual.monto}</Text>
+          <Text>Estado: {datos.donacion_actual!.estado}</Text>
+          <Text>Monto mensual: ${datos.donacion_actual!.monto}</Text>
           <Pressable style={styles.boton} onPress={manejarCancelar} disabled={procesando}>
             <Text style={styles.botonTexto}>Cancelar</Text>
           </Pressable>
