@@ -1157,3 +1157,123 @@ class CancelarSuscripcionesCondominiosCommandTests(TestCase):
         out = StringIO()
         call_command("cancelar_suscripciones_condominios", stdout=out)
         self.assertIn("No hay ninguna suscripción", out.getvalue())
+
+
+@override_settings(MERCADOPAGO_ACCESS_TOKEN="TEST-fake-token")
+class ApiDonacionesTests(TestCase):
+    """3 endpoints nuevos bajo /api/v1/pagos/ para que la app móvil (JWT)
+    pueda hacer lo mismo que DonarView/CancelarDonacionRecurrenteView/
+    MisDonacionesView del panel web (sesión por cookie, no alcanzable
+    desde la app) -- Tanda 4 de la Fase 2 de la app móvil."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test Api Donaciones", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="api_don_residente")
+        self.client.force_login(self.residente.user)
+
+    def test_mi_donacion_sin_donacion_activa_devuelve_null(self):
+        r = self.client.get(reverse("api-mi-donacion"))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        self.assertIsNone(datos["donacion_actual"])
+        self.assertEqual(datos["pagos"], [])
+        self.assertEqual(datos["total_donado"], "0.00")
+        self.assertEqual(datos["cantidad_aportes"], 0)
+
+    def test_mi_donacion_con_donacion_activa_y_pagos(self):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-mi-don-1", estado="autorizada",
+        )
+        Pago.objects.create(
+            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=suscripcion,
+            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-1",
+        )
+        r = self.client.get(reverse("api-mi-donacion"))
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        self.assertEqual(datos["donacion_actual"]["estado"], "autorizada")
+        self.assertEqual(datos["donacion_actual"]["monto"], "2000.00")
+        self.assertEqual(len(datos["pagos"]), 1)
+        self.assertEqual(datos["total_donado"], "2000.00")
+        self.assertEqual(datos["cantidad_aportes"], 1)
+
+    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_donar_crea_la_suscripcion_y_devuelve_la_url(self, mock_crear):
+        r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["url_autorizacion"], "https://fake-mp.test/autorizar/1")
+        suscripcion = SuscripcionRecurrente.objects.get(condominio=self.condominio, tipo="donacion")
+        self.assertEqual(suscripcion.membresia_id, self.residente.pk)
+        self.assertEqual(suscripcion.monto, Decimal("2000"))
+        mock_crear.assert_called_once()
+
+    def test_donar_sin_email_devuelve_400(self):
+        self.residente.user.email = ""
+        self.residente.user.save(update_fields=["email"])
+        r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Agrega tu email", r.json()["detail"])
+        self.assertFalse(SuscripcionRecurrente.objects.exists())
+
+    @override_settings(MERCADOPAGO_ACCESS_TOKEN="")
+    def test_donar_sin_access_token_configurada_devuelve_400(self):
+        r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("todavía no está disponible", r.json()["detail"])
+
+    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    def test_donar_con_donacion_activa_devuelve_409(self, mock_crear):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-ya-activa", estado="autorizada",
+        )
+        r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Ya tienes una donación automática activa", r.json()["detail"])
+        mock_crear.assert_not_called()
+
+    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value=None)
+    def test_donar_si_mercadopago_rechaza_no_deja_registro_huerfano(self, mock_crear):
+        r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 502)
+        self.assertFalse(SuscripcionRecurrente.objects.filter(condominio=self.condominio).exists())
+
+    def test_devquad_sin_membresia_recibe_409_en_los_3_endpoints(self):
+        devquad = User.objects.create_user(username="api_don_devquad", is_staff=True)
+        self.client.logout()
+        self.client.force_login(devquad)
+        for r in (
+            self.client.get(reverse("api-mi-donacion")),
+            self.client.post(reverse("api-donar")),
+            self.client.post(reverse("api-donar-cancelar")),
+        ):
+            self.assertEqual(r.status_code, 409)
+
+    def test_cancelar_sin_donacion_activa_devuelve_404(self):
+        r = self.client.post(reverse("api-donar-cancelar"))
+        self.assertEqual(r.status_code, 404)
+
+    @patch("pagos.api_views.cancelar_suscripcion_recurrente", return_value=True)
+    def test_cancelar_una_donacion_activa_la_marca_cancelada(self, mock_cancelar):
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-cancelar-api", estado="autorizada",
+        )
+        r = self.client.post(reverse("api-donar-cancelar"))
+        self.assertEqual(r.status_code, 200)
+        suscripcion.refresh_from_db()
+        self.assertEqual(suscripcion.estado, "cancelada")
+        mock_cancelar.assert_called_once()
+
+    @patch("pagos.api_views.cancelar_suscripcion_recurrente", return_value=False)
+    def test_cancelar_si_mercadopago_rechaza_devuelve_400(self, mock_cancelar):
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-cancelar-falla", estado="autorizada",
+        )
+        r = self.client.post(reverse("api-donar-cancelar"))
+        self.assertEqual(r.status_code, 400)
