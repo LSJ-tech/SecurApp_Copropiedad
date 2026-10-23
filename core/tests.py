@@ -1199,6 +1199,46 @@ class InicioViewTests(TestCase):
         self.assertContains(r, 'id="btn-panico-flotante"')
         self.assertContains(r, 'data-bs-target="#modalPanico"')
 
+    def test_avisos_y_alertas_escapan_html_antes_de_insertarlo(self):
+        """XSS real encontrado en la revisión final de la Tanda 2 de la app
+        móvil: el JS de esta página insertaba titulo/cuerpo/mensaje/nombre
+        de autor directo en innerHTML, sin escapar -- cualquier delegado
+        (puede publicar avisos) o residente (puede poner lo que quiera en
+        su propio nombre, vía "Mi perfil") podía inyectar un script que
+        corre en la sesión de cualquier otro vecino o devquad que viera
+        el dashboard. Esto no se puede probar ejecutando el JS (no hay
+        test runner para el JS de los templates, ver sonar-project.properties),
+        así que se prueba contra el código fuente del script: tiene que
+        existir una función de escape y tiene que estar aplicada a cada
+        campo de texto libre que viene de la API, no la interpolación
+        cruda de antes."""
+        residente = crear_membresia(self.condominio, "residente", username="inicio_escape_xss")
+        self.client.force_login(residente.user)
+        r = self.client.get(reverse("inicio"))
+        contenido = r.content.decode()
+
+        self.assertIn("function escapeHtml(", contenido)
+
+        # Los campos de texto libre que un usuario controla (su propio
+        # nombre, el título/cuerpo de un aviso, el mensaje de una alerta,
+        # el nombre del condominio, el nombre de una torre) tienen que
+        # pasar por escapeHtml antes de ir a innerHTML.
+        for campo_escapado in (
+            "escapeHtml(a.autor_nombre)",
+            "escapeHtml(a.mensaje)",
+            "escapeHtml(a.condominio_nombre)",
+            "escapeHtml(a.resuelta_por_nombre)",
+            "escapeHtml(a.titulo)",
+            "escapeHtml(a.cuerpo)",
+            "escapeHtml(a.torre_nombre)",
+        ):
+            self.assertIn(campo_escapado, contenido)
+
+        # La interpolación cruda de antes (sin escapeHtml) no puede seguir
+        # estando -- si vuelve a aparecer, el fix se deshizo.
+        for interpolacion_cruda in ("${a.titulo}", "${a.cuerpo}", "${a.mensaje}"):
+            self.assertNotIn(interpolacion_cruda, contenido)
+
 
 
 class EtiquetaOrganizacionTests(TestCase):

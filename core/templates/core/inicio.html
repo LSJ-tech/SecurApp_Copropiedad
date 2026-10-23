@@ -209,6 +209,19 @@ function csrfToken() {
     return document.cookie.split("; ").find(r => r.startsWith("csrftoken="))?.split("=")[1] || "";
 }
 
+// Hallazgo real de seguridad (revisión final de la Tanda 2 de la app
+// móvil): el nombre de un usuario (editable en "Mi perfil"), el título/
+// cuerpo de un aviso y el mensaje de una alerta son texto libre que
+// cualquier residente o delegado controla -- insertarlos en innerHTML
+// sin escapar permite XSS almacenado contra cualquiera que vea esta
+// página. Todo campo de texto libre que viene de la API tiene que pasar
+// por acá antes de ir a un template string que termina en innerHTML.
+function escapeHtml(valor) {
+    return String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[c]);
+}
+
 // Compartir una alerta por WhatsApp -- lo manda el propio residente a quien
 // quiera (su grupo del edificio, un vecino puntual), sin ninguna API ni
 // integración de por medio: solo un link wa.me con el mensaje ya armado.
@@ -368,12 +381,12 @@ function cargarAlertas() {
                         : `(${ETIQUETA_UNIDAD} ${a.autor_unidad})`)
                     : "";
                 const esDeOtroCondominio = a.condominio_nombre && a.condominio_nombre !== CONDOMINIO_NOMBRE_WHATSAPP;
-                const badgeCondominio = esDeOtroCondominio ? ` <span class="badge bg-info text-dark">${a.condominio_nombre}</span>` : "";
+                const badgeCondominio = esDeOtroCondominio ? ` <span class="badge bg-info text-dark">${escapeHtml(a.condominio_nombre)}</span>` : "";
                 return `
                 <div class="border rounded p-2 mb-2">
-                    <strong>${a.tipo_display}</strong>${badgeCondominio} — ${a.autor_nombre || ""} ${unidadTexto}
+                    <strong>${a.tipo_display}</strong>${badgeCondominio} — ${escapeHtml(a.autor_nombre)} ${unidadTexto}
                     <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()}</div>
-                    ${a.mensaje ? `<div>${a.mensaje}</div>` : ""}
+                    ${a.mensaje ? `<div>${escapeHtml(a.mensaje)}</div>` : ""}
                     ${a.latitud && a.longitud ? `<div id="mapa-alerta-${a.id}" style="height: 180px;" class="rounded mt-2 mb-2"></div>` : ""}
                     <button class="btn btn-sm btn-outline-success mt-1" onclick="resolverAlerta(${a.id}, 'resuelta')">Resolver</button>
                     <button class="btn btn-sm btn-outline-secondary mt-1" onclick="resolverAlerta(${a.id}, 'falsa_alarma')">Falsa alarma</button>
@@ -409,7 +422,7 @@ function cargarAlertasRecientes() {
             cont.innerHTML = alertas.map(a => {
                 const quien = a.estado === "auto_cerrada"
                     ? "Se cerró sola (nadie respondió en 30 min)"
-                    : `${a.resuelta_por_nombre || "?"} ${a.resuelta_por_unidad ? "(" + ETIQUETA_UNIDAD + " " + a.resuelta_por_unidad + ")" : ""}`;
+                    : `${a.resuelta_por_nombre ? escapeHtml(a.resuelta_por_nombre) : "?"} ${a.resuelta_por_unidad ? "(" + ETIQUETA_UNIDAD + " " + escapeHtml(a.resuelta_por_unidad) + ")" : ""}`;
                 return `
                 <div class="border rounded p-2 mb-2">
                     <strong>${a.tipo_display}</strong> — <span class="badge bg-secondary">${a.estado_display}</span>
@@ -450,11 +463,11 @@ function cargarAvisos() {
             ul.innerHTML = avisos.map(a => `
                 <li class="list-group-item">
                     <div class="d-flex justify-content-between align-items-start gap-2">
-                        <strong>${a.titulo}</strong>
-                        ${a.torre_nombre ? `<span class="badge bg-dark">Solo ${ETIQUETA_TORRE} ${a.torre_nombre}</span>` : ""}
+                        <strong>${escapeHtml(a.titulo)}</strong>
+                        ${a.torre_nombre ? `<span class="badge bg-dark">Solo ${ETIQUETA_TORRE} ${escapeHtml(a.torre_nombre)}</span>` : ""}
                     </div>
-                    <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre || "DevQuad"}</div>
-                    <div>${a.cuerpo}</div>
+                    <div class="small text-muted">${new Date(a.fecha_creacion).toLocaleString()} — ${a.autor_nombre ? escapeHtml(a.autor_nombre) : "DevQuad"}</div>
+                    <div>${escapeHtml(a.cuerpo)}</div>
                     ${a.leido_por_count !== null && a.leido_por_count !== undefined ? `<div class="small text-muted mt-1"><i class="bi bi-eye"></i> Visto por ${a.leido_por_count} de ${a.total_destinatarios} vecinos</div>` : ""}
                 </li>
             `).join("");
