@@ -2,8 +2,8 @@ import { apiFetch } from "./client";
 
 export type MembresiaOut = {
   rol: string;
-  condominio: { id: number; nombre: string; [k: string]: unknown };
-  unidad: { numero: string; [k: string]: unknown } | null;
+  condominio: { id: number; nombre: string; etiqueta_torre: string; etiqueta_unidad: string; genero_unidad: string; [k: string]: unknown };
+  unidad: { numero: string; torre_nombre: string | null; [k: string]: unknown } | null;
   nombre: string;
   telefono: string;
   first_name?: string;
