@@ -163,3 +163,24 @@ test("sin historial, muestra un mensaje en vez de una lista vacía", async () =>
   await render(<DonarScreen />);
   await screen.findByText(/todavía no tienes donaciones/i);
 });
+
+test("la pantalla es desplazable para que el historial no quede inalcanzable", async () => {
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: null, pagos: [], total_donado: "0.00", cantidad_aportes: 0,
+  });
+  await render(<DonarScreen />);
+  await screen.findByText(/^donar$/i);
+  expect(screen.toJSON()?.type).toBe("RCTScrollView");
+});
+
+test("con pagos pero ninguno aprobado, no muestra el resumen de $0 en 0 aportes", async () => {
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: null,
+    pagos: [{ estado: "pendiente", monto: "2000.00", fecha_creacion: "2026-10-01T00:00:00Z" }],
+    total_donado: "0.00",
+    cantidad_aportes: 0,
+  });
+  await render(<DonarScreen />);
+  await screen.findByText(/pendiente/i);
+  expect(screen.queryByText(/0 aportes/i)).toBeNull();
+});

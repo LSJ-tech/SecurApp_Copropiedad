@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Linking from "expo-linking";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
   listarMisPropuestas,
@@ -9,7 +9,7 @@ import {
   NumeroEmergenciaOut,
   PropuestaOut,
 } from "@/api/numerosEmergencia";
-import { mensajeDetalleDeError } from "@/api/erroresFormulario";
+import { primerMensajeDeError } from "@/api/erroresFormulario";
 import { colores } from "@/theme/colores";
 
 export default function NumerosEmergenciaScreen() {
@@ -55,7 +55,7 @@ export default function NumerosEmergenciaScreen() {
       setMostrarFormulario(false);
       setConfirmacion("Gracias, tu propuesta quedó pendiente de revisión.");
     } catch (error) {
-      setErrorFormulario(mensajeDetalleDeError(error, "No pudimos enviar tu propuesta. Probá de nuevo."));
+      setErrorFormulario(primerMensajeDeError(error));
     } finally {
       setEnviando(false);
     }
@@ -63,7 +63,7 @@ export default function NumerosEmergenciaScreen() {
 
   if (errorCarga) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.contenido]}>
         <Text style={styles.error}>{errorCarga}</Text>
         <Pressable style={styles.boton} onPress={cargar}>
           <Text style={styles.botonTexto}>Reintentar</Text>
@@ -75,7 +75,7 @@ export default function NumerosEmergenciaScreen() {
   if (numeros === null) return null;
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       <Text style={styles.titulo}>Números de emergencia</Text>
       {numeros.map((numero) => (
         <Pressable key={numero.id} style={styles.fila} onPress={() => manejarLlamar(numero.telefono)}>
@@ -105,6 +105,12 @@ export default function NumerosEmergenciaScreen() {
       ) : (
         <View style={styles.formulario}>
           {errorFormulario && <Text style={styles.error}>{errorFormulario}</Text>}
+          <TextInput
+            style={styles.input}
+            placeholder="Categoría (ej. electricidad, agua, gas, otro)"
+            value={categoria}
+            onChangeText={setCategoria}
+          />
           <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />
           <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
           <TextInput style={styles.input} placeholder="Nota (opcional)" value={nota} onChangeText={setNota} />
@@ -113,12 +119,13 @@ export default function NumerosEmergenciaScreen() {
           </Pressable>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12 },
+  container: { flex: 1 },
+  contenido: { padding: 16, gap: 12 },
   titulo: { fontSize: 18, fontWeight: "700", color: colores.primary },
   fila: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12 },
   nombreNumero: { fontWeight: "600" },

@@ -1,7 +1,8 @@
-import { render, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { render, fireEvent, screen } from "@testing-library/react-native";
 import * as Linking from "expo-linking";
 import NumerosEmergenciaScreen from "@/app/(vecino)/numeros-emergencia/index";
 import * as numerosApi from "@/api/numerosEmergencia";
+import { ErrorDeServidor } from "@/api/client";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -13,6 +14,14 @@ test("muestra la lista de números con su categoría", async () => {
   await render(<NumerosEmergenciaScreen />);
   await screen.findByText(/bomberos/i);
   expect(screen.getByText(/132/)).toBeTruthy();
+});
+
+test("la lista es desplazable para que los nacionales no queden inalcanzables", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
+  await render(<NumerosEmergenciaScreen />);
+  await screen.findByText(/números de emergencia/i);
+  expect(screen.toJSON()?.type).toBe("RCTScrollView");
 });
 
 test("al tocar un número, llama con tel: limpiando los espacios del teléfono", async () => {
@@ -36,26 +45,39 @@ test("muestra las propuestas propias con su estado", async () => {
   expect(screen.getByText(/pendiente/i)).toBeTruthy();
 });
 
-test("al enviar el formulario de proponer, llama a proponerNumero y confirma", async () => {
+test("al enviar el formulario de proponer, llama a proponerNumero con la categoría elegida y confirma", async () => {
   jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
   jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
   const proponerSpy = jest.spyOn(numerosApi, "proponerNumero").mockResolvedValue({
-    id: 9, categoria: "otro", categoria_display: "Otro", nombre: "Conserjería", telefono: "123", nota: "", estado: "pendiente", estado_display: "Pendiente", fecha_creacion: "2026-10-01T00:00:00Z",
+    id: 9, categoria: "electricidad", categoria_display: "Electricidad", nombre: "CGE", telefono: "800 800 767", nota: "", estado: "pendiente", estado_display: "Pendiente", fecha_creacion: "2026-10-01T00:00:00Z",
   });
   await render(<NumerosEmergenciaScreen />);
   await fireEvent.press(await screen.findByText(/proponer un número/i));
-  fireEvent.changeText(screen.getByPlaceholderText(/nombre/i), "Conserjería");
-  // Hallazgo: dos fireEvent.changeText seguidos sin esperar entre medio
-  // dejaban una actualización de TextInput sin asentar del todo, lo que
-  // contaminaba el test SIGUIENTE del archivo (su carga inicial nunca
-  // avanzaba más allá de "cargando") -- este waitFor fuerza a asentar
-  // cada cambio antes de seguir.
-  await waitFor(() => expect(screen.getByPlaceholderText(/nombre/i).props.value).toBe("Conserjería"));
-  fireEvent.changeText(screen.getByPlaceholderText(/teléfono/i), "123");
-  await waitFor(() => expect(screen.getByPlaceholderText(/teléfono/i).props.value).toBe("123"));
+  // await en cada changeText (no fire-and-forget): este RTL (14.1.0)
+  // trata fireEvent como async -- sin el await, el siguiente test del
+  // archivo quedaba contaminado (su cargar() inicial nunca progresaba).
+  await fireEvent.changeText(screen.getByPlaceholderText(/categoría/i), "electricidad");
+  await fireEvent.changeText(screen.getByPlaceholderText(/^nombre$/i), "CGE");
+  await fireEvent.changeText(screen.getByPlaceholderText(/teléfono/i), "800 800 767");
   await fireEvent.press(screen.getByText(/^enviar$/i));
-  expect(proponerSpy).toHaveBeenCalled();
+  expect(proponerSpy).toHaveBeenCalledWith(
+    expect.objectContaining({ categoria: "electricidad", nombre: "CGE", telefono: "800 800 767" })
+  );
   await screen.findByText(/gracias.*pendiente de revisión/i);
+});
+
+test("si el backend rechaza un campo, muestra el mensaje real en vez del genérico", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "proponerNumero").mockRejectedValue(
+    new ErrorDeServidor(400, { nombre: ["Ese ya es un número nacional, no hace falta proponerlo."] })
+  );
+  await render(<NumerosEmergenciaScreen />);
+  await fireEvent.press(await screen.findByText(/proponer un número/i));
+  await fireEvent.changeText(screen.getByPlaceholderText(/^nombre$/i), "Carabineros");
+  await fireEvent.changeText(screen.getByPlaceholderText(/teléfono/i), "133");
+  await fireEvent.press(screen.getByText(/^enviar$/i));
+  await screen.findByText(/ya es un número nacional/i);
 });
 
 test("si falla la carga, muestra error y 'Reintentar'", async () => {

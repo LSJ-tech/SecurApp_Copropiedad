@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Linking from "expo-linking";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { cancelarDonacion, crearDonacion, obtenerMiDonacion, MiDonacion } from "@/api/donaciones";
 import { mensajeDetalleDeError } from "@/api/erroresFormulario";
@@ -83,7 +83,7 @@ export default function DonarScreen() {
 
   if (errorCarga) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, styles.contenido]}>
         <Text style={styles.error}>{errorCarga}</Text>
         <Pressable style={styles.boton} onPress={cargar}>
           <Text style={styles.botonTexto}>Reintentar</Text>
@@ -97,7 +97,7 @@ export default function DonarScreen() {
   const esCancelable = datos.donacion_actual && ESTADOS_CANCELABLES.has(datos.donacion_actual.estado);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       {error && <Text style={styles.error}>{error}</Text>}
       {esCancelable ? (
         <>
@@ -123,10 +123,12 @@ export default function DonarScreen() {
         <Text>Todavía no tienes donaciones registradas.</Text>
       ) : (
         <>
-          <Text>
-            Has aportado ${formatearMonto(datos.total_donado)} en {datos.cantidad_aportes} aporte
-            {datos.cantidad_aportes === 1 ? "" : "s"}.
-          </Text>
+          {datos.cantidad_aportes > 0 && (
+            <Text>
+              Has aportado ${formatearMonto(datos.total_donado)} en {datos.cantidad_aportes} aporte
+              {datos.cantidad_aportes === 1 ? "" : "s"}.
+            </Text>
+          )}
           {datos.pagos.map((pago, indice) => (
             <Text key={indice}>
               {pago.fecha_creacion.slice(0, 10)} · ${formatearMonto(pago.monto)} · {pago.estado}
@@ -134,12 +136,13 @@ export default function DonarScreen() {
           ))}
         </>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12 },
+  container: { flex: 1 },
+  contenido: { padding: 16, gap: 12 },
   titulo: { fontSize: 18, fontWeight: "700", color: colores.primary },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },

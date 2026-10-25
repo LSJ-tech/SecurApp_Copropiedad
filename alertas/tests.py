@@ -935,6 +935,23 @@ class PropuestaNumeroEmergenciaViewSetTests(TestCase):
         )
         self.assertEqual(r.status_code, 403)
 
+    def test_no_se_puede_proponer_un_nombre_nacional(self):
+        """Mismo bloqueo que PropuestaNumeroEmergenciaForm.clean_nombre en la
+        web -- sin esto, aprobar la propuesta crea un NumeroEmergencia
+        duplicado (mismo nombre) y el próximo get_or_create de sincronización
+        de nacionales (NumeroEmergenciaListView/NumeroEmergenciaViewSet)
+        lanza MultipleObjectsReturned."""
+        from .models import PropuestaNumeroEmergencia
+        self.client.force_login(self.residente.user)
+        r = self.client.post(
+            reverse("propuesta-numero-emergencia-list"),
+            {"categoria": "policia", "nombre": "Carabineros", "telefono": "133"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("nombre", r.json())
+        self.assertFalse(PropuestaNumeroEmergencia.objects.filter(condominio=self.condominio).exists())
+
     def test_solo_ve_sus_propias_propuestas(self):
         from .models import PropuestaNumeroEmergencia
         PropuestaNumeroEmergencia.objects.create(

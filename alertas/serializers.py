@@ -2,7 +2,7 @@ from typing import Optional
 
 from rest_framework import serializers
 
-from .models import CATEGORIA_NUMERO_CHOICES, Alerta, NumeroEmergencia, PropuestaNumeroEmergencia
+from .models import CATEGORIA_NUMERO_CHOICES, _NOMBRES_NACIONALES, Alerta, NumeroEmergencia, PropuestaNumeroEmergencia
 
 
 class AlertaSerializer(serializers.ModelSerializer):
@@ -65,3 +65,11 @@ class PropuestaNumeroEmergenciaSerializer(serializers.ModelSerializer):
         model = PropuestaNumeroEmergencia
         fields = ["id", "categoria", "categoria_display", "nombre", "telefono", "nota", "estado", "estado_display", "fecha_creacion"]
         read_only_fields = ["estado"]
+
+    def validate_nombre(self, nombre):
+        # Mismo bloqueo que PropuestaNumeroEmergenciaForm.clean_nombre en la
+        # web -- los nacionales son fijos, no se proponen (ver
+        # NumeroEmergenciaListView/NumeroEmergenciaViewSet).
+        if nombre in _NOMBRES_NACIONALES:
+            raise serializers.ValidationError("Ese ya es un número nacional, no hace falta proponerlo.")
+        return nombre
