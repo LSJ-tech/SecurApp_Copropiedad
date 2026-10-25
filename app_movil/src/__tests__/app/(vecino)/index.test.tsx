@@ -7,8 +7,18 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 );
 
 const mockPush = jest.fn();
+let mockFocusCallback: (() => void) | null = null;
+// require, no import -- jest.mock() está hoisteado arriba de los imports
+// del archivo. Diferir a un useEffect de verdad (en vez de llamar el
+// callback sincrónicamente durante el render) evita un setState-durante-
+// el-render que entraba en loop infinito ("Too many re-renders").
+const mockUseFocusEffect = jest.fn((callback: () => void) => {
+  mockFocusCallback = callback;
+  require("react").useEffect(callback, []);
+});
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
+  useFocusEffect: (callback: () => void) => mockUseFocusEffect(callback),
 }));
 
 const mockUseAuth = jest.fn();
@@ -205,4 +215,55 @@ test("si fallan las tarjetas secundarias (donación/alertas), el botón de páni
   });
   jest.useRealTimers();
   expect(enviarSpy).toHaveBeenCalled();
+});
+
+test("con una donación cancelada, la tarjeta invita a donar en vez de mostrar 'activa'", async () => {
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: { estado: "cancelada", monto: "2000.00", fecha_creacion: "2026-09-01T00:00:00Z" },
+    pagos: [], total_donado: "2000.00", cantidad_aportes: 1,
+  });
+  await render(<PantallaPanico />);
+  await screen.findByText(/activa una donación automática/i);
+  expect(screen.queryByText(/donación automática activa/i)).toBeNull();
+});
+
+test("al volver a enfocar la pantalla, recarga la donación y las alertas", async () => {
+  jest
+    .spyOn(donacionesApi, "obtenerMiDonacion")
+    .mockResolvedValueOnce({ donacion_actual: null, pagos: [], total_donado: "0.00", cantidad_aportes: 0 })
+    .mockResolvedValueOnce({
+      donacion_actual: { estado: "autorizada", monto: "2000.00", fecha_creacion: "2026-09-01T00:00:00Z" },
+      pagos: [], total_donado: "2000.00", cantidad_aportes: 1,
+    });
+  await render(<PantallaPanico />);
+  await screen.findByText(/activa una donación automática/i);
+  await act(async () => {
+    mockFocusCallback?.();
+    await Promise.resolve();
+  });
+  await screen.findByText(/donación automática activa/i);
+});
+
+test("al mandar una alerta propia, la tarjeta de alertas activas se actualiza", async () => {
+  jest
+    .spyOn(alertasApi, "listarAlertas")
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ id: 5, tipo_display: "Robo", estado: "activa", estado_display: "Activa" } as any]);
+  jest.spyOn(enviarAlertaModulo, "enviarAlerta").mockResolvedValue({ id: 5 } as any);
+  await render(<PantallaPanico />);
+  await screen.findByText(/sin alertas activas/i);
+  jest.useFakeTimers();
+  await fireEvent(screen.getByTestId("boton-panico"), "pressIn");
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(2000);
+  });
+  jest.useRealTimers();
+  await screen.findByText(/robo/i);
+});
+
+test("si falla cargar las alertas activas, muestra un error en vez de 'Sin alertas activas.'", async () => {
+  jest.spyOn(alertasApi, "listarAlertas").mockRejectedValue(new Error("sin red"));
+  await render(<PantallaPanico />);
+  await screen.findByText(/no se pudieron cargar las alertas/i);
+  expect(screen.queryByText(/^sin alertas activas\.$/i)).toBeNull();
 });

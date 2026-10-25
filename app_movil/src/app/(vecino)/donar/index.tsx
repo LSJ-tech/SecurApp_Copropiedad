@@ -2,29 +2,20 @@ import { useEffect, useState } from "react";
 import * as Linking from "expo-linking";
 import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { cancelarDonacion, crearDonacion, obtenerMiDonacion, MiDonacion } from "@/api/donaciones";
+import {
+  cancelarDonacion,
+  crearDonacion,
+  obtenerMiDonacion,
+  formatearMontoDonacion,
+  ESTADOS_DONACION_CANCELABLES,
+  MiDonacion,
+} from "@/api/donaciones";
 import { mensajeDetalleDeError } from "@/api/erroresFormulario";
 import { colores } from "@/theme/colores";
 
 // Monto fijo -- no lo elige quien dona, igual que en el panel web
 // (pagos/views.py MONTO_DONACION).
 const MONTO_DONACION_TEXTO = "$2.000";
-
-// Monto sin decimales (coherente con MONTO_DONACION_TEXTO), con "." como
-// separador de miles -- evita depender de Intl/toLocaleString, que en
-// Hermes (runtime real del teléfono) no siempre trae datos ICU completos.
-function formatearMonto(valorStr: string): string {
-  const entero = Math.round(parseFloat(valorStr)).toString();
-  return entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-}
-
-// Mismo criterio que usan los propios endpoints del backend (pagos/api_views.py):
-// donar/cancelar aceptan "pendiente" o "autorizada" -- cualquier otro
-// estado (o ninguna donación) es elegible para donar de nuevo. Hallazgo
-// Critical de la revisión final: antes se decidía solo por "¿hay
-// donacion_actual?", así que una donación cancelada o pausada dejaba a
-// la persona viendo "Cancelar" para siempre, sin forma de volver a donar.
-const ESTADOS_CANCELABLES = new Set(["pendiente", "autorizada"]);
 
 export default function DonarScreen() {
   const [datos, setDatos] = useState<MiDonacion | null>(null);
@@ -94,7 +85,7 @@ export default function DonarScreen() {
 
   if (!datos) return null;
 
-  const esCancelable = datos.donacion_actual && ESTADOS_CANCELABLES.has(datos.donacion_actual.estado);
+  const esCancelable = datos.donacion_actual && ESTADOS_DONACION_CANCELABLES.has(datos.donacion_actual.estado);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
@@ -125,13 +116,13 @@ export default function DonarScreen() {
         <>
           {datos.cantidad_aportes > 0 && (
             <Text>
-              Has aportado ${formatearMonto(datos.total_donado)} en {datos.cantidad_aportes} aporte
+              Has aportado ${formatearMontoDonacion(datos.total_donado)} en {datos.cantidad_aportes} aporte
               {datos.cantidad_aportes === 1 ? "" : "s"}.
             </Text>
           )}
           {datos.pagos.map((pago, indice) => (
             <Text key={indice}>
-              {pago.fecha_creacion.slice(0, 10)} · ${formatearMonto(pago.monto)} · {pago.estado}
+              {pago.fecha_creacion.slice(0, 10)} · ${formatearMontoDonacion(pago.monto)} · {pago.estado}
             </Text>
           ))}
         </>

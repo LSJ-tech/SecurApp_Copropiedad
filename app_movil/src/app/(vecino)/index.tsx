@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BotonPanico } from "@/components/BotonPanico";
@@ -8,17 +8,9 @@ import { VentanaCancelar } from "@/components/VentanaCancelar";
 import { enviarAlerta } from "@/alertas/enviarAlerta";
 import { obtenerUbicacionActual } from "@/ubicacion/gps";
 import { useAuth } from "@/auth/AuthContext";
-import { obtenerMiDonacion, MiDonacion } from "@/api/donaciones";
+import { obtenerMiDonacion, formatearMontoDonacion, ESTADOS_DONACION_CANCELABLES, MiDonacion } from "@/api/donaciones";
 import { listarAlertas, AlertaOut } from "@/api/alertas";
 import { colores } from "@/theme/colores";
-
-// Monto sin decimales, con "." como separador de miles -- mismo criterio
-// que ya usa la pantalla Donar (evita depender de Intl/toLocaleString,
-// que en Hermes no siempre trae datos ICU completos).
-function formatearMonto(valorStr: string): string {
-  const entero = Math.round(parseFloat(valorStr)).toString();
-  return entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-}
 
 export default function PantallaPanico() {
   const { membresia } = useAuth();
@@ -35,15 +27,28 @@ export default function PantallaPanico() {
 
   const [donacion, setDonacion] = useState<MiDonacion | null>(null);
   const [alertasActivas, setAlertasActivas] = useState<AlertaOut[]>([]);
+  const [errorAlertas, setErrorAlertas] = useState(false);
 
-  useEffect(() => {
-    // Tarjetas secundarias -- un fallo acá nunca debe bloquear ni tocar
-    // el flujo de pánico, por eso cada una atrapa su propio error y
-    // simplemente se queda sin datos (la tarjeta no se muestra con
-    // información, pero el botón de pánico sigue intacto).
+  const cargarTarjetas = useCallback(() => {
+    // Tarjetas secundarias -- un fallo en donación nunca debe bloquear ni
+    // tocar el flujo de pánico, por eso atrapa su propio error y
+    // simplemente se queda sin datos. Alertas activas sí distingue "sin
+    // alertas" de "no se pudo cargar" (hallazgo Important de la revisión
+    // final: con mala señal, "Sin alertas activas." le aseguraba al
+    // vecino que no pasaba nada).
     obtenerMiDonacion().then(setDonacion).catch(() => {});
-    listarAlertas("activa").then(setAlertasActivas).catch(() => {});
+    setErrorAlertas(false);
+    listarAlertas("activa")
+      .then(setAlertasActivas)
+      .catch(() => setErrorAlertas(true));
   }, []);
+
+  // El Drawer deja esta pantalla montada al navegar a otra -- sin
+  // useFocusEffect (en vez de un useEffect de una sola vez), donar y
+  // volver, o que otro vecino dispare una alerta mientras se estaba en
+  // otra pestaña, dejaba estas tarjetas desactualizadas hasta reiniciar
+  // la app (hallazgo Important de la revisión final).
+  useFocusEffect(useCallback(cargarTarjetas, [cargarTarjetas]));
 
   async function manejarConfirmar(tipoConfirmado: string) {
     if (enviandoRef.current) return;
@@ -58,6 +63,10 @@ export default function PantallaPanico() {
       );
       if ("id" in resultado) {
         setAlertaEnviadaId(resultado.id);
+        // Si fui yo quien la mandó, la tarjeta de alertas activas tiene
+        // que mostrarla sin esperar a la próxima vez que se enfoque la
+        // pantalla (hallazgo Important de la revisión final).
+        cargarTarjetas();
       }
     } catch {
       // No es transitorio (enviarAlerta ya encoló los que sí lo son) --
@@ -92,9 +101,9 @@ export default function PantallaPanico() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.contenido}>
         <View style={styles.tarjeta}>
           <Text style={styles.tituloTarjeta}>♥ Apoya el proyecto</Text>
-          {donacion?.donacion_actual ? (
+          {donacion?.donacion_actual && ESTADOS_DONACION_CANCELABLES.has(donacion.donacion_actual.estado) ? (
             <>
-              <Text>Donación automática activa: ${formatearMonto(donacion.donacion_actual.monto)}/mes</Text>
+              <Text>Donación automática activa: ${formatearMontoDonacion(donacion.donacion_actual.monto)}/mes</Text>
               <Pressable style={styles.boton} onPress={() => router.push("/donar")}>
                 <Text style={styles.botonTexto}>Ver mi donación</Text>
               </Pressable>
@@ -125,7 +134,9 @@ export default function PantallaPanico() {
 
         <View style={styles.tarjeta}>
           <Text style={styles.tituloTarjeta}>Alertas activas</Text>
-          {alertasActivas.length === 0 ? (
+          {errorAlertas ? (
+            <Text style={styles.error}>No se pudieron cargar las alertas.</Text>
+          ) : alertasActivas.length === 0 ? (
             <Text>Sin alertas activas.</Text>
           ) : (
             alertasActivas.map((a) => (
