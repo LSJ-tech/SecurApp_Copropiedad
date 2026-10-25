@@ -16,7 +16,7 @@ const MONTO_DONACION_TEXTO = "$2.000";
 // Critical de la revisión final: antes se decidía solo por "¿hay
 // donacion_actual?", así que una donación cancelada o pausada dejaba a
 // la persona viendo "Cancelar" para siempre, sin forma de volver a donar.
-const ESTADOS_CANCELABLES = ["pendiente", "autorizada"];
+const ESTADOS_CANCELABLES = new Set(["pendiente", "autorizada"]);
 
 export default function DonarScreen() {
   const [datos, setDatos] = useState<MiDonacion | null>(null);
@@ -86,7 +86,7 @@ export default function DonarScreen() {
 
   if (!datos) return null;
 
-  const esCancelable = datos.donacion_actual && ESTADOS_CANCELABLES.includes(datos.donacion_actual.estado);
+  const esCancelable = datos.donacion_actual && ESTADOS_CANCELABLES.has(datos.donacion_actual.estado);
 
   return (
     <View style={styles.container}>
