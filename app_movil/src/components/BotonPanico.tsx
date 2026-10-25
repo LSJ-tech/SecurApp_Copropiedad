@@ -1,8 +1,6 @@
 import { useRef } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 
-import { colores } from "@/theme/colores";
-
 const DURACION_CONFIRMACION_MS = 2000;
 
 type Props = {
@@ -40,16 +38,16 @@ export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) 
 
 const styles = StyleSheet.create({
   boton: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colores.primary,
+    width: "100%",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: "#b00020",
     alignItems: "center",
     justifyContent: "center",
   },
   texto: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
     textAlign: "center",
   },
