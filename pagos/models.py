@@ -35,7 +35,11 @@ class SuscripcionRecurrente(models.Model):
     )
     tipo = models.CharField(max_length=15, choices=TIPO_PAGO_CHOICES, default="suscripcion")
     monto = models.DecimalField(max_digits=10, decimal_places=2)
-    mercadopago_preapproval_id = models.CharField(max_length=100, unique=True)
+    mercadopago_preapproval_id = models.CharField(
+        max_length=100, unique=True, null=True, blank=True,
+        help_text="NULL, nunca cadena vacía -- unique=True no distingue dos filas con \"\", "
+        "así que una fila a medio crear rompería la creación de cualquier otra.",
+    )
     estado = models.CharField(max_length=10, choices=ESTADO_SUSCRIPCION_RECURRENTE_CHOICES, default="pendiente")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_cancelacion = models.DateTimeField(null=True, blank=True)
@@ -46,6 +50,21 @@ class SuscripcionRecurrente(models.Model):
 
     class Meta:
         ordering = ["-fecha_creacion"]
+        constraints = [
+            # Hallazgo Important de la revisión final de la Tanda 4: sin
+            # esto, dos requests casi simultáneas de la misma persona
+            # podían pasar ambas el chequeo "¿ya tenés una donación
+            # activa?" (hecho con exists(), no es atómico con el create()
+            # que viene después) antes de que cualquiera guardara --
+            # resultando en dos cobros mensuales para la misma persona.
+            # La base de datos es la única que puede cerrar esa carrera
+            # de verdad.
+            models.UniqueConstraint(
+                fields=["membresia"],
+                condition=models.Q(tipo="donacion", estado__in=["pendiente", "autorizada"]),
+                name="una_donacion_activa_por_membresia",
+            ),
+        ]
 
     def __str__(self):
         return f"Suscripción recurrente #{self.pk} - {self.condominio} - {self.estado}"

@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import EmailMultiAlternatives
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.template.loader import render_to_string
@@ -251,6 +252,49 @@ def sincronizar_estado_suscripcion(suscripcion):
     return True
 
 
+class DonacionYaActivaError(Exception):
+    """Ya existe una SuscripcionRecurrente de donación pendiente/autorizada
+    para esta Membresia. La detecta la constraint de la base de datos
+    (una_donacion_activa_por_membresia) -- el exists() de antes del
+    create() deja una ventana entre dos requests casi simultáneas que la
+    constraint cierra de verdad (hallazgo Important de la revisión final
+    de la Tanda 4)."""
+
+
+class MercadoPagoRechazoError(Exception):
+    """crear_suscripcion_recurrente no devolvió una URL -- Mercado Pago
+    rechazó la solicitud, o hubo una excepción real (red, credenciales,
+    forma de la respuesta no esperada)."""
+
+
+def _crear_donacion(membresia, email, request):
+    """Crea la SuscripcionRecurrente de donación y pide la URL de
+    autorización a Mercado Pago dentro de una sola transacción -- si
+    Mercado Pago falla (devuelve None O lanza una excepción real), se
+    deshace TODO; antes solo se manejaba el caso "devuelve None" y una
+    excepción real dejaba la fila a medio crear con
+    mercadopago_preapproval_id="" (hallazgo Critical de la revisión final:
+    como ese campo es unique=True, esa fila huérfana rompía la creación de
+    CUALQUIER SuscripcionRecurrente en toda la plataforma). Devuelve la
+    URL de autorización, o lanza DonacionYaActivaError/MercadoPagoRechazoError."""
+    try:
+        with transaction.atomic():
+            suscripcion = SuscripcionRecurrente.objects.create(
+                condominio=membresia.condominio, membresia=membresia, tipo="donacion", monto=MONTO_DONACION,
+                mercadopago_preapproval_id=None,
+            )
+            url_autorizacion = crear_suscripcion_recurrente(suscripcion, email, request)
+            if not url_autorizacion:
+                raise MercadoPagoRechazoError()
+    except IntegrityError:
+        raise DonacionYaActivaError()
+    except MercadoPagoRechazoError:
+        raise
+    except Exception as exc:
+        raise MercadoPagoRechazoError() from exc
+    return url_autorizacion
+
+
 class DonarView(LoginRequiredMixin, View):
     """Cualquier miembro (residente o delegado) puede activar una donación
     mensual automática para apoyar el desarrollo de la plataforma -- cobro
@@ -276,10 +320,12 @@ class DonarView(LoginRequiredMixin, View):
             messages.error(request, "Ya tienes una donación automática activa.")
             return redirect("inicio")
 
-        suscripcion = SuscripcionRecurrente.objects.create(condominio=membresia.condominio, membresia=membresia, tipo="donacion", monto=MONTO_DONACION)
-        url_autorizacion = crear_suscripcion_recurrente(suscripcion, email, request)
-        if not url_autorizacion:
-            suscripcion.delete()
+        try:
+            url_autorizacion = _crear_donacion(membresia, email, request)
+        except DonacionYaActivaError:
+            messages.error(request, "Ya tienes una donación automática activa.")
+            return redirect("inicio")
+        except MercadoPagoRechazoError:
             messages.error(request, "No pudimos iniciar la donación automática. Intenta de nuevo en un momento.")
             return redirect("inicio")
         return redirect(url_autorizacion)

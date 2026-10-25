@@ -7,10 +7,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .mercadopago_client import cancelar_suscripcion_recurrente, crear_suscripcion_recurrente
+from .mercadopago_client import cancelar_suscripcion_recurrente
 from .models import Pago, SuscripcionRecurrente
 from .serializers import DonacionActualSerializer, PagoResumenSerializer
-from .views import MONTO_DONACION, _email_del_pagador
+from .views import DonacionYaActivaError, MercadoPagoRechazoError, _crear_donacion, _email_del_pagador
 
 MENSAJE_SIN_MEMBRESIA_PERSONAL = "Esta cuenta no tiene una membresía personal."
 
@@ -80,12 +80,11 @@ class DonarApiView(APIView):
         if SuscripcionRecurrente.objects.filter(membresia=membresia, tipo="donacion", estado__in=["pendiente", "autorizada"]).exists():
             return Response({"detail": "Ya tienes una donación automática activa."}, status=409)
 
-        suscripcion = SuscripcionRecurrente.objects.create(
-            condominio=membresia.condominio, membresia=membresia, tipo="donacion", monto=MONTO_DONACION,
-        )
-        url_autorizacion = crear_suscripcion_recurrente(suscripcion, email, request)
-        if not url_autorizacion:
-            suscripcion.delete()
+        try:
+            url_autorizacion = _crear_donacion(membresia, email, request)
+        except DonacionYaActivaError:
+            return Response({"detail": "Ya tienes una donación automática activa."}, status=409)
+        except MercadoPagoRechazoError:
             return Response(
                 {"detail": "No pudimos iniciar la donación automática. Intenta de nuevo en un momento."}, status=502,
             )

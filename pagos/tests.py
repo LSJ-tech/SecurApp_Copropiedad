@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, call, patch
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.management import call_command
+from django.db import IntegrityError
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -1201,7 +1202,7 @@ class ApiDonacionesTests(TestCase):
         self.assertEqual(datos["total_donado"], "2000.00")
         self.assertEqual(datos["cantidad_aportes"], 1)
 
-    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
     def test_donar_crea_la_suscripcion_y_devuelve_la_url(self, mock_crear):
         r = self.client.post(reverse("api-donar"))
         self.assertEqual(r.status_code, 201)
@@ -1225,7 +1226,7 @@ class ApiDonacionesTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("todavía no está disponible", r.json()["detail"])
 
-    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
     def test_donar_con_donacion_activa_devuelve_409(self, mock_crear):
         SuscripcionRecurrente.objects.create(
             condominio=self.condominio, membresia=self.residente, tipo="donacion",
@@ -1236,7 +1237,7 @@ class ApiDonacionesTests(TestCase):
         self.assertIn("Ya tienes una donación automática activa", r.json()["detail"])
         mock_crear.assert_not_called()
 
-    @patch("pagos.api_views.crear_suscripcion_recurrente", return_value=None)
+    @patch("pagos.views.crear_suscripcion_recurrente", return_value=None)
     def test_donar_si_mercadopago_rechaza_no_deja_registro_huerfano(self, mock_crear):
         r = self.client.post(reverse("api-donar"))
         self.assertEqual(r.status_code, 502)
@@ -1277,3 +1278,44 @@ class ApiDonacionesTests(TestCase):
         )
         r = self.client.post(reverse("api-donar-cancelar"))
         self.assertEqual(r.status_code, 400)
+
+    def test_donar_no_rompe_a_toda_la_plataforma_si_otra_fila_quedo_con_preapproval_id_vacio(self):
+        # Hallazgo Critical de la revisión final: mercadopago_preapproval_id
+        # es unique=True -- si una excepción real (no un None limpio) deja
+        # una fila con "" (la ventana entre create() y que Mercado Pago
+        # responda), CUALQUIER otra creación de SuscripcionRecurrente en
+        # toda la plataforma chocaba con IntegrityError (500), sin importar
+        # de qué condominio o persona fuera.
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion", monto=Decimal("2000"),
+            mercadopago_preapproval_id=None,
+        )
+        otro_residente = crear_membresia(self.condominio, "residente", username="api_don_otro")
+        self.client.force_login(otro_residente.user)
+        with patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/2"):
+            r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 201)
+
+    def test_donar_si_mercadopago_lanza_una_excepcion_real_tambien_hace_rollback(self):
+        # Antes solo se manejaba crear_suscripcion_recurrente devolviendo
+        # None -- una excepción real (ConnectionError, MPServerError, etc.)
+        # se escapaba sin capturar y dejaba la fila a medio crear.
+        with patch("pagos.views.crear_suscripcion_recurrente", side_effect=ConnectionError("sin red hacia Mercado Pago")):
+            r = self.client.post(reverse("api-donar"))
+        self.assertEqual(r.status_code, 502)
+        self.assertFalse(SuscripcionRecurrente.objects.filter(membresia=self.residente).exists())
+
+    def test_la_base_de_datos_impide_dos_donaciones_activas_para_la_misma_membresia(self):
+        # Cierra la carrera entre el exists() y el create() de DonarApiView:
+        # aunque dos requests casi simultáneas pasaran ambas el exists()
+        # antes de que cualquiera guardara, la base de datos rechaza la
+        # segunda -- nunca se duplica el cobro mensual.
+        SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-carrera-1", estado="autorizada",
+        )
+        with self.assertRaises(IntegrityError):
+            SuscripcionRecurrente.objects.create(
+                condominio=self.condominio, membresia=self.residente, tipo="donacion",
+                monto=Decimal("2000"), mercadopago_preapproval_id="pre-carrera-2", estado="pendiente",
+            )
