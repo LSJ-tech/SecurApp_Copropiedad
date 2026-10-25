@@ -839,3 +839,51 @@ class VistoPorCountSerializerTests(TestCase):
         self.client.get(reverse("alerta-detail", kwargs={"pk": self.alerta.pk}))
         self.client.get(reverse("alerta-list"))
         self.assertFalse(AlertaLectura.objects.filter(alerta=self.alerta, membresia=otro_vecino).exists())
+
+
+class NumeroEmergenciaViewSetTests(TestCase):
+    """Equivalente de NumeroEmergenciaListView para la app móvil -- ver
+    alertas/views.py."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test API Numeros", plan="premium")
+        cls.otro_condominio = Condominio.objects.create(nombre="Test API Numeros B", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="api_num_residente")
+
+    def test_precarga_los_nacionales_y_los_devuelve(self):
+        from .models import NUMEROS_NACIONALES
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numero-emergencia-list"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()), len(NUMEROS_NACIONALES))
+        nombres = {n["nombre"] for n in r.json()}
+        self.assertIn("Bomberos", nombres)
+
+    def test_marca_es_nacional(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numero-emergencia-list"))
+        bomberos = next(n for n in r.json() if n["nombre"] == "Bomberos")
+        self.assertTrue(bomberos["es_nacional"])
+
+    def test_incluye_categoria_display(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numero-emergencia-list"))
+        bomberos = next(n for n in r.json() if n["nombre"] == "Bomberos")
+        self.assertEqual(bomberos["categoria_display"], "Bomberos")
+
+    def test_no_ve_numeros_de_otro_condominio(self):
+        from .models import NumeroEmergencia
+        NumeroEmergencia.objects.create(condominio=self.otro_condominio, categoria="otro", nombre="Conserjería B", telefono="999")
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("numero-emergencia-list"))
+        nombres = {n["nombre"] for n in r.json()}
+        self.assertNotIn("Conserjería B", nombres)
+
+    def test_sin_condominio_activo_devuelve_403(self):
+        devquad = crear_devquad("api_num_devquad_sin_condominio")
+        self.client.force_login(devquad)
+        r = self.client.get(reverse("numero-emergencia-list"))
+        self.assertEqual(r.status_code, 403)

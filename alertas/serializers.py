@@ -2,7 +2,7 @@ from typing import Optional
 
 from rest_framework import serializers
 
-from .models import Alerta
+from .models import Alerta, NumeroEmergencia
 
 
 class AlertaSerializer(serializers.ModelSerializer):
@@ -41,3 +41,12 @@ class AlertaSerializer(serializers.ModelSerializer):
         # no lleva la anotación). Siempre 0 en ese caso, pero se calcula
         # igual en vez de asumirlo.
         return obj.lecturas.filter(membresia__condominio_id=obj.condominio_id).count()
+
+
+class NumeroEmergenciaSerializer(serializers.ModelSerializer):
+    categoria_display = serializers.CharField(source="get_categoria_display", read_only=True)
+
+    class Meta:
+        model = NumeroEmergencia
+        fields = ["id", "categoria", "categoria_display", "nombre", "telefono", "es_nacional"]
+        read_only_fields = fields

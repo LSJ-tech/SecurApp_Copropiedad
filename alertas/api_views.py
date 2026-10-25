@@ -11,8 +11,8 @@ from rest_framework.exceptions import PermissionDenied
 
 from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, condominio_de_la_api
 
-from .models import Alerta, AlertaLectura
-from .serializers import AlertaSerializer
+from .models import NUMEROS_NACIONALES, Alerta, AlertaLectura, NumeroEmergencia
+from .serializers import AlertaSerializer, NumeroEmergenciaSerializer
 from .services import notificar_alerta, notificar_alerta_resuelta
 
 
@@ -88,3 +88,23 @@ class AlertaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
                 # incluya.
                 alerta = self.get_queryset().get(pk=alerta.pk)
         return Response(self.get_serializer(alerta).data)
+
+
+class NumeroEmergenciaViewSet(CondominioQuerysetMixin, viewsets.ReadOnlyModelViewSet):
+    """Equivalente de NumeroEmergenciaListView (alertas/views.py) para la
+    app móvil -- de solo lectura, cualquier residente/delegado con
+    condominio activo."""
+
+    queryset = NumeroEmergencia.objects.all()
+    serializer_class = NumeroEmergenciaSerializer
+    permission_classes = [IsAuthenticated, TieneCondominioActivo]
+    http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self):
+        condominio = condominio_de_la_api(self.request)
+        if condominio is not None:
+            for categoria, nombre, telefono in NUMEROS_NACIONALES:
+                NumeroEmergencia.objects.get_or_create(
+                    condominio=condominio, nombre=nombre, defaults={"categoria": categoria, "telefono": telefono},
+                )
+        return super().get_queryset()
