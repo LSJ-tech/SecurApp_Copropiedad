@@ -11,8 +11,8 @@ from rest_framework.exceptions import PermissionDenied
 
 from core.permissions import CondominioQuerysetMixin, TieneCondominioActivo, condominio_de_la_api
 
-from .models import NUMEROS_NACIONALES, Alerta, AlertaLectura, NumeroEmergencia
-from .serializers import AlertaSerializer, NumeroEmergenciaSerializer
+from .models import NUMEROS_NACIONALES, Alerta, AlertaLectura, NumeroEmergencia, PropuestaNumeroEmergencia
+from .serializers import AlertaSerializer, NumeroEmergenciaSerializer, PropuestaNumeroEmergenciaSerializer
 from .services import notificar_alerta, notificar_alerta_resuelta
 
 
@@ -108,3 +108,24 @@ class NumeroEmergenciaViewSet(CondominioQuerysetMixin, viewsets.ReadOnlyModelVie
                     condominio=condominio, nombre=nombre, defaults={"categoria": categoria, "telefono": telefono},
                 )
         return super().get_queryset()
+
+
+class PropuestaNumeroEmergenciaViewSet(CondominioQuerysetMixin, viewsets.ModelViewSet):
+    """Equivalente de ProponerNumeroEmergenciaView (alertas/views.py) para
+    la app móvil -- cada residente/delegado solo ve y crea sus propias
+    propuestas (nunca las de otro miembro del condominio)."""
+
+    queryset = PropuestaNumeroEmergencia.objects.all()
+    serializer_class = PropuestaNumeroEmergenciaSerializer
+    permission_classes = [IsAuthenticated, TieneCondominioActivo]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        membresia = getattr(self.request.user, "membresia", None)
+        return super().get_queryset().filter(autor=membresia)
+
+    def perform_create(self, serializer):
+        membresia = getattr(self.request.user, "membresia", None)
+        if membresia is None:
+            raise PermissionDenied("Proponer un número requiere ser residente/delegado de un condominio.")
+        serializer.save(condominio=membresia.condominio, autor=membresia)

@@ -2,7 +2,7 @@ from typing import Optional
 
 from rest_framework import serializers
 
-from .models import Alerta, NumeroEmergencia
+from .models import CATEGORIA_NUMERO_CHOICES, Alerta, NumeroEmergencia, PropuestaNumeroEmergencia
 
 
 class AlertaSerializer(serializers.ModelSerializer):
@@ -50,3 +50,18 @@ class NumeroEmergenciaSerializer(serializers.ModelSerializer):
         model = NumeroEmergencia
         fields = ["id", "categoria", "categoria_display", "nombre", "telefono", "es_nacional"]
         read_only_fields = fields
+
+
+class PropuestaNumeroEmergenciaSerializer(serializers.ModelSerializer):
+    # El modelo tiene default="otro" en categoria, lo que haría que
+    # ModelSerializer la marque como no requerida -- a diferencia de
+    # PropuestaNumeroEmergenciaForm (Django ModelForm) en la web, que sí la
+    # exige. Se declara explícita para igualar esa validación.
+    categoria = serializers.ChoiceField(choices=CATEGORIA_NUMERO_CHOICES, required=True)
+    categoria_display = serializers.CharField(source="get_categoria_display", read_only=True)
+    estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+
+    class Meta:
+        model = PropuestaNumeroEmergencia
+        fields = ["id", "categoria", "categoria_display", "nombre", "telefono", "nota", "estado", "estado_display", "fecha_creacion"]
+        read_only_fields = ["estado"]

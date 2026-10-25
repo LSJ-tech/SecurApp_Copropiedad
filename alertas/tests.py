@@ -887,3 +887,59 @@ class NumeroEmergenciaViewSetTests(TestCase):
         self.client.force_login(devquad)
         r = self.client.get(reverse("numero-emergencia-list"))
         self.assertEqual(r.status_code, 403)
+
+
+class PropuestaNumeroEmergenciaViewSetTests(TestCase):
+    """Equivalente de ProponerNumeroEmergenciaView para la app móvil -- ver
+    alertas/views.py."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.condominio = Condominio.objects.create(nombre="Test API Propuestas", plan="premium")
+
+    def setUp(self):
+        self.residente = crear_membresia(self.condominio, "residente", username="api_prop_residente")
+        self.otro_residente = crear_membresia(self.condominio, "residente", username="api_prop_otro_residente")
+
+    def test_cualquier_rol_puede_proponer(self):
+        from .models import PropuestaNumeroEmergencia
+        self.client.force_login(self.residente.user)
+        r = self.client.post(
+            reverse("propuesta-numero-emergencia-list"),
+            {"categoria": "electricidad", "nombre": "CGE", "telefono": "800 800 767", "nota": "De mi boleta"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 201)
+        propuesta = PropuestaNumeroEmergencia.objects.get(condominio=self.condominio)
+        self.assertEqual(propuesta.autor, self.residente)
+        self.assertEqual(propuesta.estado, "pendiente")
+
+    def test_requiere_categoria(self):
+        self.client.force_login(self.residente.user)
+        r = self.client.post(
+            reverse("propuesta-numero-emergencia-list"),
+            {"nombre": "CGE", "telefono": "800 800 767"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("categoria", r.json())
+
+    def test_devquad_sin_membresia_no_puede_proponer(self):
+        devquad = crear_devquad("api_prop_devquad")
+        self.client.force_login(devquad)
+        self.client.get(reverse("devquad-entrar-condominio", args=[self.condominio.pk]))
+        r = self.client.post(
+            reverse("propuesta-numero-emergencia-list"),
+            {"categoria": "otro", "nombre": "X", "telefono": "123"},
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_solo_ve_sus_propias_propuestas(self):
+        from .models import PropuestaNumeroEmergencia
+        PropuestaNumeroEmergencia.objects.create(
+            condominio=self.condominio, autor=self.otro_residente, categoria="otro", nombre="De otro vecino", telefono="111",
+        )
+        self.client.force_login(self.residente.user)
+        r = self.client.get(reverse("propuesta-numero-emergencia-list"))
+        self.assertEqual(r.json(), [])
