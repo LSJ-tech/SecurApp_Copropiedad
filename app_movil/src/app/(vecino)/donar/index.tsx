@@ -10,6 +10,14 @@ import { colores } from "@/theme/colores";
 // (pagos/views.py MONTO_DONACION).
 const MONTO_DONACION_TEXTO = "$2.000";
 
+// Monto sin decimales (coherente con MONTO_DONACION_TEXTO), con "." como
+// separador de miles -- evita depender de Intl/toLocaleString, que en
+// Hermes (runtime real del teléfono) no siempre trae datos ICU completos.
+function formatearMonto(valorStr: string): string {
+  const entero = Math.round(parseFloat(valorStr)).toString();
+  return entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 // Mismo criterio que usan los propios endpoints del backend (pagos/api_views.py):
 // donar/cancelar aceptan "pendiente" o "autorizada" -- cualquier otro
 // estado (o ninguna donación) es elegible para donar de nuevo. Hallazgo
@@ -107,6 +115,23 @@ export default function DonarScreen() {
           <Pressable style={styles.boton} onPress={manejarDonar} disabled={procesando}>
             <Text style={styles.botonTexto}>Donar</Text>
           </Pressable>
+        </>
+      )}
+
+      <Text style={styles.titulo}>Historial</Text>
+      {datos.pagos.length === 0 ? (
+        <Text>Todavía no tienes donaciones registradas.</Text>
+      ) : (
+        <>
+          <Text>
+            Has aportado ${formatearMonto(datos.total_donado)} en {datos.cantidad_aportes} aporte
+            {datos.cantidad_aportes === 1 ? "" : "s"}.
+          </Text>
+          {datos.pagos.map((pago, indice) => (
+            <Text key={indice}>
+              {pago.fecha_creacion.slice(0, 10)} · ${formatearMonto(pago.monto)} · {pago.estado}
+            </Text>
+          ))}
         </>
       )}
     </View>

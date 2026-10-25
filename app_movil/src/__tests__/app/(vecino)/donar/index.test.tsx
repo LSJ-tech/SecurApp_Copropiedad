@@ -137,3 +137,29 @@ test("al volver del navegador externo (app vuelve a 'active'), recarga la donaci
 
   await screen.findByText(/autorizada/i);
 });
+
+test("muestra el total donado y la cantidad de aportes cuando hay historial", async () => {
+  // Monto del pago distinto del total para que ningún texto sea ambiguo
+  // entre el resumen ("Has aportado...") y la fila del historial -- con
+  // un solo aporte de igual monto que el total, ambos textos contienen
+  // "$2.000" y la consulta por texto se vuelve ambigua.
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: null,
+    pagos: [
+      { estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-09-01T00:00:00Z" },
+      { estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-08-01T00:00:00Z" },
+    ],
+    total_donado: "4000.00",
+    cantidad_aportes: 2,
+  });
+  await render(<DonarScreen />);
+  await screen.findByText(/has aportado \$4\.000 en 2 aportes/i);
+});
+
+test("sin historial, muestra un mensaje en vez de una lista vacía", async () => {
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: null, pagos: [], total_donado: "0.00", cantidad_aportes: 0,
+  });
+  await render(<DonarScreen />);
+  await screen.findByText(/todavía no tienes donaciones/i);
+});
