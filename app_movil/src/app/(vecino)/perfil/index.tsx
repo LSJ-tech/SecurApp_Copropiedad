@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import * as Linking from "expo-linking";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { actualizarMiPerfil, obtenerMiPerfil } from "@/api/auth";
+import { API_BASE_URL } from "@/api/client";
 import { primerMensajeDeError } from "@/api/erroresFormulario";
 import { colores } from "@/theme/colores";
 
@@ -78,6 +80,18 @@ export default function PantallaPerfil() {
       <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
       <Pressable style={styles.boton} onPress={manejarGuardar}>
         <Text style={styles.botonTexto}>Guardar</Text>
+      </Pressable>
+      <Pressable
+        style={styles.boton}
+        onPress={() => Linking.openURL(`${API_BASE_URL}/mi-perfil/cambiar-contrasena/`)}
+      >
+        <Text style={styles.botonTexto}>Cambiar contraseña</Text>
+      </Pressable>
+      <Pressable
+        style={styles.boton}
+        onPress={() => Linking.openURL(`${API_BASE_URL}/mi-perfil/eliminar-cuenta/`)}
+      >
+        <Text style={styles.botonTexto}>Solicitar eliminación de cuenta</Text>
       </Pressable>
     </View>
   );

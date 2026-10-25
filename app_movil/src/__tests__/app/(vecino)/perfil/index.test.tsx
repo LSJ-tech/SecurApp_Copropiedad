@@ -3,9 +3,10 @@ jest.mock("@/auth/AuthContext", () => ({
 }));
 
 import { render, fireEvent, screen } from "@testing-library/react-native";
+import * as Linking from "expo-linking";
 import PantallaPerfil from "@/app/(vecino)/perfil/index";
 import * as authApi from "@/api/auth";
-import { ErrorDeRed, ErrorDeServidor } from "@/api/client";
+import { ErrorDeRed, ErrorDeServidor, API_BASE_URL } from "@/api/client";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -79,4 +80,26 @@ test("al guardar con éxito, confirma que se guardó (hallazgo Important: antes 
   await screen.findByDisplayValue("Ana");
   await fireEvent.press(screen.getByText(/guardar/i));
   await screen.findByText(/tus datos quedaron actualizados/i);
+});
+
+test("el botón Cambiar contraseña abre la página web en el navegador externo", async () => {
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    rol: "residente", condominio: { id: 1, nombre: "X" }, unidad: null,
+    nombre: "Ana Pérez", telefono: "", first_name: "Ana", last_name: "Pérez", email: "ana@test.cl",
+  });
+  const abrirSpy = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await render(<PantallaPerfil />);
+  await fireEvent.press(await screen.findByText(/cambiar contraseña/i));
+  expect(abrirSpy).toHaveBeenCalledWith(`${API_BASE_URL}/mi-perfil/cambiar-contrasena/`);
+});
+
+test("el botón Solicitar eliminación de cuenta abre la página web en el navegador externo", async () => {
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    rol: "residente", condominio: { id: 1, nombre: "X" }, unidad: null,
+    nombre: "Ana Pérez", telefono: "", first_name: "Ana", last_name: "Pérez", email: "ana@test.cl",
+  });
+  const abrirSpy = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await render(<PantallaPerfil />);
+  await fireEvent.press(await screen.findByText(/solicitar eliminación de cuenta/i));
+  expect(abrirSpy).toHaveBeenCalledWith(`${API_BASE_URL}/mi-perfil/eliminar-cuenta/`);
 });
