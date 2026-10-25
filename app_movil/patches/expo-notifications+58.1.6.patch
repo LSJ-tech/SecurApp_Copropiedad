@@ -1,0 +1,43 @@
+diff --git a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+index 4ad9aff..6552c94 100644
+--- a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
++++ b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+@@ -1,4 +1,14 @@
+-import { requireNativeModule } from 'expo';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
++import { requireOptionalNativeModule } from 'expo';
++// Parche (patch-package): la app nunca usa subscribeToTopicAsync/
++// unsubscribeFromTopicAsync (son específicas de FCM directo, el
++// proyecto usa el servicio de push propio de Expo, sin Firebase
++// configurado) -- requireNativeModule (incondicional) tiraba al
++// IMPORTAR este archivo, no solo al llamar las funciones, así que
++// cualquier `import ... from "expo-notifications"` rompía la app
++// entera al arrancar en cualquier build real de Android. Con
++// requireOptionalNativeModule, si el módulo no existe queda en
++// null (en vez de tirar) -- las funciones de arriba ya revisan que
++// exista antes de usarlo.
++export default requireOptionalNativeModule('ExpoTopicSubscriptionModule');
+ 
+ //# sourceMappingURL=TopicSubscriptionModule.android.js.map
+diff --git a/node_modules/expo-notifications/build/topicSubscription.js b/node_modules/expo-notifications/build/topicSubscription.js
+index 0f1ac5c..4c76e39 100644
+--- a/node_modules/expo-notifications/build/topicSubscription.js
++++ b/node_modules/expo-notifications/build/topicSubscription.js
+@@ -7,7 +7,7 @@ import { warnOfExpoGoPushUsage } from './warnOfExpoGoPushUsage';
+  * @return a Promise which resolves to `null` once the device is subscribed to the topic.
+  * @platform android
+  */ export async function subscribeToTopicAsync(topic) {
+-    if (!TopicSubscriptionModule.subscribeToTopicAsync) {
++    if (!TopicSubscriptionModule?.subscribeToTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'subscribeToTopicAsync');
+     }
+     warnOfExpoGoPushUsage();
+@@ -19,7 +19,7 @@ import { warnOfExpoGoPushUsage } from './warnOfExpoGoPushUsage';
+  * @return a Promise which resolves to `null` once the device is unsubscribed from the topic.
+  * @platform android
+  */ export async function unsubscribeFromTopicAsync(topic) {
+-    if (!TopicSubscriptionModule.unsubscribeFromTopicAsync) {
++    if (!TopicSubscriptionModule?.unsubscribeFromTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'unsubscribeFromTopicAsync');
+     }
+     warnOfExpoGoPushUsage();

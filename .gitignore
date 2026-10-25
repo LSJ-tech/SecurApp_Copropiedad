@@ -4,6 +4,11 @@ __pycache__/
 db.sqlite3
 .env
 .env.migracion
+# app_movil/.env SÍ se commitea -- EXPO_PUBLIC_* queda embebido en el
+# bundle de JS igual (no es secreto, es la URL pública del backend, no
+# una API key), esconderlo del repo no agrega ninguna seguridad real y
+# solo hace que el proyecto no arranque solo después de un clone nuevo.
+!app_movil/.env
 backup_migracion_*.json
 server*.log
 *.sqlite3
