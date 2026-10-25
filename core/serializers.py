@@ -15,7 +15,7 @@ _COMUNAS_VALIDAS = {comuna for comunas in COMUNAS_POR_REGION.values() for comuna
 class CondominioResumenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Condominio
-        fields = ["id", "nombre", "plan", "puede_operar"]
+        fields = ["id", "nombre", "plan", "puede_operar", "etiqueta_torre", "etiqueta_unidad", "genero_unidad"]
 
 
 class TorreSerializer(serializers.ModelSerializer):
@@ -25,9 +25,11 @@ class TorreSerializer(serializers.ModelSerializer):
 
 
 class UnidadResumenSerializer(serializers.ModelSerializer):
+    torre_nombre = serializers.CharField(source="torre.nombre", read_only=True, default=None)
+
     class Meta:
         model = Unidad
-        fields = ["id", "numero"]
+        fields = ["id", "numero", "torre_nombre"]
 
 
 class UnidadSerializer(serializers.ModelSerializer):

@@ -1017,6 +1017,34 @@ class ApiAuthTests(TestCase):
         r = self.client.get(reverse("api-me"), HTTP_AUTHORIZATION=f"Bearer {access}")
         self.assertEqual(r.status_code, 409)
 
+    def test_me_incluye_las_etiquetas_del_condominio_y_la_torre_de_la_unidad(self):
+        self.condominio.etiqueta_torre = "Block"
+        self.condominio.etiqueta_unidad = "Departamento"
+        self.condominio.genero_unidad = "m"
+        self.condominio.save()
+        torre = Torre.objects.create(condominio=self.condominio, nombre="9")
+        unidad = Unidad.objects.create(condominio=self.condominio, torre=torre, numero="54")
+        self.membresia.unidad = unidad
+        self.membresia.save()
+        login = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-segura-123"})
+        access = login.json()["access"]
+        r = self.client.get(reverse("api-me"), HTTP_AUTHORIZATION=f"Bearer {access}")
+        self.assertEqual(r.status_code, 200)
+        datos = r.json()
+        self.assertEqual(datos["condominio"]["etiqueta_torre"], "Block")
+        self.assertEqual(datos["condominio"]["etiqueta_unidad"], "Departamento")
+        self.assertEqual(datos["condominio"]["genero_unidad"], "m")
+        self.assertEqual(datos["unidad"]["torre_nombre"], "9")
+
+    def test_me_unidad_sin_torre_trae_torre_nombre_none(self):
+        unidad = Unidad.objects.create(condominio=self.condominio, numero="12")
+        self.membresia.unidad = unidad
+        self.membresia.save()
+        login = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-segura-123"})
+        access = login.json()["access"]
+        r = self.client.get(reverse("api-me"), HTTP_AUTHORIZATION=f"Bearer {access}")
+        self.assertIsNone(r.json()["unidad"]["torre_nombre"])
+
     def test_logout_invalida_el_refresh_token(self):
         login = self.client.post(reverse("api-login"), {"username": "api_auth_user", "password": "clave-segura-123"})
         access, refresh = login.json()["access"], login.json()["refresh"]
