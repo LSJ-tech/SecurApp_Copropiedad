@@ -60,3 +60,15 @@ test("la grilla es una vista que envuelve en wrap, no una lista virtualizada ani
   const estilo = [grilla.props.style].flat();
   expect(estilo).toEqual(expect.arrayContaining([expect.objectContaining({ flexWrap: "wrap" })]));
 });
+
+test("las cajas no son cuadradas forzadas -- en una pantalla ancha (tablet) un cuadrado se agranda mucho y empuja todo lo de abajo", async () => {
+  // Hallazgo real probando en una tablet: aspectRatio:1 hace que la
+  // altura de cada caja crezca junto con el ancho de pantalla -- en
+  // una tablet quedaban enormes y "Alertas activas"/"Invitar vecinos"
+  // terminaban mucho más abajo de lo esperado.
+  const onCambiar = jest.fn();
+  await render(<SelectorTipoAlerta valor="otro" onCambiar={onCambiar} />);
+  const opcion = await screen.findByTestId("opcion-tipo-incendio");
+  const estilo = Object.assign({}, ...[opcion.props.style].flat());
+  expect(estilo.aspectRatio).toBeUndefined();
+});
