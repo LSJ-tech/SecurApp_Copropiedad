@@ -20,6 +20,16 @@ test("con permiso denegado, devuelve null sin lanzar", async () => {
   await expect(obtenerUbicacionActual()).resolves.toBeNull();
 });
 
+test("si el GPS rechaza (ej. servicio de ubicación apagado), devuelve null en vez de lanzar", async () => {
+  // Camino sin cubrir hasta ahora: no es un timeout, es un rechazo real
+  // (ej. GPS deshabilitado en el teléfono) -- igual de crítico que el
+  // timeout, el envío de la alerta no puede depender de que el GPS
+  // funcione.
+  (Location.requestForegroundPermissionsAsync as jest.Mock).mockResolvedValue({ status: "granted" });
+  (Location.getCurrentPositionAsync as jest.Mock).mockRejectedValue(new Error("Location services disabled"));
+  await expect(obtenerUbicacionActual()).resolves.toBeNull();
+});
+
 test("si el dialogo de permiso o el GPS tardan mas de 2s, devuelve null en vez de bloquear el envio", async () => {
   // Hallazgo C4 de la revision final: D-04 #1 dice "sin ningun paso
   // extra visible" -- un dialogo de permiso pendiente o un GPS en frio

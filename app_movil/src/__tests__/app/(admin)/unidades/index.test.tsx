@@ -35,6 +35,28 @@ test("muestra la torre de cada unidad para distinguir numeros duplicados entre t
   await screen.findByText("101 · Torre B");
 });
 
+test("si falla cargar las unidades, muestra un error", async () => {
+  jest.spyOn(torresApi, "listarTorres").mockResolvedValue([]);
+  jest.spyOn(unidadesApi, "listarUnidades").mockRejectedValue(new Error("sin red"));
+  await render(<UnidadesScreen />);
+  await screen.findByText(/no se pudieron cargar las unidades/i);
+});
+
+test("al elegir una torre del selector y agregar, crea la unidad con esa torre", async () => {
+  jest.spyOn(torresApi, "listarTorres").mockResolvedValue([{ id: 5, nombre: "Torre C" }]);
+  jest.spyOn(unidadesApi, "listarUnidades").mockResolvedValue([]);
+  const crearSpy = jest
+    .spyOn(unidadesApi, "crearUnidad")
+    .mockResolvedValue({ id: 3, numero: "303", calle: "", torre: 5, alicuota: null });
+  await render(<UnidadesScreen />);
+  await fireEvent.press(await screen.findByText(/sin torre/i));
+  await fireEvent.press(await screen.findByText("Torre C"));
+  await screen.findByText("Torre C");
+  await fireEvent.changeText(screen.getByPlaceholderText(/número/i), "303");
+  await fireEvent.press(screen.getByText(/agregar/i));
+  expect(crearSpy).toHaveBeenCalledWith({ numero: "303", torre: 5 });
+});
+
 test("si la torre elegida no pertenece al condominio, muestra el mensaje real del backend", async () => {
   // Texto exacto confirmado contra el backend real (UnidadSerializer.validate,
   // core/serializers.py) -- no es un mensaje inventado para el test.

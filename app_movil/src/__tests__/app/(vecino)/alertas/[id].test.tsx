@@ -2,7 +2,7 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "7" }),
 }));
 
-import { render, screen } from "@testing-library/react-native";
+import { render, fireEvent, screen } from "@testing-library/react-native";
 import DetalleAlertaScreen from "@/app/(vecino)/alertas/[id]";
 import * as alertasApi from "@/api/alertas";
 import { ErrorDeRed } from "@/api/client";
@@ -19,6 +19,30 @@ test("si obtenerAlerta falla, muestra un error en vez de quedar en blanco para s
   jest.spyOn(alertasApi, "obtenerAlerta").mockRejectedValue(new ErrorDeRed("sin red"));
   await render(<DetalleAlertaScreen />);
   await screen.findByText(/no se pudo cargar la alerta/i);
+});
+
+test("al marcar como visto con éxito, actualiza el conteo y esconde el botón", async () => {
+  jest.spyOn(alertasApi, "obtenerAlerta").mockResolvedValue({
+    id: 7, tipo_display: "Robo", estado: "activa", estado_display: "Activa", mensaje: "", autor_nombre: "Ana", visto_por_count: null,
+  } as any);
+  const marcarSpy = jest.spyOn(alertasApi, "marcarVisto").mockResolvedValue({
+    id: 7, tipo_display: "Robo", estado: "activa", estado_display: "Activa", mensaje: "", autor_nombre: "Ana", visto_por_count: 1,
+  } as any);
+  await render(<DetalleAlertaScreen />);
+  await fireEvent.press(await screen.findByText(/marcar como visto/i));
+  expect(marcarSpy).toHaveBeenCalledWith(7);
+  await screen.findByText(/visto por 1 vecino/i);
+  expect(screen.queryByText(/marcar como visto/i)).toBeNull();
+});
+
+test("si marcar como visto falla, muestra un error", async () => {
+  jest.spyOn(alertasApi, "obtenerAlerta").mockResolvedValue({
+    id: 7, tipo_display: "Robo", estado: "activa", estado_display: "Activa", mensaje: "", autor_nombre: "Ana", visto_por_count: null,
+  } as any);
+  jest.spyOn(alertasApi, "marcarVisto").mockRejectedValue(new ErrorDeRed("sin red"));
+  await render(<DetalleAlertaScreen />);
+  await fireEvent.press(await screen.findByText(/marcar como visto/i));
+  await screen.findByText(/no se pudo marcar como visto/i);
 });
 
 test("el bloque de datos de la alerta usa el color de fondo informativo", async () => {
