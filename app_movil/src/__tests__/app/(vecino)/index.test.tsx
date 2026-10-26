@@ -29,6 +29,7 @@ jest.mock("@/auth/AuthContext", () => ({
 import { act, cleanup, render, fireEvent, screen } from "@testing-library/react-native";
 import PantallaPanico from "@/app/(vecino)/index";
 import * as enviarAlertaModulo from "@/alertas/enviarAlerta";
+import * as colaEnvioModulo from "@/alertas/colaEnvio";
 import * as donacionesApi from "@/api/donaciones";
 import * as alertasApi from "@/api/alertas";
 import { ErrorDeServidor } from "@/api/client";
@@ -227,6 +228,34 @@ test("mientras la membresía no cargó, no muestra un saludo roto", async () => 
   mockUseAuth.mockReturnValue({ membresia: null });
   await render(<PantallaPanico />);
   expect(screen.queryByText(/hola,/i)).toBeNull();
+});
+
+test("cuando una alerta en cola finalmente se manda, avisa aunque ya haya pasado la confirmación inicial", async () => {
+  // Continuación del hallazgo anterior: el autor está excluido de su
+  // propio push (notificar_alerta), así que sin este listener nadie le
+  // avisa si esa alerta en cola terminó mandándose de verdad.
+  let listenerCapturado: ((evento: { tipo: string }) => void) | null = null;
+  jest.spyOn(colaEnvioModulo, "alProcesarColaAlerta").mockImplementation((listener: any) => {
+    listenerCapturado = listener;
+  });
+  await render(<PantallaPanico />);
+  await act(async () => {
+    listenerCapturado?.({ tipo: "enviada" });
+  });
+  await screen.findByText("Alerta enviada");
+  await screen.findByText("Vecinos notificados");
+});
+
+test("si una alerta en cola se descarta (error no transitorio), avisa con un error", async () => {
+  let listenerCapturado: ((evento: { tipo: string }) => void) | null = null;
+  jest.spyOn(colaEnvioModulo, "alProcesarColaAlerta").mockImplementation((listener: any) => {
+    listenerCapturado = listener;
+  });
+  await render(<PantallaPanico />);
+  await act(async () => {
+    listenerCapturado?.({ tipo: "descartada" });
+  });
+  await screen.findByText(/no se pudo mandar la alerta que había quedado en cola/i);
 });
 
 test("sin conexión, la alerta queda encolada y el residente lo ve -- no queda sin ninguna señal", async () => {

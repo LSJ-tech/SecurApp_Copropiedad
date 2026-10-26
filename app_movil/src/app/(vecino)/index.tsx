@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -7,6 +7,7 @@ import { ConfirmacionAnimada } from "@/components/ConfirmacionAnimada";
 import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { SelectorTipoAlerta } from "@/components/SelectorTipoAlerta";
 import { VentanaCancelar } from "@/components/VentanaCancelar";
+import { alProcesarColaAlerta } from "@/alertas/colaEnvio";
 import { enviarAlerta } from "@/alertas/enviarAlerta";
 import { obtenerUbicacionActual } from "@/ubicacion/gps";
 import { useAuth } from "@/auth/AuthContext";
@@ -25,6 +26,12 @@ export default function PantallaPanico() {
   // alerta había hecho algo. La clave (timestamp) remonta
   // ConfirmacionAnimada en cada intento, igual que alertaEnviadaId.
   const [claveEncolada, setClaveEncolada] = useState<number | null>(null);
+  // Cuando esa alerta encolada finalmente se procesa (procesarCola, en
+  // colaEnvio.ts), nada más avisa -- el autor está excluido a propósito
+  // de su propio push (notificar_alerta en el backend). Sin este
+  // listener, un vecino que ya se movió de pantalla nunca se entera si
+  // su alerta en cola terminó mandándose de verdad.
+  const [claveColaResuelta, setClaveColaResuelta] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Ref, no solo estado: la guarda tiene que valer apenas se llama a
   // manejarConfirmar, sin depender de que React ya haya re-renderizado
@@ -57,6 +64,18 @@ export default function PantallaPanico() {
   // otra pestaña, dejaba estas tarjetas desactualizadas hasta reiniciar
   // la app (hallazgo Important de la revisión final).
   useFocusEffect(useCallback(cargarTarjetas, [cargarTarjetas]));
+
+  useEffect(() => {
+    alProcesarColaAlerta((evento) => {
+      if (evento.tipo === "enviada") {
+        setClaveColaResuelta(Date.now());
+        cargarTarjetas();
+      } else {
+        setError("No se pudo mandar la alerta que había quedado en cola.");
+      }
+    });
+    return () => alProcesarColaAlerta(null);
+  }, [cargarTarjetas]);
 
   async function manejarConfirmar(tipoConfirmado: string) {
     if (enviandoRef.current) return;
@@ -156,6 +175,13 @@ export default function PantallaPanico() {
               key={`encolada-${claveEncolada}`}
               titulo="Alerta en cola"
               subtitulo="Se enviará apenas vuelva la señal"
+            />
+          )}
+          {claveColaResuelta !== null && (
+            <ConfirmacionAnimada
+              key={`cola-resuelta-${claveColaResuelta}`}
+              titulo="Alerta enviada"
+              subtitulo="Vecinos notificados"
             />
           )}
         </View>

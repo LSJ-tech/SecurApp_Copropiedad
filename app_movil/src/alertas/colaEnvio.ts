@@ -42,6 +42,19 @@ export async function encolarAlerta(payload: AlertaPendiente): Promise<void> {
   });
 }
 
+type EventoColaAlerta = { tipo: "enviada" } | { tipo: "descartada" };
+type ListenerColaAlerta = (evento: EventoColaAlerta) => void;
+let listenerColaAlerta: ListenerColaAlerta | null = null;
+
+/** Único listener a la vez -- mismo patrón que alSesionExpirada en
+ * api/client.ts. El autor de una alerta está excluido a propósito de su
+ * propio push (ver alertas/services.py:notificar_alerta), así que sin
+ * esto no hay NINGUNA forma de enterarse de si una alerta que quedó en
+ * cola por falta de señal terminó mandándose, o se descartó. */
+export function alProcesarColaAlerta(listener: ListenerColaAlerta | null): void {
+  listenerColaAlerta = listener;
+}
+
 let procesando = false;
 
 export async function procesarCola(): Promise<void> {
@@ -57,6 +70,7 @@ export async function procesarCola(): Promise<void> {
 
       try {
         await crearAlerta(siguiente);
+        listenerColaAlerta?.({ tipo: "enviada" });
       } catch (error) {
         if (error instanceof ErrorDeRed || error instanceof SesionExpiradaError) {
           // Transitorio, o no es culpa de ESTA alerta (la sesión expiró
@@ -67,6 +81,7 @@ export async function procesarCola(): Promise<void> {
         // No transitorio (4xx/5xx real): reintentarlo no lo va a
         // arreglar. Se descarta ESE item (no toda la cola) para no
         // bloquear a los que vienen detrás para siempre (hallazgo I2).
+        listenerColaAlerta?.({ tipo: "descartada" });
       }
 
       // Secuencial a propósito, no se puede paralelizar -- cada vuelta

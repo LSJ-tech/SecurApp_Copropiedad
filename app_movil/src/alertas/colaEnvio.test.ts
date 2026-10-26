@@ -4,7 +4,7 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 
 import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { encolarAlerta, procesarCola, iniciarProcesamientoAutomatico } from "./colaEnvio";
+import { encolarAlerta, procesarCola, iniciarProcesamientoAutomatico, alProcesarColaAlerta } from "./colaEnvio";
 import * as alertasApi from "../api/alertas";
 import { ErrorDeRed, ErrorDeServidor, SesionExpiradaError } from "../api/client";
 
@@ -14,6 +14,38 @@ beforeEach(async () => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  alProcesarColaAlerta(null);
+});
+
+test("al mandar con éxito un item encolado, avisa al listener que se envió", async () => {
+  // Hallazgo real: una alerta en cola que finalmente se manda no le
+  // avisa a nadie -- el autor está excluido a propósito de su propio
+  // push (notificar_alerta), así que si la pantalla no está escuchando,
+  // nunca se entera de si esa alerta llegó.
+  await encolarAlerta({ tipo: "otro" });
+  jest.spyOn(alertasApi, "crearAlerta").mockResolvedValue({ id: 1 } as any);
+  const listener = jest.fn();
+  alProcesarColaAlerta(listener);
+  await procesarCola();
+  expect(listener).toHaveBeenCalledWith({ tipo: "enviada" });
+});
+
+test("ante un error no transitorio (se descarta el item), avisa al listener que se descartó", async () => {
+  await encolarAlerta({ tipo: "otro" });
+  jest.spyOn(alertasApi, "crearAlerta").mockRejectedValue(new ErrorDeServidor(400));
+  const listener = jest.fn();
+  alProcesarColaAlerta(listener);
+  await procesarCola();
+  expect(listener).toHaveBeenCalledWith({ tipo: "descartada" });
+});
+
+test("ante un error transitorio (sigue en cola), no avisa nada todavía", async () => {
+  await encolarAlerta({ tipo: "otro" });
+  jest.spyOn(alertasApi, "crearAlerta").mockRejectedValue(new ErrorDeRed("sin red"));
+  const listener = jest.fn();
+  alProcesarColaAlerta(listener);
+  await procesarCola();
+  expect(listener).not.toHaveBeenCalled();
 });
 
 test("procesa los items encolados en orden y los quita al confirmar exito", async () => {
