@@ -2119,13 +2119,14 @@ class PaginasPublicasRenderizanTests(TestCase):
         r = self.client.get(reverse("privacidad"))
         self.assertEqual(r.status_code, 200)
 
-    def test_privacidad_no_afirma_que_la_app_movil_ya_entrega_notificaciones(self):
-        """No existe ninguna app móvil (Expo/React Native) en este repo --
-        solo el código servidor que la enviaría si existiera. La política
-        no debe describir eso en presente como si ya ocurriera hoy."""
+    def test_privacidad_si_afirma_que_la_app_movil_entrega_notificaciones(self):
+        """Lo contrario del hallazgo anterior (guardado hasta el
+        26-10-2026): la app móvil (app_movil/, Expo/React Native) ya
+        existe y usa Expo push de verdad -- la política tenía que dejar
+        de describirlo como "si en el futuro... hoy no se usa"."""
         r = self.client.get(reverse("privacidad"))
         contenido = r.content.decode()
-        self.assertNotIn("entrega las notificaciones a tu celular", contenido)
+        self.assertIn("entrega las notificaciones a tu celular", contenido)
 
 
 def crear_devquad(username="devquad_test"):

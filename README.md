@@ -4,7 +4,7 @@
 
 Red de seguridad y comunicación para juntas de vecinos, condominios, pasajes y barrios en Chile — segundo producto de [DevQuad](https://devquad.cl), en la misma línea que [PataAgenda](https://patagenda.devquad.cl).
 
-Botón de pánico con notificación push, avisos y directorio de vecinos, con un panel web (instalable como PWA). DevQuad administra la configuración de cada condominio (torres, unidades, altas de cuentas) desde un panel propio con acceso a todos los condominios clientes -- no hay un rol de pago operado por el propio condominio. Una app nativa (React Native + Expo) es el siguiente paso si el volumen de clientes lo justifica.
+Botón de pánico con notificación push, avisos y directorio de vecinos, con un panel web (instalable como PWA) **y una app nativa** (React Native + Expo, `app_movil/`) con paridad de funciones para el rol residente/delegado. DevQuad administra la configuración de cada condominio (torres, unidades, altas de cuentas) desde un panel propio con acceso a todos los condominios clientes -- no hay un rol de pago operado por el propio condominio.
 
 **Mi Barrio+ es gratis.** No hay suscripción ni cobro al condominio -- cualquier residente puede, de forma opcional, activar una donación mensual voluntaria (residente → DevQuad) vía Mercado Pago, cancelable cuando quiera.
 
@@ -21,16 +21,19 @@ Implementado y probado de punta a punta:
 - Política de Privacidad y Términos de Uso (`/privacidad/`, `/terminos/`), con aceptación obligatoria al registrarse, y solicitud de eliminación de cuenta/datos desde "Mi perfil".
 - Panel de administración (django-unfold) para el dueño de la plataforma.
 - API REST documentada con Swagger en `/api/docs/` (drf-spectacular).
-- PWA instalable (manifest + service worker en `/sw.js`, íconos propios): ícono en el escritorio del celular, ventana standalone, página de respaldo sin conexión en `/offline/`. **Con Web Push real**: botón de pánico y avisos llegan como notificación del sistema aunque la PWA esté cerrada (VAPID + `pywebpush`, generar el par de llaves con `manage.py generar_vapid_keys`) -- separado de `DispositivoPush`/Expo, que sigue siendo solo para la futura app nativa.
+- PWA instalable (manifest + service worker en `/sw.js`, íconos propios): ícono en el escritorio del celular, ventana standalone, página de respaldo sin conexión en `/offline/`. **Con Web Push real**: botón de pánico y avisos llegan como notificación del sistema aunque la PWA esté cerrada (VAPID + `pywebpush`, generar el par de llaves con `manage.py generar_vapid_keys`) -- separado de `DispositivoPush`/Expo, que es el canal de push que sí usa la app nativa.
+- **App móvil** (`app_movil/`, Expo Router + TypeScript, Jest para tests): login, botón de pánico (GPS + cola de reintento offline + ventana de 10s para cancelar), alertas (lista/detalle, notificación push), avisos, directorio, invitar vecinos, donar, números de emergencia, Mi perfil -- paridad con el panel web para residente/delegado, más un "modo administrador" (Mi condominio/Torres/Unidades/Miembros) para devquad. Sistema de color por tarjeta, confirmación animada con vibración al mandar una alerta, estados vacíos ilustrados. Builds de prueba vía EAS Build (distribución interna, solo Android por ahora -- iOS pendiente de una cuenta de Apple Developer Program), actualizaciones de JS entregadas por EAS Update (OTA) sin reinstalar. Monitoreo de errores en producción con Sentry.
 - Compartir una alerta activa por WhatsApp (link `wa.me`, mensaje armado con condominio/torre/unidad/autor), además de la notificación push normal.
 - Etiquetas de "Torre" y "Unidad" configurables por condominio (ej. "Block"/"Departamento" para Empart) -- las fija devquad vía `/admin/core/condominio/`, no hay form en la app para esto.
 - Correo de bienvenida en HTML al registrarse (autoregistro o alta por devquad), con el mismo look del panel.
 
-No implementado a propósito todavía: QR de visitas, confirmaciones de alerta entre vecinos, reportes, app nativa. **Retirado (ver memoria del proyecto):** gastos comunes, registro de accesos, gestión de personal/liquidaciones de sueldo y la suscripción de pago del condominio -- las apps `gastoscomunes`/`accesos`/`personal` se borraron del código; sus tablas quedaron intactas (huérfanas, no gestionadas) en la base de datos de producción. **También retirada: la red vecinal geográfica** (app `vecindario`, registro público por GPS sin condominio) -- se volvió al modelo de alertas cerradas, exclusivas de quien tiene Membresia en un condominio.
+No implementado a propósito todavía: QR de visitas, confirmaciones de alerta entre vecinos, reportes, publicación en App Store/Google Play (hoy solo distribución interna vía link/APK). **Retirado (ver memoria del proyecto):** gastos comunes, registro de accesos, gestión de personal/liquidaciones de sueldo y la suscripción de pago del condominio -- las apps `gastoscomunes`/`accesos`/`personal` se borraron del código; sus tablas quedaron intactas (huérfanas, no gestionadas) en la base de datos de producción. **También retirada: la red vecinal geográfica** (app `vecindario`, registro público por GPS sin condominio) -- se volvió al modelo de alertas cerradas, exclusivas de quien tiene Membresia en un condominio.
 
 ## Stack
 
-Django 6 + Django REST Framework + JWT (`djangorestframework-simplejwt`) + PostgreSQL (SQLite en desarrollo) + Bootstrap (panel web) + django-unfold (admin) + Mercado Pago (donaciones) + Expo/Web Push (notificaciones) + reportlab (PDFs: boucher y liquidación de sueldo) + mindicador.cl (UTM/UF en vivo para liquidaciones).
+**Backend/web:** Django 6 + Django REST Framework + JWT (`djangorestframework-simplejwt`) + PostgreSQL (SQLite en desarrollo) + Bootstrap (panel web) + django-unfold (admin) + Mercado Pago (donaciones) + Expo/Web Push (notificaciones) + reportlab (PDFs: boucher y liquidación de sueldo) + mindicador.cl (UTM/UF en vivo para liquidaciones).
+
+**App móvil (`app_movil/`):** React Native + Expo (Router, SDK 58) + TypeScript + Jest/Testing Library (tests) + Sentry (monitoreo de errores) + EAS Build/Update.
 
 ## Desarrollo local
 
@@ -50,15 +53,18 @@ Tests: `python manage.py test` (cubre permisos por rol, el gate de Términos/Pri
 ## Estructura
 
 ```
-config/            # settings.py, urls.py (equivalente a "peluqueria/" en PataAgenda)
-core/               # Condominio, Torre, Unidad, Membresia, auth JWT, mixins de tenant, panel de devquad
-alertas/            # botón de pánico
-comunicacion/       # avisos
-notificaciones/     # dispositivos push y envío vía Expo/Web Push
-pagos/              # donaciones voluntarias (Mercado Pago)
+config/          # settings.py, urls.py (equivalente a "peluqueria/" en PataAgenda)
+core/             # Condominio, Torre, Unidad, Membresia, auth JWT, mixins de tenant, panel de devquad
+alertas/          # botón de pánico
+comunicacion/     # avisos
+notificaciones/   # dispositivos push y envío vía Expo/Web Push
+pagos/            # donaciones voluntarias (Mercado Pago)
+app_movil/        # app nativa (Expo Router) -- consume la misma API /api/v1/ del backend
 ```
 
 Cada app de dominio (excepto `core`) sigue el mismo patrón: `models.py`, `serializers.py` + `api_views.py` + `api_urls.py` (API para la app móvil, bajo `/api/v1/`), y `views.py`/`forms.py`/`urls.py` cuando además tiene panel web.
+
+Dentro de `app_movil/src/app/`, las rutas están agrupadas por rol: `(vecino)/` para residente/delegado, `(admin)/` para el modo administrador de devquad -- mismo criterio de separación de roles que el backend.
 
 ## Despliegue
 
