@@ -77,8 +77,13 @@ export default function NumerosEmergenciaScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       <Text style={styles.titulo}>Números de emergencia</Text>
-      {numeros.map((numero) => (
-        <Pressable key={numero.id} style={styles.fila} onPress={() => manejarLlamar(numero.telefono)}>
+      {numeros.map((numero, indice) => (
+        <Pressable
+          key={numero.id}
+          testID={`fila-numero-${indice}`}
+          style={styles.fila}
+          onPress={() => manejarLlamar(numero.telefono)}
+        >
           <Text style={styles.nombreNumero}>{numero.nombre}</Text>
           <Text style={styles.detalleNumero}>{numero.telefono}</Text>
         </Pressable>
@@ -127,13 +132,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   contenido: { padding: 16, gap: 12 },
   titulo: { fontSize: 18, fontWeight: "700", color: colores.primary },
-  fila: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12 },
+  // Acento (borde lateral), nunca relleno completo -- la lista de
+  // números puede crecer (nacionales + los que agregue cada condominio),
+  // no debe volverse muchos bloques de color repetidos (D-03).
+  fila: { borderLeftWidth: 3, borderLeftColor: colores.primary, borderRadius: 4, padding: 12 },
   nombreNumero: { fontWeight: "600" },
   detalleNumero: { color: colores.secondary },
   formulario: { gap: 12 },
   input: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12 },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  error: { color: "#b00020", textAlign: "center" },
+  error: { color: colores.peligro, textAlign: "center" },
   exito: { color: colores.accent, textAlign: "center" },
 });

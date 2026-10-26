@@ -3,6 +3,7 @@ import * as Linking from "expo-linking";
 import NumerosEmergenciaScreen from "@/app/(vecino)/numeros-emergencia/index";
 import * as numerosApi from "@/api/numerosEmergencia";
 import { ErrorDeServidor } from "@/api/client";
+import { colores } from "@/theme/colores";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -86,4 +87,15 @@ test("si falla la carga, muestra error y 'Reintentar'", async () => {
   await render(<NumerosEmergenciaScreen />);
   await screen.findByText(/no se pudo cargar/i);
   await fireEvent.press(screen.getByText(/reintentar/i));
+});
+
+test("cada número de la lista no lleva un color de fondo sólido", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([
+    { id: 1, categoria: "bomberos", categoria_display: "Bomberos", nombre: "Bomberos", telefono: "132", es_nacional: true },
+  ]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
+  await render(<NumerosEmergenciaScreen />);
+  const fila = await screen.findByTestId("fila-numero-0");
+  const estilo = [fila.props.style].flat();
+  expect(estilo).not.toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })]));
 });
