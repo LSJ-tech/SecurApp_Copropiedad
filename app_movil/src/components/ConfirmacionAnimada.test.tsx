@@ -34,14 +34,39 @@ test("llama a la vibración de éxito al montar", async () => {
   expect(spy).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);
 });
 
-test("si la vibración falla, la confirmación visual igual se muestra", async () => {
+test("si la vibración falla, no queda un rechazo sin manejar", async () => {
+  // Hallazgo Minor de la revisión final: el test anterior solo probaba
+  // que el texto se pintara (pasa en el primer render, antes de que
+  // corra el effect que llama a Haptics) -- no probaba que el .catch
+  // realmente atrapara el rechazo.
+  const manejador = jest.fn();
+  process.on("unhandledRejection", manejador);
   jest.spyOn(Haptics, "notificationAsync").mockRejectedValue(new Error("no linked"));
   await render(<ConfirmacionAnimada titulo="Alerta enviada" />);
   await screen.findByText("Alerta enviada");
+  await new Promise((resolve) => setImmediate(resolve));
+  process.off("unhandledRejection", manejador);
+  expect(manejador).not.toHaveBeenCalled();
 });
 
-test("si se desmonta mientras tanto, no revienta ni deja un timer colgado", async () => {
+test("si se desmonta mientras tanto, limpia el timer pendiente", async () => {
+  // Hallazgo Minor de la revisión final: antes solo probaba que
+  // unmount() no tirara -- desde React 18 ya no existe el warning de
+  // "setState on unmounted component", así que eso pasaría igual sin el
+  // clearTimeout del cleanup. jest.getTimerCount() prueba el cleanup de
+  // verdad.
+  const setTimeoutSpy = jest.spyOn(global, "setTimeout");
+  const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
   const { unmount } = await render(<ConfirmacionAnimada titulo="Alerta enviada" />);
   await screen.findByText("Alerta enviada");
-  expect(() => unmount()).not.toThrow();
+  // Filtra por el delay exacto (4500ms, DURACION_MS en el componente) en
+  // vez de asumir que es la primera llamada global a setTimeout -- este
+  // entorno de test puede tener timers ajenos al componente de por medio.
+  const indice = setTimeoutSpy.mock.calls.findIndex((llamada) => llamada[1] === 4500);
+  expect(indice).toBeGreaterThanOrEqual(0);
+  const idDelTemporizador = setTimeoutSpy.mock.results[indice].value;
+  await act(async () => {
+    unmount();
+  });
+  expect(clearTimeoutSpy).toHaveBeenCalledWith(idDelTemporizador);
 });

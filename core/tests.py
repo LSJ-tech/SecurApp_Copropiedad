@@ -968,6 +968,24 @@ class ApiAuthTests(TestCase):
         self.assertEqual(datos["membresia"]["rol"], "residente")
         self.assertEqual(datos["membresia"]["condominio"]["nombre"], self.condominio.nombre)
 
+    def test_login_devuelve_first_name(self):
+        # Hallazgo de la revisión final de la app móvil: el saludo
+        # personalizado usaba first_name si estaba, si no la primera
+        # palabra de "nombre" (get_full_name) -- pero el login nunca
+        # mandaba first_name (solo /auth/me/ lo agregaba a mano), así que
+        # el saludo cambiaba de "Hola, Ana" a "Hola, Ana María" entre
+        # loguearse y reabrir la app.
+        User.objects.create_user(
+            username="api_auth_con_nombre", password="clave-segura-123", first_name="Ana María",
+        )
+        Membresia.objects.create(
+            user=User.objects.get(username="api_auth_con_nombre"),
+            condominio=self.condominio, rol="residente", terminos_aceptados_en=timezone.now(),
+        )
+        r = self.client.post(reverse("api-login"), {"username": "api_auth_con_nombre", "password": "clave-segura-123"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["membresia"]["first_name"], "Ana María")
+
     def test_login_sin_membresia_devuelve_membresia_none(self):
         User.objects.create_user(username="sin_membresia_api", password="clave-segura-123")
         r = self.client.post(reverse("api-login"), {"username": "sin_membresia_api", "password": "clave-segura-123"})

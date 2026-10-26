@@ -105,10 +105,16 @@ class MembresiaSerializer(serializers.ModelSerializer):
     condominio = CondominioResumenSerializer(read_only=True)
     unidad = UnidadResumenSerializer(read_only=True)
     nombre = serializers.CharField(source="user.get_full_name", read_only=True)
+    # El login (CustomTokenObtainPairSerializer) usa este serializer
+    # directo -- sin esto, el saludo personalizado de la app móvil tenía
+    # el nombre completo recién logueado y solo el primer nombre después
+    # de reabrir la app (cuando sí pasaba por GET /auth/me/, que lo
+    # agregaba a mano).
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
 
     class Meta:
         model = Membresia
-        fields = ["rol", "condominio", "unidad", "nombre", "telefono"]
+        fields = ["rol", "condominio", "unidad", "nombre", "telefono", "first_name"]
 
 
 class CondominioEdicionSerializer(serializers.ModelSerializer):

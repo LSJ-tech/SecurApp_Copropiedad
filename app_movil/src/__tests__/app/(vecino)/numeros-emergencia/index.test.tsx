@@ -50,11 +50,11 @@ test("sin números cargados, muestra el estado vacío ilustrado en vez de quedar
 test("sin números pero con una propuesta propia, se ven ambas cosas", async () => {
   jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
   jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([
-    { id: 1, categoria: "electricidad", categoria_display: "Electricidad", nombre: "Plomero", telefono: "900 000 000", nota: "", estado: "pendiente", estado_display: "Pendiente", fecha_creacion: "2026-10-01T00:00:00Z" },
+    { id: 1, categoria: "electricidad", categoria_display: "Electricidad", nombre: "CGE", telefono: "900 000 000", nota: "", estado: "pendiente", estado_display: "Pendiente", fecha_creacion: "2026-10-01T00:00:00Z" },
   ]);
   await render(<NumerosEmergenciaScreen />);
   await screen.findByTestId("tarjeta-sin-numeros");
-  await screen.findByText(/plomero/i);
+  await screen.findByText(/cge/i);
 });
 
 test("muestra las propuestas propias con su estado", async () => {
