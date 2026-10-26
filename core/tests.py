@@ -1311,6 +1311,14 @@ class InicioViewTests(TestCase):
             "escapeHtml(a.titulo)",
             "escapeHtml(a.cuerpo)",
             "escapeHtml(a.torre_nombre)",
+            # Hallazgo real de la auditoría (2026-10-26): autor_unidad y
+            # autor_torre (bloque "Alertas activas") quedaron afuera del
+            # fix original -- numero_unidad_libre es texto que cualquiera
+            # escribe libre en el autoregistro de "modo casas"
+            # (RegistroResidenteForm._crear_unidad_casa_libre), mismo
+            # vector que autor_nombre.
+            "escapeHtml(a.autor_unidad)",
+            "escapeHtml(a.autor_torre)",
         ):
             self.assertIn(campo_escapado, contenido)
 

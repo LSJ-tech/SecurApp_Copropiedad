@@ -377,8 +377,8 @@ function cargarAlertas() {
             cont.innerHTML = alertas.map(a => {
                 const unidadTexto = a.autor_unidad
                     ? (a.autor_torre
-                        ? `(${ETIQUETA_TORRE} ${a.autor_torre}, ${ETIQUETA_UNIDAD.toLowerCase()} ${a.autor_unidad})`
-                        : `(${ETIQUETA_UNIDAD} ${a.autor_unidad})`)
+                        ? `(${ETIQUETA_TORRE} ${escapeHtml(a.autor_torre)}, ${ETIQUETA_UNIDAD.toLowerCase()} ${escapeHtml(a.autor_unidad)})`
+                        : `(${ETIQUETA_UNIDAD} ${escapeHtml(a.autor_unidad)})`)
                     : "";
                 const esDeOtroCondominio = a.condominio_nombre && a.condominio_nombre !== CONDOMINIO_NOMBRE_WHATSAPP;
                 const badgeCondominio = esDeOtroCondominio ? ` <span class="badge bg-info text-dark">${escapeHtml(a.condominio_nombre)}</span>` : "";
