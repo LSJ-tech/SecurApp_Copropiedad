@@ -242,7 +242,7 @@ class SolicitudAcceso(models.Model):
     region = models.CharField(max_length=100, blank=True)
     comuna = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=30)
-    email = models.EmailField(blank=True)
+    email = models.EmailField()
     mensaje = models.TextField(blank=True)
     atendido = models.BooleanField(default=False, help_text="Marca cuando ya contactaste a esta persona.")
     fecha_creacion = models.DateTimeField(auto_now_add=True)

@@ -10,7 +10,6 @@ from .models import REGION_CHOICES, Condominio, SolicitudAcceso, Torre, Unidad
 
 LABEL_TU_NOMBRE = "Tu nombre"
 LABEL_EMAIL = "Email"
-LABEL_EMAIL_OPCIONAL = "Email (opcional)"
 PLACEHOLDER_TELEFONO = "+56 9 ..."
 
 
@@ -378,7 +377,7 @@ class SolicitudAccesoForm(RegionComunaMixin, forms.ModelForm):
             "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": LABEL_TU_NOMBRE}),
             "condominio": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombre del condominio o junta de vecinos"}),
             "telefono": forms.TextInput(attrs={"class": "form-control", "placeholder": PLACEHOLDER_TELEFONO}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": LABEL_EMAIL_OPCIONAL}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "tu@email.cl"}),
             "mensaje": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Cuéntanos un poco de tu comunidad (opcional)"}),
         }
         labels = {

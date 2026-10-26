@@ -2235,7 +2235,7 @@ class SolicitudAccesoRegionComunaTests(TestCase):
     texto libre sin validar."""
 
     def _datos_base(self, **extra):
-        datos = {"nombre": "Rosa", "condominio": "Mi Junta de Vecinos", "telefono": "+56912345678"}
+        datos = {"nombre": "Rosa", "condominio": "Mi Junta de Vecinos", "telefono": "+56912345678", "email": "rosa@example.com"}
         datos.update(extra)
         return datos
 
@@ -2257,6 +2257,13 @@ class SolicitudAccesoRegionComunaTests(TestCase):
 
         form = SolicitudAccesoForm(data=self._datos_base())
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_email_es_obligatorio(self):
+        from .forms import SolicitudAccesoForm
+
+        form = SolicitudAccesoForm(data=self._datos_base(email=""))
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
 
     def test_landing_sin_login_muestra_el_selector_de_region_en_cascada(self):
         r = self.client.get(reverse("inicio"))
