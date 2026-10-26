@@ -68,16 +68,18 @@ export default function PantallaPerfil() {
     <View style={styles.container}>
       {errorGuardado && <Text style={styles.error}>{errorGuardado}</Text>}
       {guardadoOk && <Text style={styles.exito}>Tus datos quedaron actualizados.</Text>}
-      <TextInput style={styles.input} placeholder="Nombre" value={firstName} onChangeText={setFirstName} />
-      <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
-      <TextInput
-        style={styles.input}
-        placeholder="Correo"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-      />
-      <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
+      <View testID="tarjeta-perfil" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]}>
+        <TextInput style={styles.input} placeholder="Nombre" value={firstName} onChangeText={setFirstName} />
+        <TextInput style={styles.input} placeholder="Apellido" value={lastName} onChangeText={setLastName} />
+        <TextInput
+          style={styles.input}
+          placeholder="Correo"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+        />
+        <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
+      </View>
       <Pressable style={styles.boton} onPress={manejarGuardar}>
         <Text style={styles.botonTexto}>Guardar</Text>
       </Pressable>
@@ -99,9 +101,10 @@ export default function PantallaPerfil() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 12 },
-  input: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12 },
+  tarjeta: { borderRadius: 14, padding: 12, gap: 12 },
+  input: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12, backgroundColor: "#fff" },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  error: { color: "#b00020", textAlign: "center" },
+  error: { color: colores.peligro, textAlign: "center" },
   exito: { color: colores.accent, textAlign: "center" },
 });

@@ -7,6 +7,7 @@ import * as Linking from "expo-linking";
 import PantallaPerfil from "@/app/(vecino)/perfil/index";
 import * as authApi from "@/api/auth";
 import { ErrorDeRed, ErrorDeServidor, API_BASE_URL } from "@/api/client";
+import { colores } from "@/theme/colores";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -102,4 +103,16 @@ test("el botón Solicitar eliminación de cuenta abre la página web en el naveg
   await render(<PantallaPerfil />);
   await fireEvent.press(await screen.findByText(/solicitar eliminación de cuenta/i));
   expect(abrirSpy).toHaveBeenCalledWith(`${API_BASE_URL}/mi-perfil/eliminar-cuenta/`);
+});
+
+test("el formulario principal usa el color de fondo informativo", async () => {
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    rol: "residente", condominio: { id: 1, nombre: "X" }, unidad: null,
+    nombre: "Ana Pérez", telefono: "", first_name: "Ana", last_name: "Pérez", email: "ana@test.cl",
+  });
+  await render(<PantallaPerfil />);
+  const tarjeta = await screen.findByTestId("tarjeta-perfil");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })])
+  );
 });
