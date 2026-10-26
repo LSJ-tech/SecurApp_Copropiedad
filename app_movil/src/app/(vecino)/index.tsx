@@ -3,6 +3,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BotonPanico } from "@/components/BotonPanico";
+import { ConfirmacionAnimada } from "@/components/ConfirmacionAnimada";
+import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { SelectorTipoAlerta } from "@/components/SelectorTipoAlerta";
 import { VentanaCancelar } from "@/components/VentanaCancelar";
 import { enviarAlerta } from "@/alertas/enviarAlerta";
@@ -78,6 +80,8 @@ export default function PantallaPanico() {
     }
   }
 
+  const primerNombre = membresia?.first_name ?? membresia?.nombre?.split(" ")[0];
+
   const condominio = membresia?.condominio;
   const unidad = membresia?.unidad;
   const etiquetaUnidadMin = condominio?.etiqueta_unidad?.toLowerCase() ?? "unidad";
@@ -99,6 +103,8 @@ export default function PantallaPanico() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.contenido}>
+        {primerNombre && <Text style={styles.saludo}>Hola, {primerNombre} 👋</Text>}
+
         <View testID="tarjeta-depto" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]}>
           <Text style={styles.tituloTarjeta}>Mi {etiquetaUnidadMin}</Text>
           <Text>{textoUnidad}</Text>
@@ -128,11 +134,14 @@ export default function PantallaPanico() {
           <BotonPanico onConfirmar={manejarConfirmar} tipoSeleccionado={tipo} />
           {error && <Text style={styles.error}>{error}</Text>}
           {alertaEnviadaId !== null && (
-            <VentanaCancelar
-              key={alertaEnviadaId}
-              alertaId={alertaEnviadaId}
-              onCancelada={() => setAlertaEnviadaId(null)}
-            />
+            <>
+              <ConfirmacionAnimada key={`confirmacion-${alertaEnviadaId}`} titulo="Alerta enviada" subtitulo="Vecinos notificados" />
+              <VentanaCancelar
+                key={`cancelar-${alertaEnviadaId}`}
+                alertaId={alertaEnviadaId}
+                onCancelada={() => setAlertaEnviadaId(null)}
+              />
+            </>
           )}
         </View>
 
@@ -144,7 +153,7 @@ export default function PantallaPanico() {
           {errorAlertas ? (
             <Text style={styles.error}>No se pudieron cargar las alertas.</Text>
           ) : alertasActivas.length === 0 ? (
-            <Text>Sin alertas activas.</Text>
+            <EstadoVacioIlustrado testID="estado-vacio-alertas-home" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
           ) : (
             alertasActivas.map((a) => (
               <Pressable key={a.id} onPress={() => router.push(`/alertas/${a.id}`)}>
@@ -171,6 +180,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scroll: { flex: 1 },
   contenido: { padding: 16, gap: 12 },
+  saludo: { fontSize: 18, fontWeight: "700", color: colores.primary },
   tarjeta: { borderRadius: 14, padding: 12, gap: 8 },
   tituloTarjeta: { fontWeight: "700", color: colores.primary },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 12, alignItems: "center" },

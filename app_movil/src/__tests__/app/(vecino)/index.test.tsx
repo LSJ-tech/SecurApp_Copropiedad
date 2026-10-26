@@ -199,9 +199,48 @@ test("muestra las alertas activas y cada una navega a su detalle", async () => {
   expect(mockPush).toHaveBeenCalledWith("/alertas/9");
 });
 
-test("sin alertas activas, muestra 'Sin alertas activas.'", async () => {
+test("sin alertas activas, muestra el estado vacío ilustrado", async () => {
   await render(<PantallaPanico />);
-  await screen.findByText(/sin alertas activas/i);
+  await screen.findByText(/todo tranquilo por ahora/i);
+});
+
+test("saluda por el nombre de pila del residente", async () => {
+  await render(<PantallaPanico />);
+  await screen.findByText(/hola, logan/i);
+});
+
+test("si no hay first_name, usa la primera palabra de nombre", async () => {
+  mockUseAuth.mockReturnValue({
+    membresia: {
+      rol: "residente",
+      condominio: { id: 1, nombre: "Empart", etiqueta_torre: "Block", etiqueta_unidad: "Departamento", genero_unidad: "m" },
+      unidad: null,
+      nombre: "Logan Silva Jara", telefono: "",
+    },
+  });
+  await render(<PantallaPanico />);
+  await screen.findByText(/hola, logan\b/i);
+  expect(screen.queryByText(/silva/i)).toBeNull();
+});
+
+test("mientras la membresía no cargó, no muestra un saludo roto", async () => {
+  mockUseAuth.mockReturnValue({ membresia: null });
+  await render(<PantallaPanico />);
+  expect(screen.queryByText(/hola,/i)).toBeNull();
+});
+
+test("al confirmar el envío, aparece la confirmación animada", async () => {
+  jest.spyOn(enviarAlertaModulo, "enviarAlerta").mockResolvedValue({ id: 1 } as any);
+  await render(<PantallaPanico />);
+  jest.useFakeTimers();
+  const boton = screen.getByTestId("boton-panico");
+  await fireEvent(boton, "pressIn");
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(2000);
+  });
+  jest.useRealTimers();
+  await screen.findByText("Alerta enviada");
+  await screen.findByText("Vecinos notificados");
 });
 
 test("si fallan las tarjetas secundarias (donación/alertas), el botón de pánico sigue funcionando", async () => {
@@ -252,7 +291,7 @@ test("al mandar una alerta propia, la tarjeta de alertas activas se actualiza", 
     .mockResolvedValueOnce([{ id: 5, tipo_display: "Robo", estado: "activa", estado_display: "Activa" } as any]);
   jest.spyOn(enviarAlertaModulo, "enviarAlerta").mockResolvedValue({ id: 5 } as any);
   await render(<PantallaPanico />);
-  await screen.findByText(/sin alertas activas/i);
+  await screen.findByText(/todo tranquilo por ahora/i);
   jest.useFakeTimers();
   await fireEvent(screen.getByTestId("boton-panico"), "pressIn");
   await act(async () => {
@@ -262,11 +301,11 @@ test("al mandar una alerta propia, la tarjeta de alertas activas se actualiza", 
   await screen.findByText(/robo/i);
 });
 
-test("si falla cargar las alertas activas, muestra un error en vez de 'Sin alertas activas.'", async () => {
+test("si falla cargar las alertas activas, muestra un error en vez del estado vacío", async () => {
   jest.spyOn(alertasApi, "listarAlertas").mockRejectedValue(new Error("sin red"));
   await render(<PantallaPanico />);
   await screen.findByText(/no se pudieron cargar las alertas/i);
-  expect(screen.queryByText(/^sin alertas activas\.$/i)).toBeNull();
+  expect(screen.queryByText(/todo tranquilo por ahora/i)).toBeNull();
 });
 
 test("el orden de la pantalla es: mi depto, donación, botón de pánico, alertas activas, invitar", async () => {
