@@ -229,6 +229,24 @@ test("mientras la membresía no cargó, no muestra un saludo roto", async () => 
   expect(screen.queryByText(/hola,/i)).toBeNull();
 });
 
+test("sin conexión, la alerta queda encolada y el residente lo ve -- no queda sin ninguna señal", async () => {
+  // Hallazgo real: enviarAlerta() devuelve {encolada: true} (sin id)
+  // cuando no hay red -- antes manejarConfirmar solo reaccionaba a un
+  // resultado con id, así que un vecino con mala señal mandaba la
+  // alerta y no veía absolutamente nada, ni confirmación ni error.
+  jest.spyOn(enviarAlertaModulo, "enviarAlerta").mockResolvedValue({ encolada: true } as any);
+  await render(<PantallaPanico />);
+  jest.useFakeTimers();
+  const boton = screen.getByTestId("boton-panico");
+  await fireEvent(boton, "pressIn");
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(2000);
+  });
+  jest.useRealTimers();
+  await screen.findByText("Alerta en cola");
+  await screen.findByText("Se enviará apenas vuelva la señal");
+});
+
 test("al confirmar el envío, aparece la confirmación animada", async () => {
   jest.spyOn(enviarAlertaModulo, "enviarAlerta").mockResolvedValue({ id: 1 } as any);
   await render(<PantallaPanico />);

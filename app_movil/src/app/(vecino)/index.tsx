@@ -19,6 +19,12 @@ export default function PantallaPanico() {
   const router = useRouter();
   const [tipo, setTipo] = useState("otro");
   const [alertaEnviadaId, setAlertaEnviadaId] = useState<number | null>(null);
+  // Cuando enviarAlerta() no logra conectar, la encola para reintentar y
+  // devuelve {encolada: true} (sin id) -- antes eso no disparaba ninguna
+  // señal visible, un vecino con mala señal no se enteraba de si su
+  // alerta había hecho algo. La clave (timestamp) remonta
+  // ConfirmacionAnimada en cada intento, igual que alertaEnviadaId.
+  const [claveEncolada, setClaveEncolada] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Ref, no solo estado: la guarda tiene que valer apenas se llama a
   // manejarConfirmar, sin depender de que React ya haya re-renderizado
@@ -69,6 +75,8 @@ export default function PantallaPanico() {
         // que mostrarla sin esperar a la próxima vez que se enfoque la
         // pantalla (hallazgo Important de la revisión final).
         cargarTarjetas();
+      } else {
+        setClaveEncolada(Date.now());
       }
     } catch {
       // No es transitorio (enviarAlerta ya encoló los que sí lo son) --
@@ -142,6 +150,13 @@ export default function PantallaPanico() {
                 onCancelada={() => setAlertaEnviadaId(null)}
               />
             </>
+          )}
+          {claveEncolada !== null && (
+            <ConfirmacionAnimada
+              key={`encolada-${claveEncolada}`}
+              titulo="Alerta en cola"
+              subtitulo="Se enviará apenas vuelva la señal"
+            />
           )}
         </View>
 
