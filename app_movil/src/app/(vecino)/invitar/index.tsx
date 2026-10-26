@@ -31,18 +31,21 @@ export default function InvitarScreen() {
 
   return (
     <View style={styles.container}>
-      {mensaje && <Text style={styles.mensaje}>{mensaje}</Text>}
-      <Pressable style={styles.boton} onPress={manejarCompartir}>
-        <Text style={styles.botonTexto}>Compartir</Text>
-      </Pressable>
+      <View testID="tarjeta-invitar" style={[styles.tarjeta, { backgroundColor: colores.fondoApoyo }]}>
+        {mensaje && <Text style={styles.mensaje}>{mensaje}</Text>}
+        <Pressable style={styles.boton} onPress={manejarCompartir}>
+          <Text style={styles.botonTexto}>Compartir</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 16 },
+  tarjeta: { borderRadius: 14, padding: 12, gap: 12 },
   mensaje: { color: colores.primary },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  error: { color: "#b00020", textAlign: "center" },
+  error: { color: colores.peligro, textAlign: "center" },
 });
