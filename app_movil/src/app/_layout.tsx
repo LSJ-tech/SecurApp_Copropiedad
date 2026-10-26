@@ -1,5 +1,8 @@
+import "@/monitoreo/sentry";
+
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
+import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 
@@ -60,7 +63,7 @@ function GuardDeRutas() {
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   useEffect(() => {
     configurarManejadorDeNotificaciones();
   }, []);
@@ -71,3 +74,5 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);
