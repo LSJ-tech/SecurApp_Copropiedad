@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react-native";
 import ListaAvisosScreen from "@/app/(vecino)/avisos/index";
 import * as avisosApi from "@/api/avisos";
 import { ErrorDeRed } from "@/api/client";
+import { colores } from "@/theme/colores";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -36,4 +37,15 @@ test("si falla la carga, muestra un error en vez de un rechazo sin manejar", asy
   jest.spyOn(avisosApi, "listarAvisos").mockRejectedValue(new ErrorDeRed("sin red"));
   await render(<ListaAvisosScreen />);
   await screen.findByText(/no se pudieron cargar los avisos/i);
+});
+
+test("cada aviso de la lista no lleva un color de fondo sólido", async () => {
+  jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([
+    { id: 1, titulo: "A", cuerpo: "...", fecha_creacion: "2026-01-01T00:00:00Z", autor_nombre: null, torre_nombre: null, leido_por_count: null, total_destinatarios: null },
+  ]);
+  jest.spyOn(avisosApi, "marcarLeido").mockResolvedValue({} as any);
+  await render(<ListaAvisosScreen />);
+  const fila = await screen.findByTestId("fila-aviso-0");
+  const estilo = [fila.props.style].flat();
+  expect(estilo).not.toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })]));
 });

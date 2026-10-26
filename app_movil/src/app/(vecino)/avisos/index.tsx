@@ -50,7 +50,7 @@ export default function ListaAvisosScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
 
       {membresia?.rol === "delegado" && (
-        <View style={styles.formulario}>
+        <View testID="tarjeta-formulario-aviso" style={[styles.formulario, { backgroundColor: colores.fondoInfo }]}>
           <TextInput
             style={styles.input}
             placeholder="Título"
@@ -73,8 +73,8 @@ export default function ListaAvisosScreen() {
       <FlatList
         data={avisos}
         keyExtractor={(a) => String(a.id)}
-        renderItem={({ item }) => (
-          <View style={styles.tarjeta}>
+        renderItem={({ item, index }) => (
+          <View testID={`fila-aviso-${index}`} style={styles.tarjeta}>
             <Text style={styles.titulo}>{item.titulo}</Text>
             <Text style={styles.meta}>
               {new Date(item.fecha_creacion).toLocaleString()} — {item.autor_nombre ?? "DevQuad"}
@@ -89,12 +89,14 @@ export default function ListaAvisosScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  formulario: { gap: 8, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12 },
+  formulario: { gap: 8, marginBottom: 16, borderRadius: 14, padding: 12 },
+  input: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12, backgroundColor: "#fff" },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 12, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  tarjeta: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  // Acento (borde lateral), nunca relleno completo -- un historial largo
+  // de avisos no debe volverse muchos bloques de color repetidos (D-03).
+  tarjeta: { paddingVertical: 12, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: colores.primary, marginBottom: 6 },
   titulo: { fontWeight: "700", color: colores.primary },
   meta: { fontSize: 12, color: colores.slate, marginBottom: 4 },
-  error: { color: "#b00020", textAlign: "center", marginBottom: 8 },
+  error: { color: colores.peligro, textAlign: "center", marginBottom: 8 },
 });

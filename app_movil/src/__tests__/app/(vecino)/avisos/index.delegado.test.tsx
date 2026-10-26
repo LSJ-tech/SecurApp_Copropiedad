@@ -1,8 +1,9 @@
 jest.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ membresia: { rol: "delegado" } }) }));
 
-import { render, fireEvent, screen } from "@testing-library/react-native";
+import { act, render, fireEvent, screen } from "@testing-library/react-native";
 import ListaAvisosScreen from "@/app/(vecino)/avisos/index";
 import * as avisosApi from "@/api/avisos";
+import { colores } from "@/theme/colores";
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -29,9 +30,29 @@ test("dos toques seguidos en Publicar aviso no mandan el aviso dos veces (hallaz
   await fireEvent.changeText(screen.getByPlaceholderText(/título/i), "Corte de agua");
   await fireEvent.changeText(screen.getByPlaceholderText(/mensaje/i), "Mañana 9-12h");
   const boton = screen.getByText(/publicar aviso/i);
-  const primeraPromesa = fireEvent.press(boton);
-  const segundaPromesa = fireEvent.press(boton);
-  resolverPrimera({ id: 9 });
-  await Promise.all([primeraPromesa, segundaPromesa]);
+  // fireEvent.press no espera a que termine el handler async completo --
+  // dos llamadas sueltas (sin envolver) dejaban la continuación de
+  // manejarPublicar (el finally que libera publicandoRef) pendiente al
+  // terminar este test, y disparaba durante el siguiente (mismo tipo de
+  // hallazgo ya visto con fireEvent.changeText sin await en
+  // numeros-emergencia) -- un solo act() alrededor de las dos pulsaciones
+  // fuerza a asentar todo antes de seguir.
+  await act(async () => {
+    fireEvent.press(boton);
+    fireEvent.press(boton);
+    resolverPrimera({ id: 9 });
+    await Promise.resolve();
+    await Promise.resolve();
+  });
   expect(crearSpy).toHaveBeenCalledTimes(1);
+});
+
+test("el formulario de publicar usa el color de fondo informativo", async () => {
+  jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([]);
+  await render(<ListaAvisosScreen />);
+  await screen.findByText(/publicar aviso/i);
+  const tarjeta = screen.getByTestId("tarjeta-formulario-aviso");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })])
+  );
 });
