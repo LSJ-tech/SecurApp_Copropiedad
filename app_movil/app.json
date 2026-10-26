@@ -51,6 +51,12 @@
         "projectId": "4ad27d57-2a6b-4e23-8a5b-b77db8b30f0b"
       }
     },
-    "owner": "backdraft"
+    "owner": "backdraft",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4ad27d57-2a6b-4e23-8a5b-b77db8b30f0b"
+    }
   }
 }
