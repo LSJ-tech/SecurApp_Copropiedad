@@ -2103,6 +2103,17 @@ class PaginasPublicasRenderizanTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Números de emergencia")
 
+    def test_landing_el_formulario_publico_enlaza_la_politica_de_privacidad(self):
+        # Hallazgo de la auditoría de checklist (26-10-2026): el único
+        # link a /privacidad/ en toda la landing estaba en el footer
+        # general -- el formulario público de contacto (el que de verdad
+        # recolecta datos personales) no tenía ninguno al lado.
+        r = self.client.get(reverse("inicio"))
+        contenido = r.content.decode()
+        inicio_form = contenido.index('id="solicitar"')
+        fin_form = contenido.index("</form>", inicio_form)
+        self.assertIn(reverse("privacidad"), contenido[inicio_form:fin_form])
+
     def test_landing_respeta_prefers_reduced_motion(self):
         """Hallazgo real de accesibilidad: .hero-badge y .hero-badge-pulso
         tienen animaciones infinitas (flotar, pulso-anillo) sin ningún
@@ -2118,6 +2129,15 @@ class PaginasPublicasRenderizanTests(TestCase):
     def test_privacidad_renderiza(self):
         r = self.client.get(reverse("privacidad"))
         self.assertEqual(r.status_code, 200)
+
+    def test_privacidad_menciona_los_recursos_externos_que_carga_la_pagina(self):
+        # Hallazgo de la auditoría de checklist (26-10-2026): la página
+        # carga Bootstrap/íconos desde jsdelivr y tipografías desde
+        # Google Fonts -- ninguno estaba nombrado en la política.
+        r = self.client.get(reverse("privacidad"))
+        contenido = r.content.decode()
+        self.assertIn("jsdelivr", contenido)
+        self.assertIn("Google Fonts", contenido)
 
     def test_privacidad_si_afirma_que_la_app_movil_entrega_notificaciones(self):
         """Lo contrario del hallazgo anterior (guardado hasta el
