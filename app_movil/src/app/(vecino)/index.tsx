@@ -190,7 +190,6 @@ export default function PantallaPanico() {
         </View>
 
         <View style={styles.bloquePanico}>
-          <SelectorTipoAlerta valor={tipo} onCambiar={setTipo} />
           <BotonPanico onConfirmar={manejarConfirmar} tipoSeleccionado={tipo} />
           {error && <Text style={styles.error}>{error}</Text>}
           {alertaEnviadaId !== null && (
@@ -217,6 +216,7 @@ export default function PantallaPanico() {
               subtitulo="Vecinos notificados"
             />
           )}
+          <SelectorTipoAlerta valor={tipo} onCambiar={setTipo} />
         </View>
 
         <View

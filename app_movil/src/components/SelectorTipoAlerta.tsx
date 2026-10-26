@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { TIPOS_ALERTA } from "@/alertas/tipos";
@@ -12,78 +11,45 @@ type Props = {
 };
 
 export function SelectorTipoAlerta({ valor, onCambiar }: Readonly<Props>) {
-  const [abierto, setAbierto] = useState(false);
-  const actual = TIPOS_ALERTA.find((t) => t.valor === valor);
-
   return (
     <View style={styles.contenedor}>
       <Text style={styles.etiqueta}>Tipo de emergencia</Text>
-      <Pressable
-        testID="selector-tipo-abrir"
-        style={styles.control}
-        onPress={() => setAbierto(true)}
-        accessibilityRole="button"
-        accessibilityLabel={`Tipo de emergencia: ${actual?.etiqueta ?? "Otro"}. Toca para cambiar.`}
-      >
-        <Text style={styles.controlTexto}>{actual?.etiqueta ?? "Otro"}</Text>
-        <Text style={styles.flecha}>▾</Text>
-      </Pressable>
-      <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
-        <Pressable style={styles.fondo} onPress={() => setAbierto(false)}>
-          <View style={styles.lista}>
-            <FlatList
-              testID="grilla-tipos-alerta"
-              data={TIPOS_ALERTA}
-              numColumns={3}
-              keyExtractor={(item) => item.valor}
-              renderItem={({ item }) => {
-                const seleccionado = item.valor === valor;
-                return (
-                  <Pressable
-                    testID={`opcion-tipo-${item.valor}`}
-                    style={[styles.opcion, seleccionado && styles.opcionSeleccionada]}
-                    onPress={() => {
-                      onCambiar(item.valor);
-                      setAbierto(false);
-                    }}
-                  >
-                    <Ionicons
-                      testID={`icono-tipo-${item.valor}`}
-                      name={ICONO_POR_TIPO[item.valor]}
-                      size={24}
-                      color={seleccionado ? "#fff" : colores.peligro}
-                    />
-                    <Text style={[styles.opcionTexto, seleccionado && styles.opcionTextoSeleccionado]}>
-                      {item.etiqueta}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
-          </View>
-        </Pressable>
-      </Modal>
+      <FlatList
+        testID="grilla-tipos-alerta"
+        data={TIPOS_ALERTA}
+        numColumns={3}
+        scrollEnabled={false}
+        keyExtractor={(item) => item.valor}
+        renderItem={({ item }) => {
+          const seleccionado = item.valor === valor;
+          return (
+            <Pressable
+              testID={`opcion-tipo-${item.valor}`}
+              style={[styles.opcion, seleccionado && styles.opcionSeleccionada]}
+              onPress={() => onCambiar(item.valor)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.etiqueta}${seleccionado ? ", seleccionado" : ""}`}
+            >
+              <Ionicons
+                testID={`icono-tipo-${item.valor}`}
+                name={ICONO_POR_TIPO[item.valor]}
+                size={24}
+                color={seleccionado ? "#fff" : colores.peligro}
+              />
+              <Text style={[styles.opcionTexto, seleccionado && styles.opcionTextoSeleccionado]}>
+                {item.etiqueta}
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  contenedor: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
-  etiqueta: { fontSize: 12, color: colores.secondary, fontWeight: "600" },
-  control: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: colores.slate,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  controlTexto: { color: colores.primary, fontWeight: "600" },
-  flecha: { color: colores.primary },
-  fondo: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", padding: 24 },
-  lista: { backgroundColor: "#fff", borderRadius: 12, maxHeight: "70%", padding: 10 },
+  contenedor: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  etiqueta: { fontSize: 12, color: colores.secondary, fontWeight: "600", textAlign: "center" },
   opcion: {
     flex: 1 / 3,
     margin: 4,

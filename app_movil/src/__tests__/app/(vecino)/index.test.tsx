@@ -26,7 +26,7 @@ jest.mock("@/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-import { act, cleanup, render, fireEvent, screen } from "@testing-library/react-native";
+import { act, cleanup, render, fireEvent, screen, within } from "@testing-library/react-native";
 import PantallaPanico from "@/app/(vecino)/index";
 import * as enviarAlertaModulo from "@/alertas/enviarAlerta";
 import * as colaEnvioModulo from "@/alertas/colaEnvio";
@@ -196,7 +196,8 @@ test("muestra las alertas activas y cada una navega a su detalle", async () => {
     { id: 9, tipo_display: "Robo", estado: "activa", estado_display: "Activa" } as any,
   ]);
   await render(<PantallaPanico />);
-  await fireEvent.press(await screen.findByText(/robo/i));
+  const tarjetaAlertas = await screen.findByTestId("tarjeta-alertas");
+  await fireEvent.press(await within(tarjetaAlertas).findByText(/robo/i));
   expect(mockPush).toHaveBeenCalledWith("/alertas/9");
 });
 
@@ -345,7 +346,8 @@ test("al mandar una alerta propia, la tarjeta de alertas activas se actualiza", 
     await jest.advanceTimersByTimeAsync(2000);
   });
   jest.useRealTimers();
-  await screen.findByText(/robo/i);
+  const tarjetaAlertas = await screen.findByTestId("tarjeta-alertas");
+  await within(tarjetaAlertas).findByText(/robo/i);
 });
 
 test("si falla cargar las alertas activas, muestra un error en vez del estado vacío", async () => {
@@ -369,15 +371,18 @@ test("el orden de la pantalla es: mi depto, donación, botón de pánico, alerta
   expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
 });
 
-test("el selector de tipo y el botón de pánico quedan juntos, sin otra tarjeta en el medio", async () => {
+test("el botón de pánico y el selector de tipo quedan juntos, sin otra tarjeta en el medio -- el botón primero para que quede visible sin scroll", async () => {
+  // Hallazgo de la revisión: con el selector antes, la grilla de 12
+  // tipos (ahora siempre visible, ver SelectorTipoAlerta) empujaba el
+  // botón de pánico fuera de la vista inicial en una pantalla chica.
   await render(<PantallaPanico />);
   await screen.findByText(/invitar vecinos/i);
   const texto = JSON.stringify(screen.toJSON());
-  const posSelector = texto.indexOf("Tipo de emergencia");
   const posBoton = texto.indexOf("Mantén presionado");
+  const posSelector = texto.indexOf("Tipo de emergencia");
   const posAlertas = texto.indexOf("Alertas activas");
-  expect(posSelector).toBeLessThan(posBoton);
-  expect(posBoton).toBeLessThan(posAlertas);
+  expect(posBoton).toBeLessThan(posSelector);
+  expect(posSelector).toBeLessThan(posAlertas);
 });
 
 test("la tarjeta de mi depto usa el color de fondo informativo", async () => {
