@@ -1,6 +1,6 @@
 jest.mock("./client");
 
-import { cancelarDonacion, crearDonacion, obtenerMiDonacion } from "./donaciones";
+import { cancelarDonacion, crearDonacion, formatearMontoDonacion, obtenerMiDonacion } from "./donaciones";
 import { apiFetch } from "./client";
 
 afterEach(() => {
@@ -26,4 +26,22 @@ test("cancelarDonacion pide POST /api/v1/pagos/donar/cancelar/ sin body", async 
   (apiFetch as jest.Mock).mockResolvedValue({ detail: "Listo." });
   await cancelarDonacion();
   expect(apiFetch).toHaveBeenCalledWith("/api/v1/pagos/donar/cancelar/", { method: "POST" });
+});
+
+describe("formatearMontoDonacion", () => {
+  test("monto de un dígito, sin separador", () => {
+    expect(formatearMontoDonacion("2000.00")).toBe("2.000");
+  });
+
+  test("menos de mil, sin separador", () => {
+    expect(formatearMontoDonacion("500.00")).toBe("500");
+  });
+
+  test("millones, con dos separadores", () => {
+    expect(formatearMontoDonacion("1234567.00")).toBe("1.234.567");
+  });
+
+  test("redondea los decimales", () => {
+    expect(formatearMontoDonacion("1999.60")).toBe("2.000");
+  });
 });

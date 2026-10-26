@@ -26,6 +26,47 @@ function Fila({
   );
 }
 
+// Extraído del ternario anidado error ? null : lista.length === 0 ? (...) :
+// (...) que tenía Sonar (typescript:S3358) -- de paso elimina la
+// duplicación entre Activas e Historial, que ya eran casi idénticos.
+function SeccionAlertas({
+  lista,
+  hayError,
+  variante,
+  testIdTarjeta,
+  testIdEstadoVacio,
+  mensajeVacio,
+  fondoVacio,
+  onPress,
+}: Readonly<{
+  lista: AlertaOut[];
+  hayError: boolean;
+  variante: VarianteFila;
+  testIdTarjeta: string;
+  testIdEstadoVacio: string;
+  mensajeVacio: string;
+  fondoVacio: string;
+  onPress: (item: AlertaOut) => void;
+}>) {
+  if (hayError) return null;
+  if (lista.length === 0) {
+    return (
+      <View testID={testIdTarjeta} style={[styles.tarjeta, { backgroundColor: fondoVacio }]}>
+        <EstadoVacioIlustrado testID={testIdEstadoVacio} icono="shield-checkmark-outline" mensaje={mensajeVacio} />
+      </View>
+    );
+  }
+  return (
+    <FlatList
+      data={lista}
+      keyExtractor={(a) => String(a.id)}
+      renderItem={({ item, index }) => (
+        <Fila item={item} variante={variante} indice={index} onPress={() => onPress(item)} />
+      )}
+    />
+  );
+}
+
 export default function ListaAlertasScreen() {
   const router = useRouter();
   const [activas, setActivas] = useState<AlertaOut[]>([]);
@@ -47,33 +88,27 @@ export default function ListaAlertasScreen() {
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.seccion}>Activas</Text>
-      {error ? null : activas.length === 0 ? (
-        <View testID="tarjeta-sin-activas" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
-          <EstadoVacioIlustrado testID="estado-vacio-alertas-activas" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
-        </View>
-      ) : (
-        <FlatList
-          data={activas}
-          keyExtractor={(a) => String(a.id)}
-          renderItem={({ item, index }) => (
-            <Fila item={item} variante="activa" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
-          )}
-        />
-      )}
+      <SeccionAlertas
+        lista={activas}
+        hayError={!!error}
+        variante="activa"
+        testIdTarjeta="tarjeta-sin-activas"
+        testIdEstadoVacio="estado-vacio-alertas-activas"
+        mensajeVacio="Todo tranquilo por ahora"
+        fondoVacio={colores.fondoPositivo}
+        onPress={(item) => router.push(`/alertas/${item.id}`)}
+      />
       <Text style={styles.seccion}>Historial</Text>
-      {error ? null : historial.length === 0 ? (
-        <View testID="tarjeta-sin-historial" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]}>
-          <EstadoVacioIlustrado testID="estado-vacio-alertas-historial" icono="shield-checkmark-outline" mensaje="Sin alertas resueltas en las últimas 24 h" />
-        </View>
-      ) : (
-        <FlatList
-          data={historial}
-          keyExtractor={(a) => String(a.id)}
-          renderItem={({ item, index }) => (
-            <Fila item={item} variante="historial" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
-          )}
-        />
-      )}
+      <SeccionAlertas
+        lista={historial}
+        hayError={!!error}
+        variante="historial"
+        testIdTarjeta="tarjeta-sin-historial"
+        testIdEstadoVacio="estado-vacio-alertas-historial"
+        mensajeVacio="Sin alertas resueltas en las últimas 24 h"
+        fondoVacio={colores.fondoInfo}
+        onPress={(item) => router.push(`/alertas/${item.id}`)}
+      />
     </View>
   );
 }

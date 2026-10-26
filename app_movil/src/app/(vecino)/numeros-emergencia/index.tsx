@@ -13,6 +13,12 @@ import { primerMensajeDeError } from "@/api/erroresFormulario";
 import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { colores } from "@/theme/colores";
 
+// No usa nada del estado del componente -- vivía adentro y se
+// recreaba en cada render sin necesidad (Sonar typescript:S7721).
+async function manejarLlamar(telefonoNumero: string) {
+  await Linking.openURL(`tel:${telefonoNumero.replace(/\s+/g, "")}`);
+}
+
 export default function NumerosEmergenciaScreen() {
   const [numeros, setNumeros] = useState<NumeroEmergenciaOut[] | null>(null);
   const [misPropuestas, setMisPropuestas] = useState<PropuestaOut[]>([]);
@@ -38,10 +44,6 @@ export default function NumerosEmergenciaScreen() {
   }
 
   useEffect(cargar, []);
-
-  async function manejarLlamar(telefonoNumero: string) {
-    await Linking.openURL(`tel:${telefonoNumero.replace(/\s+/g, "")}`);
-  }
 
   async function manejarEnviarPropuesta() {
     setErrorFormulario(null);

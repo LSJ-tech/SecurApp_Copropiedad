@@ -15,6 +15,37 @@ import { obtenerMiDonacion, formatearMontoDonacion, ESTADOS_DONACION_CANCELABLES
 import { listarAlertas, AlertaOut } from "@/api/alertas";
 import { colores } from "@/theme/colores";
 
+// Extraído del ternario anidado que tenía Sonar (typescript:S3358).
+function colorTarjetaAlertasDe(errorAlertas: boolean, hayAlertasActivas: boolean): string {
+  if (errorAlertas) return colores.fondoInfo;
+  if (hayAlertasActivas) return colores.fondoPeligro;
+  return colores.fondoPositivo;
+}
+
+// Mismo motivo -- antes era errorAlertas ? (...) : alertasActivas.length
+// === 0 ? (...) : (...) dentro del JSX.
+function ContenidoTarjetaAlertas({
+  errorAlertas,
+  alertasActivas,
+  onPress,
+}: Readonly<{ errorAlertas: boolean; alertasActivas: AlertaOut[]; onPress: (id: number) => void }>) {
+  if (errorAlertas) {
+    return <Text style={styles.error}>No se pudieron cargar las alertas.</Text>;
+  }
+  if (alertasActivas.length === 0) {
+    return <EstadoVacioIlustrado testID="estado-vacio-alertas-home" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />;
+  }
+  return (
+    <>
+      {alertasActivas.map((a) => (
+        <Pressable key={a.id} onPress={() => onPress(a.id)}>
+          <Text>{a.tipo_display}</Text>
+        </Pressable>
+      ))}
+    </>
+  );
+}
+
 export default function PantallaPanico() {
   const { membresia } = useAuth();
   const router = useRouter();
@@ -121,11 +152,7 @@ export default function PantallaPanico() {
   // una real) -- hallazgo Important de la revisión final: antes
   // !errorAlertas la dejaba en verde igual, contradiciendo el mensaje de
   // error que está justo al lado.
-  const colorTarjetaAlertas = errorAlertas
-    ? colores.fondoInfo
-    : hayAlertasActivas
-      ? colores.fondoPeligro
-      : colores.fondoPositivo;
+  const colorTarjetaAlertas = colorTarjetaAlertasDe(errorAlertas, hayAlertasActivas);
 
   return (
     <View style={styles.container}>
@@ -191,17 +218,11 @@ export default function PantallaPanico() {
           style={[styles.tarjeta, { backgroundColor: colorTarjetaAlertas }]}
         >
           <Text style={styles.tituloTarjeta}>Alertas activas</Text>
-          {errorAlertas ? (
-            <Text style={styles.error}>No se pudieron cargar las alertas.</Text>
-          ) : alertasActivas.length === 0 ? (
-            <EstadoVacioIlustrado testID="estado-vacio-alertas-home" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
-          ) : (
-            alertasActivas.map((a) => (
-              <Pressable key={a.id} onPress={() => router.push(`/alertas/${a.id}`)}>
-                <Text>{a.tipo_display}</Text>
-              </Pressable>
-            ))
-          )}
+          <ContenidoTarjetaAlertas
+            errorAlertas={errorAlertas}
+            alertasActivas={alertasActivas}
+            onPress={(id) => router.push(`/alertas/${id}`)}
+          />
         </View>
 
         <Pressable testID="tarjeta-invitar" style={[styles.tarjeta, { backgroundColor: colores.fondoApoyo }]} onPress={() => router.push("/invitar")}>

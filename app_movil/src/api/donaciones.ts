@@ -2,9 +2,15 @@ import { apiFetch } from "./client";
 
 export type Donacion = { estado: string; monto: string; fecha_creacion: string };
 
+// A diferencia de Donacion (DonacionActualSerializer, sin id -- es la
+// suscripción activa, un solo objeto), cada Pago del historial sí tiene
+// id (PagoResumenSerializer) -- lo necesita la app para usarlo como key
+// de lista en vez del índice del array (Sonar typescript:S6479).
+export type Pago = Donacion & { id: number };
+
 export type MiDonacion = {
   donacion_actual: Donacion | null;
-  pagos: Donacion[];
+  pagos: Pago[];
   total_donado: string;
   cantidad_aportes: number;
 };
@@ -34,8 +40,17 @@ export const ESTADOS_DONACION_CANCELABLES = new Set(["pendiente", "autorizada"])
 
 // Monto sin decimales, con "." como separador de miles -- evita depender
 // de Intl/toLocaleString, que en Hermes (runtime real del teléfono) no
-// siempre trae datos ICU completos.
+// siempre trae datos ICU completos. Agrupa de a 3 dígitos por loop (no
+// por regex) -- la regex anterior, /\B(?=(\d{3})+(?!\d))/g, tenía
+// backtracking super-lineal (Sonar typescript:S8786).
 export function formatearMontoDonacion(valorStr: string): string {
-  const entero = Math.round(parseFloat(valorStr)).toString();
-  return entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const entero = Math.round(Number.parseFloat(valorStr)).toString();
+  const grupos: string[] = [];
+  let resto = entero;
+  while (resto.length > 3) {
+    grupos.unshift(resto.slice(-3));
+    resto = resto.slice(0, -3);
+  }
+  grupos.unshift(resto);
+  return grupos.join(".");
 }
