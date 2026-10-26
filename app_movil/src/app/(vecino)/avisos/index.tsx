@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 
 import { crearAviso, listarAvisos, marcarLeido, AvisoOut } from "@/api/avisos";
 import { useAuth } from "@/auth/AuthContext";
+import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { colores } from "@/theme/colores";
 
 export default function ListaAvisosScreen() {
@@ -82,6 +83,11 @@ export default function ListaAvisosScreen() {
             <Text>{item.cuerpo}</Text>
           </View>
         )}
+        ListEmptyComponent={
+          <View testID="tarjeta-sin-avisos" style={[styles.tarjetaVacia, { backgroundColor: colores.fondoInfo }]}>
+            <EstadoVacioIlustrado testID="estado-vacio-avisos" icono="newspaper-outline" mensaje="Todavía no hay avisos" />
+          </View>
+        }
       />
     </View>
   );
@@ -96,6 +102,7 @@ const styles = StyleSheet.create({
   // Acento (borde lateral), nunca relleno completo -- un historial largo
   // de avisos no debe volverse muchos bloques de color repetidos (D-03).
   tarjeta: { paddingVertical: 12, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: colores.primary, marginBottom: 6 },
+  tarjetaVacia: { borderRadius: 14, padding: 12 },
   titulo: { fontWeight: "700", color: colores.primary },
   meta: { fontSize: 12, color: colores.slate, marginBottom: 4 },
   error: { color: colores.peligro, textAlign: "center", marginBottom: 8 },

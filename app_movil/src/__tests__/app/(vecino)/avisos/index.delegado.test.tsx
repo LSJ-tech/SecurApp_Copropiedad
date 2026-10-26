@@ -47,6 +47,13 @@ test("dos toques seguidos en Publicar aviso no mandan el aviso dos veces (hallaz
   expect(crearSpy).toHaveBeenCalledTimes(1);
 });
 
+test("delegado sin avisos igual ve el formulario de publicar", async () => {
+  jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([]);
+  await render(<ListaAvisosScreen />);
+  await screen.findByTestId("tarjeta-formulario-aviso");
+  await screen.findByTestId("tarjeta-sin-avisos");
+});
+
 test("el formulario de publicar usa el color de fondo informativo", async () => {
   jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([]);
   await render(<ListaAvisosScreen />);

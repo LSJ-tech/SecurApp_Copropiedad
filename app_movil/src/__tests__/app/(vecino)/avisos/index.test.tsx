@@ -39,6 +39,16 @@ test("si falla la carga, muestra un error en vez de un rechazo sin manejar", asy
   await screen.findByText(/no se pudieron cargar los avisos/i);
 });
 
+test("sin avisos, muestra el estado vacío ilustrado en vez de quedar en blanco", async () => {
+  jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([]);
+  await render(<ListaAvisosScreen />);
+  const tarjeta = await screen.findByTestId("tarjeta-sin-avisos");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })])
+  );
+  await screen.findByText(/todavía no hay avisos/i);
+});
+
 test("cada aviso de la lista no lleva un color de fondo sólido", async () => {
   jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([
     { id: 1, titulo: "A", cuerpo: "...", fecha_creacion: "2026-01-01T00:00:00Z", autor_nombre: null, torre_nombre: null, leido_por_count: null, total_destinatarios: null },
