@@ -10,6 +10,7 @@ import {
   PropuestaOut,
 } from "@/api/numerosEmergencia";
 import { primerMensajeDeError } from "@/api/erroresFormulario";
+import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { colores } from "@/theme/colores";
 
 export default function NumerosEmergenciaScreen() {
@@ -77,17 +78,23 @@ export default function NumerosEmergenciaScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       <Text style={styles.titulo}>Números de emergencia</Text>
-      {numeros.map((numero, indice) => (
-        <Pressable
-          key={numero.id}
-          testID={`fila-numero-${indice}`}
-          style={styles.fila}
-          onPress={() => manejarLlamar(numero.telefono)}
-        >
-          <Text style={styles.nombreNumero}>{numero.nombre}</Text>
-          <Text style={styles.detalleNumero}>{numero.telefono}</Text>
-        </Pressable>
-      ))}
+      {numeros.length === 0 ? (
+        <View testID="tarjeta-sin-numeros" style={[styles.tarjetaVacia, { backgroundColor: colores.fondoInfo }]}>
+          <EstadoVacioIlustrado testID="estado-vacio-numeros" icono="call-outline" mensaje="Todavía no hay números cargados" />
+        </View>
+      ) : (
+        numeros.map((numero, indice) => (
+          <Pressable
+            key={numero.id}
+            testID={`fila-numero-${indice}`}
+            style={styles.fila}
+            onPress={() => manejarLlamar(numero.telefono)}
+          >
+            <Text style={styles.nombreNumero}>{numero.nombre}</Text>
+            <Text style={styles.detalleNumero}>{numero.telefono}</Text>
+          </Pressable>
+        ))
+      )}
 
       {misPropuestas.length > 0 && (
         <>
@@ -136,6 +143,7 @@ const styles = StyleSheet.create({
   // números puede crecer (nacionales + los que agregue cada condominio),
   // no debe volverse muchos bloques de color repetidos (D-03).
   fila: { borderLeftWidth: 3, borderLeftColor: colores.primary, borderRadius: 4, padding: 12 },
+  tarjetaVacia: { borderRadius: 14, padding: 12 },
   nombreNumero: { fontWeight: "600" },
   detalleNumero: { color: colores.secondary },
   formulario: { gap: 12 },

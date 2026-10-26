@@ -36,6 +36,27 @@ test("al tocar un número, llama con tel: limpiando los espacios del teléfono",
   expect(abrirSpy).toHaveBeenCalledWith("tel:6003607777");
 });
 
+test("sin números cargados, muestra el estado vacío ilustrado en vez de quedar en blanco", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
+  await render(<NumerosEmergenciaScreen />);
+  const tarjeta = await screen.findByTestId("tarjeta-sin-numeros");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })])
+  );
+  await screen.findByText(/todavía no hay números cargados/i);
+});
+
+test("sin números pero con una propuesta propia, se ven ambas cosas", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([
+    { id: 1, categoria: "electricidad", categoria_display: "Electricidad", nombre: "Plomero", telefono: "900 000 000", nota: "", estado: "pendiente", estado_display: "Pendiente", fecha_creacion: "2026-10-01T00:00:00Z" },
+  ]);
+  await render(<NumerosEmergenciaScreen />);
+  await screen.findByTestId("tarjeta-sin-numeros");
+  await screen.findByText(/plomero/i);
+});
+
 test("muestra las propuestas propias con su estado", async () => {
   jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
   jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([
