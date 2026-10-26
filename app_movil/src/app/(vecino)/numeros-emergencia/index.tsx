@@ -124,7 +124,13 @@ export default function NumerosEmergenciaScreen() {
             onChangeText={setCategoria}
           />
           <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />
-          <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
+          <TextInput
+            style={styles.input}
+            placeholder="Teléfono"
+            value={telefono}
+            onChangeText={setTelefono}
+            keyboardType="phone-pad"
+          />
           <TextInput style={styles.input} placeholder="Nota (opcional)" value={nota} onChangeText={setNota} />
           <Pressable style={styles.boton} onPress={manejarEnviarPropuesta} disabled={enviando}>
             <Text style={styles.botonTexto}>Enviar</Text>

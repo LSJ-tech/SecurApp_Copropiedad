@@ -110,6 +110,14 @@ test("si falla la carga, muestra error y 'Reintentar'", async () => {
   await fireEvent.press(screen.getByText(/reintentar/i));
 });
 
+test("el campo de teléfono de la propuesta abre el teclado numérico", async () => {
+  jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([]);
+  jest.spyOn(numerosApi, "listarMisPropuestas").mockResolvedValue([]);
+  await render(<NumerosEmergenciaScreen />);
+  await fireEvent.press(await screen.findByText(/proponer un número/i));
+  expect(screen.getByPlaceholderText(/teléfono/i).props.keyboardType).toBe("phone-pad");
+});
+
 test("cada número de la lista no lleva un color de fondo sólido", async () => {
   jest.spyOn(numerosApi, "listarNumerosEmergencia").mockResolvedValue([
     { id: 1, categoria: "bomberos", categoria_display: "Bomberos", nombre: "Bomberos", telefono: "132", es_nacional: true },

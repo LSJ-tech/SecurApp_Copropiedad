@@ -36,6 +36,13 @@ test("el usuario y la contraseña generados siguen visibles aunque la lista se r
   expect(screen.getByText(/xYz789/)).toBeTruthy();
 });
 
+test("el campo de correo abre el teclado de email", async () => {
+  jest.spyOn(miembrosApi, "listarMiembros").mockResolvedValue([]);
+  await render(<MiembrosScreen />);
+  await screen.findByPlaceholderText("Correo");
+  expect(screen.getByPlaceholderText("Correo").props.keyboardType).toBe("email-address");
+});
+
 test("el selector de unidad muestra la torre para distinguir numeros duplicados entre torres distintas (hallazgo Important)", async () => {
   jest.spyOn(torresApi, "listarTorres").mockResolvedValue([
     { id: 1, nombre: "Torre A" },

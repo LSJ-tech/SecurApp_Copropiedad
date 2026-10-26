@@ -85,6 +85,9 @@ export default function MiembrosScreen() {
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
         />
         <View style={styles.roles}>
           {ROLES.map((item) => (
