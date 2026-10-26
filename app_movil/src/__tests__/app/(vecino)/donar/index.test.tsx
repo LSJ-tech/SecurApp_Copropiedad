@@ -4,6 +4,7 @@ import * as Linking from "expo-linking";
 import DonarScreen from "@/app/(vecino)/donar/index";
 import * as donacionesApi from "@/api/donaciones";
 import { ErrorDeRed, ErrorDeServidor } from "@/api/client";
+import { colores } from "@/theme/colores";
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -183,4 +184,15 @@ test("con pagos pero ninguno aprobado, no muestra el resumen de $0 en 0 aportes"
   await render(<DonarScreen />);
   await screen.findByText(/pendiente/i);
   expect(screen.queryByText(/0 aportes/i)).toBeNull();
+});
+
+test("la tarjeta principal usa el color de fondo de apoyo", async () => {
+  jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
+    donacion_actual: null, pagos: [], total_donado: "0.00", cantidad_aportes: 0,
+  });
+  await render(<DonarScreen />);
+  const tarjeta = await screen.findByTestId("tarjeta-donar");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoApoyo })])
+  );
 });

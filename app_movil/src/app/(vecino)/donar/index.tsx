@@ -90,24 +90,26 @@ export default function DonarScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
       {error && <Text style={styles.error}>{error}</Text>}
-      {esCancelable ? (
-        <>
-          <Text style={styles.titulo}>Tu donación</Text>
-          <Text>Estado: {datos.donacion_actual!.estado}</Text>
-          <Text>Monto mensual: ${datos.donacion_actual!.monto}</Text>
-          <Pressable style={styles.boton} onPress={manejarCancelar} disabled={procesando}>
-            <Text style={styles.botonTexto}>Cancelar</Text>
-          </Pressable>
-        </>
-      ) : (
-        <>
-          <Text style={styles.titulo}>Apoyá a Mi Barrio+</Text>
-          <Text>Donación mensual automática de {MONTO_DONACION_TEXTO}</Text>
-          <Pressable style={styles.boton} onPress={manejarDonar} disabled={procesando}>
-            <Text style={styles.botonTexto}>Donar</Text>
-          </Pressable>
-        </>
-      )}
+      <View testID="tarjeta-donar" style={[styles.tarjeta, { backgroundColor: colores.fondoApoyo }]}>
+        {esCancelable ? (
+          <>
+            <Text style={styles.titulo}>Tu donación</Text>
+            <Text>Estado: {datos.donacion_actual!.estado}</Text>
+            <Text>Monto mensual: ${datos.donacion_actual!.monto}</Text>
+            <Pressable style={styles.boton} onPress={manejarCancelar} disabled={procesando}>
+              <Text style={styles.botonTexto}>Cancelar</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.titulo}>Apoyá a Mi Barrio+</Text>
+            <Text>Donación mensual automática de {MONTO_DONACION_TEXTO}</Text>
+            <Pressable style={styles.boton} onPress={manejarDonar} disabled={procesando}>
+              <Text style={styles.botonTexto}>Donar</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
 
       <Text style={styles.titulo}>Historial</Text>
       {datos.pagos.length === 0 ? (
@@ -134,8 +136,9 @@ export default function DonarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   contenido: { padding: 16, gap: 12 },
+  tarjeta: { borderRadius: 14, padding: 12, gap: 8 },
   titulo: { fontSize: 18, fontWeight: "700", color: colores.primary },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 14, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  error: { color: "#b00020", textAlign: "center" },
+  error: { color: colores.peligro, textAlign: "center" },
 });
