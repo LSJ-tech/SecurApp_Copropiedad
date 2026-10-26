@@ -14,9 +14,11 @@ export function SelectorTipoAlerta({ valor, onCambiar }: Readonly<Props>) {
   const actual = TIPOS_ALERTA.find((t) => t.valor === valor);
 
   return (
-    <View>
+    <View style={styles.contenedor}>
+      <Text style={styles.etiqueta}>Tipo de emergencia</Text>
       <Pressable testID="selector-tipo-abrir" style={styles.control} onPress={() => setAbierto(true)}>
         <Text style={styles.controlTexto}>{actual?.etiqueta ?? "Otro"}</Text>
+        <Text style={styles.flecha}>▾</Text>
       </Pressable>
       <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
         <Pressable style={styles.fondo} onPress={() => setAbierto(false)}>
@@ -44,14 +46,20 @@ export function SelectorTipoAlerta({ valor, onCambiar }: Readonly<Props>) {
 }
 
 const styles = StyleSheet.create({
+  contenedor: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
+  etiqueta: { fontSize: 12, color: colores.secondary, fontWeight: "600" },
   control: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1,
     borderColor: colores.slate,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
-  controlTexto: { color: colores.primary },
+  controlTexto: { color: colores.primary, fontWeight: "600" },
+  flecha: { color: colores.primary },
   fondo: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", padding: 24 },
   lista: { backgroundColor: "#fff", borderRadius: 12, maxHeight: "60%" },
   opcion: { padding: 16, borderBottomWidth: 1, borderBottomColor: "#eee" },

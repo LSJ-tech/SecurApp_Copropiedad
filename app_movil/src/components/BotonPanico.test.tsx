@@ -24,6 +24,16 @@ test("soltar antes de 2000ms no confirma nada", async () => {
   expect(onConfirmar).not.toHaveBeenCalled();
 });
 
+test("mientras se mantiene presionado, se ve la barra de progreso", async () => {
+  // Hallazgo real probando en el emulador: no había ninguna señal de
+  // cuánto faltaba para los 2 segundos -- la barra le da esa referencia.
+  const onConfirmar = jest.fn();
+  await render(<BotonPanico onConfirmar={onConfirmar} tipoSeleccionado="otro" />);
+  const boton = screen.getByTestId("boton-panico");
+  await fireEvent(boton, "pressIn");
+  expect(screen.getByTestId("boton-panico-progreso")).toBeTruthy();
+});
+
 test("usa el tipo pasado por prop, no siempre 'otro'", async () => {
   const onConfirmar = jest.fn();
   await render(<BotonPanico onConfirmar={onConfirmar} tipoSeleccionado="incendio" />);
