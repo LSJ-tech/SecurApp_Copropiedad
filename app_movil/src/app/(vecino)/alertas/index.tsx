@@ -46,13 +46,19 @@ export default function ListaAlertasScreen() {
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.seccion}>Activas</Text>
-      <FlatList
-        data={activas}
-        keyExtractor={(a) => String(a.id)}
-        renderItem={({ item, index }) => (
-          <Fila item={item} variante="activa" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
-        )}
-      />
+      {activas.length === 0 ? (
+        <View testID="tarjeta-sin-activas" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
+          <Text>Sin alertas activas.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={activas}
+          keyExtractor={(a) => String(a.id)}
+          renderItem={({ item, index }) => (
+            <Fila item={item} variante="activa" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
+          )}
+        />
+      )}
       <Text style={styles.seccion}>Historial</Text>
       <FlatList
         data={historial}
@@ -73,6 +79,7 @@ const styles = StyleSheet.create({
   // (D-03). "Activas" es la excepción explícita (ver variante "activa"
   // en Fila): normalmente 0-3 ítems, el color es señal de urgencia real.
   fila: { padding: 12, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: colores.primary, marginBottom: 6, borderRadius: 4 },
+  tarjeta: { borderRadius: 14, padding: 12 },
   filaTitulo: { fontWeight: "600" },
   filaSubtitulo: { color: colores.slate },
   error: { color: colores.peligro, textAlign: "center", marginBottom: 8 },

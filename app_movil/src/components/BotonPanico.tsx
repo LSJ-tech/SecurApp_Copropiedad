@@ -21,7 +21,17 @@ export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) 
   // "Exceeded timeout"/"accessed after the Jest environment was torn
   // down" en los tests.
   useEffect(() => {
-    return () => progreso.stopAnimation();
+    return () => {
+      progreso.stopAnimation();
+      // Sin esto, desmontar mientras se mantenía presionado dejaba el
+      // setTimeout vivo -- disparaba onConfirmar más tarde, sobre un
+      // componente que ya no existía, mandando una alerta real sin que
+      // nadie la haya terminado de confirmar.
+      if (temporizador.current) {
+        clearTimeout(temporizador.current);
+        temporizador.current = null;
+      }
+    };
   }, [progreso]);
 
   function manejarPressIn() {
@@ -51,18 +61,22 @@ export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) 
     progreso.setValue(0);
   }
 
-  const escalaProgreso = progreso.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
   return (
     <Pressable
       testID="boton-panico"
       style={styles.boton}
       onPressIn={manejarPressIn}
       onPressOut={manejarPressOut}
+      // Sin esto, con el botón ahora dentro de un ScrollView (D-04), si
+      // el dedo se corre unos píxeles mientras se mantiene presionado
+      // (fácil en una pantalla con scroll), RN le pasa la respuesta del
+      // gesto al ScrollView y dispara onPressOut solo -- cancelando la
+      // alerta en silencio, sin que la persona haya soltado a propósito.
+      cancelable={false}
     >
       <Animated.View
         testID="boton-panico-progreso"
-        style={[styles.progreso, { transform: [{ scaleX: escalaProgreso }] }]}
+        style={[styles.progreso, { transform: [{ scaleX: progreso }] }]}
       />
       <Text style={styles.texto}>⚠ Mantén presionado{"\n"}2 segundos</Text>
     </Pressable>

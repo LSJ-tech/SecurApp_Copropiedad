@@ -86,6 +86,15 @@ export default function PantallaPanico() {
     : `Sin ${etiquetaUnidadMin} asignad${condominio?.genero_unidad === "m" ? "o" : "a"}`;
 
   const hayAlertasActivas = !errorAlertas && alertasActivas.length > 0;
+  // Si falló la carga, ni verde ("todo bien") ni rojo (no sabemos si hay
+  // una real) -- hallazgo Important de la revisión final: antes
+  // !errorAlertas la dejaba en verde igual, contradiciendo el mensaje de
+  // error que está justo al lado.
+  const colorTarjetaAlertas = errorAlertas
+    ? colores.fondoInfo
+    : hayAlertasActivas
+      ? colores.fondoPeligro
+      : colores.fondoPositivo;
 
   return (
     <View style={styles.container}>
@@ -129,7 +138,7 @@ export default function PantallaPanico() {
 
         <View
           testID="tarjeta-alertas"
-          style={[styles.tarjeta, { backgroundColor: hayAlertasActivas ? colores.fondoPeligro : colores.fondoPositivo }]}
+          style={[styles.tarjeta, { backgroundColor: colorTarjetaAlertas }]}
         >
           <Text style={styles.tituloTarjeta}>Alertas activas</Text>
           {errorAlertas ? (

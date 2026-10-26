@@ -328,6 +328,23 @@ test("sin alertas activas, la tarjeta usa el color positivo", async () => {
   expect(tarjeta.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })]));
 });
 
+test("con alertas activas reales, la tarjeta usa el color de peligro", async () => {
+  jest.spyOn(alertasApi, "listarAlertas").mockResolvedValue([
+    { id: 9, tipo_display: "Robo", estado: "activa", estado_display: "Activa" } as any,
+  ]);
+  await render(<PantallaPanico />);
+  const tarjeta = await screen.findByTestId("tarjeta-alertas");
+  expect(tarjeta.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPeligro })]));
+});
+
+test("si falla cargar las alertas, la tarjeta NO queda verde (no debe parecer 'todo bien')", async () => {
+  jest.spyOn(alertasApi, "listarAlertas").mockRejectedValue(new Error("sin red"));
+  await render(<PantallaPanico />);
+  await screen.findByText(/no se pudieron cargar las alertas/i);
+  const tarjeta = screen.getByTestId("tarjeta-alertas");
+  expect(tarjeta.props.style).not.toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })]));
+});
+
 test("el botón de pánico no se angosta a un tamaño chico al dejar de ser franja completa", async () => {
   await render(<PantallaPanico />);
   const boton = await screen.findByTestId("boton-panico");

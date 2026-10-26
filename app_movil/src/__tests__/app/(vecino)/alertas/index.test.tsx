@@ -35,3 +35,12 @@ test("una fila de Historial NO lleva relleno completo (sigue la regla general de
   const estilo = [fila.props.style].flat();
   expect(estilo).not.toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPeligro })]));
 });
+
+test("sin alertas activas, muestra una tarjeta positiva (D-02: también en esta pestaña, no solo en la principal)", async () => {
+  jest.spyOn(alertasApi, "listarAlertas").mockResolvedValue([]);
+  await render(<ListaAlertasScreen />);
+  const tarjeta = await screen.findByTestId("tarjeta-sin-activas");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })])
+  );
+});
