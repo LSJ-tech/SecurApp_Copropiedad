@@ -27,8 +27,8 @@ export default function DirectorioScreen() {
       <FlatList
         data={miembros}
         keyExtractor={(item, indice) => `${item.nombre}-${indice}`}
-        renderItem={({ item }) => (
-          <View style={styles.fila}>
+        renderItem={({ item, index }) => (
+          <View testID={`fila-directorio-${index}`} style={styles.fila}>
             <Text style={styles.nombre}>{item.nombre}</Text>
             {(item.torre || item.unidad) && (
               <Text style={styles.unidad}>
@@ -44,8 +44,10 @@ export default function DirectorioScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  fila: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  // Acento (borde lateral), nunca relleno completo -- una lista larga de
+  // vecinos no debe volverse muchos bloques de color repetidos (D-03).
+  fila: { paddingVertical: 10, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: colores.primary, marginBottom: 6 },
   nombre: { fontWeight: "600", color: colores.primary },
   unidad: { color: colores.slate },
-  error: { color: "#b00020", textAlign: "center", marginBottom: 8 },
+  error: { color: colores.peligro, textAlign: "center", marginBottom: 8 },
 });
