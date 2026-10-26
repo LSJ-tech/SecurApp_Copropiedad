@@ -1,12 +1,22 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { Pressable, Text } from "react-native";
 import { Drawer } from "expo-router/drawer";
 
 import { iniciarProcesamientoAutomatico } from "@/alertas/colaEnvio";
 import { useAuth } from "@/auth/AuthContext";
 import { colores } from "@/theme/colores";
 
+function BotonCerrarSesion({ onCerrar }: Readonly<{ onCerrar: () => void }>) {
+  return (
+    <Pressable testID="boton-cerrar-sesion" onPress={onCerrar} style={{ marginRight: 16 }}>
+      <Text style={{ color: "#fff", fontWeight: "600" }}>Cerrar sesión</Text>
+    </Pressable>
+  );
+}
+
 export default function VecinoLayout() {
-  const { membresia } = useAuth();
+  const { membresia, cerrarSesion } = useAuth();
+  const headerRight = useCallback(() => <BotonCerrarSesion onCerrar={cerrarSesion} />, [cerrarSesion]);
 
   useEffect(() => {
     // Solo mientras hay sesión de residente (este layout no renderiza
@@ -22,6 +32,13 @@ export default function VecinoLayout() {
         headerStyle: { backgroundColor: colores.primary },
         headerTintColor: "#fff",
         drawerActiveTintColor: colores.primary,
+        // Igual criterio que (admin)/_layout.tsx: una acción de cuenta
+        // (no una ruta real) vive en el header, no como ítem de Drawer
+        // -- Expo Router solo acepta Drawer.Screen para rutas que
+        // existen de verdad como archivo. Hallazgo real probando en el
+        // emulador (2026-10-26): el residente no tenía NINGUNA forma de
+        // cerrar sesión, a diferencia del modo administrador.
+        headerRight,
       }}
     >
       <Drawer.Screen name="index" options={{ title: "Mi Barrio+" }} />
