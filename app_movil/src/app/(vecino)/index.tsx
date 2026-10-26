@@ -15,6 +15,12 @@ import { obtenerMiDonacion, formatearMontoDonacion, ESTADOS_DONACION_CANCELABLES
 import { listarAlertas, AlertaOut } from "@/api/alertas";
 import { colores } from "@/theme/colores";
 
+// Extraído del ternario anidado (dentro del template literal de
+// textoUnidad) que tenía Sonar (typescript:S3358).
+function terminacionGenero(generoUnidad: string | undefined): "o" | "a" {
+  return generoUnidad === "m" ? "o" : "a";
+}
+
 // Extraído del ternario anidado que tenía Sonar (typescript:S3358).
 function colorTarjetaAlertasDe(errorAlertas: boolean, hayAlertasActivas: boolean): string {
   if (errorAlertas) return colores.fondoInfo;
@@ -145,7 +151,7 @@ export default function PantallaPanico() {
   const etiquetaUnidadMin = condominio?.etiqueta_unidad?.toLowerCase() ?? "unidad";
   const textoUnidad = unidad
     ? `${condominio?.etiqueta_torre ?? ""} ${unidad.torre_nombre ?? "—"}, ${etiquetaUnidadMin} ${unidad.numero}`
-    : `Sin ${etiquetaUnidadMin} asignad${condominio?.genero_unidad === "m" ? "o" : "a"}`;
+    : `Sin ${etiquetaUnidadMin} asignad${terminacionGenero(condominio?.genero_unidad)}`;
 
   const hayAlertasActivas = !errorAlertas && alertasActivas.length > 0;
   // Si falló la carga, ni verde ("todo bien") ni rojo (no sabemos si hay
