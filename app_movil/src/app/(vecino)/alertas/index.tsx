@@ -5,9 +5,20 @@ import { useRouter } from "expo-router";
 import { listarAlertas, AlertaOut } from "@/api/alertas";
 import { colores } from "@/theme/colores";
 
-function Fila({ item, onPress }: Readonly<{ item: AlertaOut; onPress: () => void }>) {
+type VarianteFila = "activa" | "historial";
+
+function Fila({
+  item,
+  onPress,
+  variante,
+  indice,
+}: Readonly<{ item: AlertaOut; onPress: () => void; variante: VarianteFila; indice: number }>) {
   return (
-    <Pressable style={styles.fila} onPress={onPress}>
+    <Pressable
+      testID={`fila-${variante}-${indice}`}
+      style={[styles.fila, variante === "activa" && { backgroundColor: colores.fondoPeligro }]}
+      onPress={onPress}
+    >
       <Text style={styles.filaTitulo}>{item.tipo_display}</Text>
       <Text style={styles.filaSubtitulo}>{item.estado_display}</Text>
     </Pressable>
@@ -38,13 +49,17 @@ export default function ListaAlertasScreen() {
       <FlatList
         data={activas}
         keyExtractor={(a) => String(a.id)}
-        renderItem={({ item }) => <Fila item={item} onPress={() => router.push(`/alertas/${item.id}`)} />}
+        renderItem={({ item, index }) => (
+          <Fila item={item} variante="activa" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
+        )}
       />
       <Text style={styles.seccion}>Historial</Text>
       <FlatList
         data={historial}
         keyExtractor={(a) => String(a.id)}
-        renderItem={({ item }) => <Fila item={item} onPress={() => router.push(`/alertas/${item.id}`)} />}
+        renderItem={({ item, index }) => (
+          <Fila item={item} variante="historial" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
+        )}
       />
     </View>
   );
@@ -53,8 +68,12 @@ export default function ListaAlertasScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   seccion: { fontSize: 18, fontWeight: "700", color: colores.primary, marginVertical: 8 },
-  fila: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  // Acento (borde lateral) para Historial, nunca relleno completo -- un
+  // historial largo no debe volverse muchos bloques de color repetidos
+  // (D-03). "Activas" es la excepción explícita (ver variante "activa"
+  // en Fila): normalmente 0-3 ítems, el color es señal de urgencia real.
+  fila: { padding: 12, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: colores.primary, marginBottom: 6, borderRadius: 4 },
   filaTitulo: { fontWeight: "600" },
   filaSubtitulo: { color: colores.slate },
-  error: { color: "#b00020", textAlign: "center", marginBottom: 8 },
+  error: { color: colores.peligro, textAlign: "center", marginBottom: 8 },
 });
