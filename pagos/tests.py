@@ -1202,6 +1202,22 @@ class ApiDonacionesTests(TestCase):
         self.assertEqual(datos["total_donado"], "2000.00")
         self.assertEqual(datos["cantidad_aportes"], 1)
 
+    def test_mi_donacion_los_pagos_incluyen_su_id(self):
+        # Hallazgo real de SonarCloud en la app móvil (typescript:S6479):
+        # sin un id estable, la lista de pagos usaba el índice del array
+        # como key de React -- se agrega acá para que la app pueda usar
+        # el id real de cada Pago.
+        suscripcion = SuscripcionRecurrente.objects.create(
+            condominio=self.condominio, membresia=self.residente, tipo="donacion",
+            monto=Decimal("2000"), mercadopago_preapproval_id="pre-mi-don-2", estado="autorizada",
+        )
+        pago = Pago.objects.create(
+            condominio=self.condominio, membresia=self.residente, suscripcion_recurrente=suscripcion,
+            tipo="donacion", monto=Decimal("2000"), estado="aprobado", mercadopago_payment_id="pay-2",
+        )
+        r = self.client.get(reverse("api-mi-donacion"))
+        self.assertEqual(r.json()["pagos"][0]["id"], pago.pk)
+
     @patch("pagos.views.crear_suscripcion_recurrente", return_value="https://fake-mp.test/autorizar/1")
     def test_donar_crea_la_suscripcion_y_devuelve_la_url(self, mock_crear):
         r = self.client.post(reverse("api-donar"))

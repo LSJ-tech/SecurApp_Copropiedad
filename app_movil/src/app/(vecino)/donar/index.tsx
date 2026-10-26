@@ -122,8 +122,8 @@ export default function DonarScreen() {
               {datos.cantidad_aportes === 1 ? "" : "s"}.
             </Text>
           )}
-          {datos.pagos.map((pago, indice) => (
-            <Text key={indice}>
+          {datos.pagos.map((pago) => (
+            <Text key={pago.id}>
               {pago.fecha_creacion.slice(0, 10)} · ${formatearMontoDonacion(pago.monto)} · {pago.estado}
             </Text>
           ))}

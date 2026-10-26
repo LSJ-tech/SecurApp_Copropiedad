@@ -147,8 +147,8 @@ test("muestra el total donado y la cantidad de aportes cuando hay historial", as
   jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
     donacion_actual: null,
     pagos: [
-      { estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-09-01T00:00:00Z" },
-      { estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-08-01T00:00:00Z" },
+      { id: 1, estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-09-01T00:00:00Z" },
+      { id: 2, estado: "aprobado", monto: "2000.00", fecha_creacion: "2026-08-01T00:00:00Z" },
     ],
     total_donado: "4000.00",
     cantidad_aportes: 2,
@@ -177,7 +177,7 @@ test("la pantalla es desplazable para que el historial no quede inalcanzable", a
 test("con pagos pero ninguno aprobado, no muestra el resumen de $0 en 0 aportes", async () => {
   jest.spyOn(donacionesApi, "obtenerMiDonacion").mockResolvedValue({
     donacion_actual: null,
-    pagos: [{ estado: "pendiente", monto: "2000.00", fecha_creacion: "2026-10-01T00:00:00Z" }],
+    pagos: [{ id: 1, estado: "pendiente", monto: "2000.00", fecha_creacion: "2026-10-01T00:00:00Z" }],
     total_donado: "0.00",
     cantidad_aportes: 0,
   });

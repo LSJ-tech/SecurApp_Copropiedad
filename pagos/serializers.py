@@ -6,7 +6,7 @@ from .models import Pago, SuscripcionRecurrente
 class PagoResumenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pago
-        fields = ["monto", "estado", "fecha_creacion"]
+        fields = ["id", "monto", "estado", "fecha_creacion"]
 
 
 class DonacionActualSerializer(serializers.ModelSerializer):
