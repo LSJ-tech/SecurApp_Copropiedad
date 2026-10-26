@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { listarAlertas, AlertaOut } from "@/api/alertas";
+import { EstadoVacioIlustrado } from "@/components/EstadoVacioIlustrado";
 import { colores } from "@/theme/colores";
 
 type VarianteFila = "activa" | "historial";
@@ -48,7 +49,7 @@ export default function ListaAlertasScreen() {
       <Text style={styles.seccion}>Activas</Text>
       {activas.length === 0 ? (
         <View testID="tarjeta-sin-activas" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
-          <Text>Sin alertas activas.</Text>
+          <EstadoVacioIlustrado testID="estado-vacio-alertas-activas" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
         </View>
       ) : (
         <FlatList
@@ -60,13 +61,19 @@ export default function ListaAlertasScreen() {
         />
       )}
       <Text style={styles.seccion}>Historial</Text>
-      <FlatList
-        data={historial}
-        keyExtractor={(a) => String(a.id)}
-        renderItem={({ item, index }) => (
-          <Fila item={item} variante="historial" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
-        )}
-      />
+      {historial.length === 0 ? (
+        <View testID="tarjeta-sin-historial" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
+          <EstadoVacioIlustrado testID="estado-vacio-alertas-historial" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
+        </View>
+      ) : (
+        <FlatList
+          data={historial}
+          keyExtractor={(a) => String(a.id)}
+          renderItem={({ item, index }) => (
+            <Fila item={item} variante="historial" indice={index} onPress={() => router.push(`/alertas/${item.id}`)} />
+          )}
+        />
+      )}
     </View>
   );
 }

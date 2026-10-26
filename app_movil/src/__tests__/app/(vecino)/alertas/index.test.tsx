@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, within } from "@testing-library/react-native";
 import ListaAlertasScreen from "@/app/(vecino)/alertas/index";
 import * as alertasApi from "@/api/alertas";
 import { ErrorDeRed } from "@/api/client";
@@ -43,4 +43,15 @@ test("sin alertas activas, muestra una tarjeta positiva (D-02: también en esta 
   expect(tarjeta.props.style).toEqual(
     expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })])
   );
+  await within(tarjeta).findByText(/todo tranquilo por ahora/i);
+});
+
+test("historial vacío muestra el estado vacío ilustrado, no queda en blanco", async () => {
+  jest.spyOn(alertasApi, "listarAlertas").mockResolvedValue([]);
+  await render(<ListaAlertasScreen />);
+  const tarjeta = await screen.findByTestId("tarjeta-sin-historial");
+  expect(tarjeta.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })])
+  );
+  await within(tarjeta).findByText(/todo tranquilo por ahora/i);
 });
