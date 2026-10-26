@@ -18,7 +18,13 @@ export function SelectorTipoAlerta({ valor, onCambiar }: Readonly<Props>) {
   return (
     <View style={styles.contenedor}>
       <Text style={styles.etiqueta}>Tipo de emergencia</Text>
-      <Pressable testID="selector-tipo-abrir" style={styles.control} onPress={() => setAbierto(true)}>
+      <Pressable
+        testID="selector-tipo-abrir"
+        style={styles.control}
+        onPress={() => setAbierto(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Tipo de emergencia: ${actual?.etiqueta ?? "Otro"}. Toca para cambiar.`}
+      >
         <Text style={styles.controlTexto}>{actual?.etiqueta ?? "Otro"}</Text>
         <Text style={styles.flecha}>▾</Text>
       </Pressable>

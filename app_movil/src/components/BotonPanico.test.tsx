@@ -65,6 +65,14 @@ test("si el componente se desmonta mientras está presionado, no confirma despu�
   expect(onConfirmar).not.toHaveBeenCalled();
 });
 
+test("tiene rol y etiqueta de accesibilidad -- un lector de pantalla no tenía ninguna señal de qué hace este botón", async () => {
+  const onConfirmar = jest.fn();
+  await render(<BotonPanico onConfirmar={onConfirmar} tipoSeleccionado="otro" />);
+  const boton = screen.getByTestId("boton-panico");
+  expect(boton.props.accessibilityRole).toBe("button");
+  expect(boton.props.accessibilityLabel).toMatch(/pánico/i);
+});
+
 test("usa el tipo pasado por prop, no siempre 'otro'", async () => {
   const onConfirmar = jest.fn();
   await render(<BotonPanico onConfirmar={onConfirmar} tipoSeleccionado="incendio" />);

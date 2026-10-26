@@ -23,6 +23,14 @@ test("el modal muestra los tipos con ícono, no una lista de texto plana", async
   expect(screen.getByTestId("icono-tipo-incendio").props.name).toBe("flame-outline");
 });
 
+test("el control tiene rol y etiqueta de accesibilidad", async () => {
+  const onCambiar = jest.fn();
+  await render(<SelectorTipoAlerta valor="incendio" onCambiar={onCambiar} />);
+  const control = screen.getByTestId("selector-tipo-abrir");
+  expect(control.props.accessibilityRole).toBe("button");
+  expect(control.props.accessibilityLabel).toMatch(/tipo de emergencia/i);
+});
+
 test("el tipo actualmente seleccionado se resalta en la grilla", async () => {
   const onCambiar = jest.fn();
   await render(<SelectorTipoAlerta valor="incendio" onCambiar={onCambiar} />);

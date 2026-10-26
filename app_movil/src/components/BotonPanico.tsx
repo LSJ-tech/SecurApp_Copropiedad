@@ -67,6 +67,8 @@ export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) 
       style={styles.boton}
       onPressIn={manejarPressIn}
       onPressOut={manejarPressOut}
+      accessibilityRole="button"
+      accessibilityLabel="Botón de pánico. Mantén presionado dos segundos para enviar una alerta de emergencia."
       // Sin esto, con el botón ahora dentro de un ScrollView (D-04), si
       // el dedo se corre unos píxeles mientras se mantiene presionado
       // (fácil en una pantalla con scroll), RN le pasa la respuesta del
