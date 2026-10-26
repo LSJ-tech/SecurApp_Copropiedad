@@ -2,7 +2,7 @@ jest.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ membresia: { rol: "residente" } }),
 }));
 
-import { render, fireEvent, screen } from "@testing-library/react-native";
+import { act, render, fireEvent, screen } from "@testing-library/react-native";
 import * as Linking from "expo-linking";
 import PantallaPerfil from "@/app/(vecino)/perfil/index";
 import * as authApi from "@/api/auth";
@@ -103,6 +103,40 @@ test("el botón Solicitar eliminación de cuenta abre la página web en el naveg
   await render(<PantallaPerfil />);
   await fireEvent.press(await screen.findByText(/solicitar eliminación de cuenta/i));
   expect(abrirSpy).toHaveBeenCalledWith(`${API_BASE_URL}/mi-perfil/eliminar-cuenta/`);
+});
+
+test("dos toques seguidos en Guardar no mandan dos PATCH (hallazgo: era la única pantalla sin esta guarda)", async () => {
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    rol: "residente", condominio: { id: 1, nombre: "X" }, unidad: null,
+    nombre: "Ana Pérez", telefono: "", first_name: "Ana", last_name: "Pérez", email: "ana@test.cl",
+  });
+  let resolverPrimera: (valor: any) => void = () => {};
+  const esperaPrimera = new Promise((resolve) => {
+    resolverPrimera = resolve;
+  });
+  const actualizarSpy = jest.spyOn(authApi, "actualizarMiPerfil").mockReturnValue(esperaPrimera as any);
+  await render(<PantallaPerfil />);
+  await screen.findByDisplayValue("Ana");
+  const boton = screen.getByText(/guardar/i);
+  await act(async () => {
+    fireEvent.press(boton);
+    fireEvent.press(boton);
+    resolverPrimera({ first_name: "Ana", last_name: "Pérez", email: "ana@test.cl", telefono: "" });
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(actualizarSpy).toHaveBeenCalledTimes(1);
+});
+
+test("el correo y el teléfono abren el teclado correspondiente", async () => {
+  jest.spyOn(authApi, "obtenerMiPerfil").mockResolvedValue({
+    rol: "residente", condominio: { id: 1, nombre: "X" }, unidad: null,
+    nombre: "Ana Pérez", telefono: "", first_name: "Ana", last_name: "Pérez", email: "ana@test.cl",
+  });
+  await render(<PantallaPerfil />);
+  await screen.findByDisplayValue("Ana");
+  expect(screen.getByPlaceholderText("Correo").props.keyboardType).toBe("email-address");
+  expect(screen.getByPlaceholderText("Teléfono").props.keyboardType).toBe("phone-pad");
 });
 
 test("el formulario principal usa el color de fondo informativo", async () => {

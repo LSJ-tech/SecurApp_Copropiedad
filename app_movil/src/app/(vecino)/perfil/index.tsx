@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Linking from "expo-linking";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -20,6 +20,10 @@ export default function PantallaPerfil() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+  // Hallazgo real: era la única pantalla con botón de guardar sin esta
+  // guarda (avisos, números de emergencia y elegir-condominio ya la
+  // tenían) -- dos toques seguidos mandaban dos PATCH.
+  const guardandoRef = useRef(false);
 
   function cargar() {
     setCargando(true);
@@ -41,6 +45,8 @@ export default function PantallaPerfil() {
   useEffect(cargar, []);
 
   async function manejarGuardar() {
+    if (guardandoRef.current) return;
+    guardandoRef.current = true;
     setErrorGuardado(null);
     setGuardadoOk(false);
     try {
@@ -48,6 +54,8 @@ export default function PantallaPerfil() {
       setGuardadoOk(true);
     } catch (error) {
       setErrorGuardado(primerMensajeDeError(error));
+    } finally {
+      guardandoRef.current = false;
     }
   }
 
@@ -77,8 +85,18 @@ export default function PantallaPerfil() {
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
         />
-        <TextInput style={styles.input} placeholder="Teléfono" value={telefono} onChangeText={setTelefono} />
+        <TextInput
+          style={styles.input}
+          placeholder="Teléfono"
+          value={telefono}
+          onChangeText={setTelefono}
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+        />
       </View>
       <Pressable style={styles.boton} onPress={manejarGuardar}>
         <Text style={styles.botonTexto}>Guardar</Text>

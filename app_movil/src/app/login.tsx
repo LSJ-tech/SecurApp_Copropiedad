@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/auth/AuthContext";
+import { ErrorDeRed } from "@/api/client";
 import { colores } from "@/theme/colores";
 
 export default function LoginScreen() {
@@ -16,8 +17,11 @@ export default function LoginScreen() {
     setEnviando(true);
     try {
       await iniciarSesion(username, password);
-    } catch {
-      setError("Usuario o contraseña incorrectos.");
+    } catch (error) {
+      // Hallazgo real: un catch genérico mostraba "Usuario o contraseña
+      // incorrectos." aunque el problema fuera la conexión -- hacía
+      // dudar de la contraseña a un residente sin señal.
+      setError(error instanceof ErrorDeRed ? "No se pudo conectar. Revisa tu conexión." : "Usuario o contraseña incorrectos.");
     } finally {
       setEnviando(false);
     }
