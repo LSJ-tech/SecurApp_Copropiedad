@@ -66,9 +66,10 @@ def icono_adaptativo_background(tamano=1024):
 def icono_adaptativo_monochrome(tamano=1024):
     """Silueta de un solo color (blanco), fondo transparente -- Android
     13+ la tiñe con el color del tema del usuario."""
-    img, draw, escala, ox, oy = _mark_en_zona_segura(tamano, (0, 0, 0, 0))
+    img, _, escala, ox, oy = _mark_en_zona_segura(tamano, (0, 0, 0, 0))
     # dibujar_mark ya usa varios colores (navy/blanco/teal) -- acá se
-    # fuerza todo a blanco dibujando sobre una máscara de alpha.
+    # fuerza todo a blanco dibujando sobre una máscara de alpha (no usa
+    # el `draw` de _mark_en_zona_segura, dibuja directo sobre img abajo).
     mascara = Image.new("L", (tamano, tamano), 0)
     mdraw = ImageDraw.Draw(mascara)
     dibujar_mark_mascara(mdraw, escala, ox, oy)
@@ -116,7 +117,6 @@ def splash_icon(tamano=200):
     -- sin fondo propio, app.json ya define backgroundColor del splash
     por separado (#208AEF) y lo pinta detrás."""
     img = Image.new("RGBA", (tamano, tamano), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
     mascara = Image.new("L", (tamano, tamano), 0)
     mdraw = ImageDraw.Draw(mascara)
     dibujar_mark_mascara(mdraw, tamano / 100, 0, 0)
