@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "app_movil",
+    "name": "Mi Barrio+",
     "slug": "app_movil",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,6 @@
     "scheme": "appmovil",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "cl.devquad.mibarrioplus"
     },
     "android": {
