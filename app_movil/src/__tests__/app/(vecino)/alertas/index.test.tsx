@@ -16,6 +16,19 @@ test("si listar las alertas falla, muestra un error en vez de un rechazo sin man
   await screen.findByText(/no se pudieron cargar las alertas/i);
 });
 
+test("si falla la carga, no muestra 'Todo tranquilo por ahora' -- sería una falsa tranquilidad", async () => {
+  // Hallazgo Important de la revisión final: activas/historial arrancan
+  // en [] y el error no los limpia, así que con mala señal la pantalla
+  // mostraba un error Y, debajo, las dos tarjetas verdes de "todo
+  // tranquilo" -- justo el mensaje contrario al que corresponde en una
+  // app de seguridad.
+  jest.spyOn(alertasApi, "listarAlertas").mockRejectedValue(new ErrorDeRed("sin red"));
+  await render(<ListaAlertasScreen />);
+  await screen.findByText(/no se pudieron cargar las alertas/i);
+  expect(screen.queryByTestId("tarjeta-sin-activas")).toBeNull();
+  expect(screen.queryByTestId("tarjeta-sin-historial")).toBeNull();
+});
+
 test("una fila de Activas lleva el color de fondo de peligro (excepción a la regla general)", async () => {
   jest.spyOn(alertasApi, "listarAlertas").mockImplementation((estado?: string) =>
     Promise.resolve(estado === "activa" ? [{ id: 1, tipo_display: "Robo", estado: "activa", estado_display: "Activa" } as any] : [])
@@ -47,11 +60,15 @@ test("sin alertas activas, muestra una tarjeta positiva (D-02: también en esta 
 });
 
 test("historial vacío muestra el estado vacío ilustrado, no queda en blanco", async () => {
+  // Hallazgo Important de la revisión final: "Todo tranquilo por ahora"
+  // en Historial es engañoso -- un historial vacío no significa que no
+  // haya alertas activas (eso lo dice la sección Activas, no esta), así
+  // que no es un color/mensaje de "buena noticia" sino informativo.
   jest.spyOn(alertasApi, "listarAlertas").mockResolvedValue([]);
   await render(<ListaAlertasScreen />);
   const tarjeta = await screen.findByTestId("tarjeta-sin-historial");
   expect(tarjeta.props.style).toEqual(
-    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })])
+    expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })])
   );
-  await within(tarjeta).findByText(/todo tranquilo por ahora/i);
+  await within(tarjeta).findByText(/sin alertas resueltas en las últimas 24 h/i);
 });

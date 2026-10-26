@@ -39,6 +39,16 @@ test("si falla la carga, muestra un error en vez de un rechazo sin manejar", asy
   await screen.findByText(/no se pudieron cargar los avisos/i);
 });
 
+test("si falla la carga, no muestra 'Todavía no hay avisos' -- sería un mensaje equivocado", async () => {
+  // Mismo hallazgo Important que en Alertas: avisos arranca en [] y el
+  // error no lo limpia, así que el ListEmptyComponent se mostraba junto
+  // al mensaje de error.
+  jest.spyOn(avisosApi, "listarAvisos").mockRejectedValue(new ErrorDeRed("sin red"));
+  await render(<ListaAvisosScreen />);
+  await screen.findByText(/no se pudieron cargar los avisos/i);
+  expect(screen.queryByTestId("tarjeta-sin-avisos")).toBeNull();
+});
+
 test("sin avisos, muestra el estado vacío ilustrado en vez de quedar en blanco", async () => {
   jest.spyOn(avisosApi, "listarAvisos").mockResolvedValue([]);
   await render(<ListaAvisosScreen />);

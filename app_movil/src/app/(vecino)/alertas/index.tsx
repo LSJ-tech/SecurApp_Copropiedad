@@ -47,7 +47,7 @@ export default function ListaAlertasScreen() {
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.seccion}>Activas</Text>
-      {activas.length === 0 ? (
+      {error ? null : activas.length === 0 ? (
         <View testID="tarjeta-sin-activas" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
           <EstadoVacioIlustrado testID="estado-vacio-alertas-activas" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
         </View>
@@ -61,9 +61,9 @@ export default function ListaAlertasScreen() {
         />
       )}
       <Text style={styles.seccion}>Historial</Text>
-      {historial.length === 0 ? (
-        <View testID="tarjeta-sin-historial" style={[styles.tarjeta, { backgroundColor: colores.fondoPositivo }]}>
-          <EstadoVacioIlustrado testID="estado-vacio-alertas-historial" icono="shield-checkmark-outline" mensaje="Todo tranquilo por ahora" />
+      {error ? null : historial.length === 0 ? (
+        <View testID="tarjeta-sin-historial" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]}>
+          <EstadoVacioIlustrado testID="estado-vacio-alertas-historial" icono="shield-checkmark-outline" mensaje="Sin alertas resueltas en las últimas 24 h" />
         </View>
       ) : (
         <FlatList

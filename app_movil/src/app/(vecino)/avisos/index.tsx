@@ -84,9 +84,11 @@ export default function ListaAvisosScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <View testID="tarjeta-sin-avisos" style={[styles.tarjetaVacia, { backgroundColor: colores.fondoInfo }]}>
-            <EstadoVacioIlustrado testID="estado-vacio-avisos" icono="newspaper-outline" mensaje="Todavía no hay avisos" />
-          </View>
+          error ? null : (
+            <View testID="tarjeta-sin-avisos" style={[styles.tarjetaVacia, { backgroundColor: colores.fondoInfo }]}>
+              <EstadoVacioIlustrado testID="estado-vacio-avisos" icono="newspaper-outline" mensaje="Todavía no hay avisos" />
+            </View>
+          )
         }
       />
     </View>
