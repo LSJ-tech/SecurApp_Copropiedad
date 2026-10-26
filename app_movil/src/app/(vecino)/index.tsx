@@ -85,21 +85,17 @@ export default function PantallaPanico() {
     ? `${condominio?.etiqueta_torre ?? ""} ${unidad.torre_nombre ?? "—"}, ${etiquetaUnidadMin} ${unidad.numero}`
     : `Sin ${etiquetaUnidadMin} asignad${condominio?.genero_unidad === "m" ? "o" : "a"}`;
 
+  const hayAlertasActivas = !errorAlertas && alertasActivas.length > 0;
+
   return (
     <View style={styles.container}>
-      <BotonPanico onConfirmar={manejarConfirmar} tipoSeleccionado={tipo} />
-      <SelectorTipoAlerta valor={tipo} onCambiar={setTipo} />
-      {error && <Text style={styles.error}>{error}</Text>}
-      {alertaEnviadaId !== null && (
-        <VentanaCancelar
-          key={alertaEnviadaId}
-          alertaId={alertaEnviadaId}
-          onCancelada={() => setAlertaEnviadaId(null)}
-        />
-      )}
-
       <ScrollView style={styles.scroll} contentContainerStyle={styles.contenido}>
-        <View style={styles.tarjeta}>
+        <View testID="tarjeta-depto" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]}>
+          <Text style={styles.tituloTarjeta}>Mi {etiquetaUnidadMin}</Text>
+          <Text>{textoUnidad}</Text>
+        </View>
+
+        <View testID="tarjeta-donacion" style={[styles.tarjeta, { backgroundColor: colores.fondoApoyo }]}>
           <Text style={styles.tituloTarjeta}>♥ Apoya el proyecto</Text>
           {donacion?.donacion_actual && ESTADOS_DONACION_CANCELABLES.has(donacion.donacion_actual.estado) ? (
             <>
@@ -118,21 +114,23 @@ export default function PantallaPanico() {
           )}
         </View>
 
-        <View style={styles.tarjeta}>
-          <Text style={styles.tituloTarjeta}>Mi {etiquetaUnidadMin}</Text>
-          <Text>{textoUnidad}</Text>
+        <View style={styles.bloquePanico}>
+          <SelectorTipoAlerta valor={tipo} onCambiar={setTipo} />
+          <BotonPanico onConfirmar={manejarConfirmar} tipoSeleccionado={tipo} />
+          {error && <Text style={styles.error}>{error}</Text>}
+          {alertaEnviadaId !== null && (
+            <VentanaCancelar
+              key={alertaEnviadaId}
+              alertaId={alertaEnviadaId}
+              onCancelada={() => setAlertaEnviadaId(null)}
+            />
+          )}
         </View>
 
-        <Pressable style={styles.boton} onPress={() => router.push("/invitar")}>
-          <Text style={styles.botonTexto}>Invitar vecinos</Text>
-        </Pressable>
-        {membresia?.rol === "delegado" && (
-          <Pressable style={styles.boton} onPress={() => router.push("/directorio")}>
-            <Text style={styles.botonTexto}>Directorio</Text>
-          </Pressable>
-        )}
-
-        <View style={styles.tarjeta}>
+        <View
+          testID="tarjeta-alertas"
+          style={[styles.tarjeta, { backgroundColor: hayAlertasActivas ? colores.fondoPeligro : colores.fondoPositivo }]}
+        >
           <Text style={styles.tituloTarjeta}>Alertas activas</Text>
           {errorAlertas ? (
             <Text style={styles.error}>No se pudieron cargar las alertas.</Text>
@@ -146,6 +144,15 @@ export default function PantallaPanico() {
             ))
           )}
         </View>
+
+        <Pressable testID="tarjeta-invitar" style={[styles.tarjeta, { backgroundColor: colores.fondoApoyo }]} onPress={() => router.push("/invitar")}>
+          <Text style={styles.tituloTarjeta}>Invitar vecinos</Text>
+        </Pressable>
+        {membresia?.rol === "delegado" && (
+          <Pressable testID="tarjeta-directorio" style={[styles.tarjeta, { backgroundColor: colores.fondoInfo }]} onPress={() => router.push("/directorio")}>
+            <Text style={styles.tituloTarjeta}>Directorio</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );
@@ -155,9 +162,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scroll: { flex: 1 },
   contenido: { padding: 16, gap: 12 },
-  tarjeta: { borderWidth: 1, borderColor: colores.slate, borderRadius: 8, padding: 12, gap: 8 },
+  tarjeta: { borderRadius: 14, padding: 12, gap: 8 },
   tituloTarjeta: { fontWeight: "700", color: colores.primary },
   boton: { backgroundColor: colores.primary, borderRadius: 8, padding: 12, alignItems: "center" },
   botonTexto: { color: "#fff", fontWeight: "600" },
-  error: { color: "#b00020", textAlign: "center", paddingHorizontal: 24 },
+  error: { color: colores.peligro, textAlign: "center", paddingHorizontal: 24 },
+  bloquePanico: { alignItems: "center", gap: 10, paddingVertical: 8 },
 });

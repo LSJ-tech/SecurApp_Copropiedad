@@ -71,19 +71,23 @@ export function BotonPanico({ onConfirmar, tipoSeleccionado }: Readonly<Props>) 
 
 const styles = StyleSheet.create({
   boton: {
-    width: "100%",
-    paddingVertical: 18,
+    // Centrado dentro de su contenedor (D-04): ya no franja de ancho
+    // completo, un tamaño intermedio -- llamativo, pero conviviendo con
+    // las tarjetas de color alrededor, no compitiendo con un círculo
+    // gigante ni angostándose a algo chico.
+    width: 220,
+    paddingVertical: 24,
     paddingHorizontal: 16,
     backgroundColor: "#b00020",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderRadius: 24,
     overflow: "hidden",
-    elevation: 4,
+    elevation: 6,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   progreso: {
     position: "absolute",

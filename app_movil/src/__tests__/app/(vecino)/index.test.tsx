@@ -32,6 +32,7 @@ import * as enviarAlertaModulo from "@/alertas/enviarAlerta";
 import * as donacionesApi from "@/api/donaciones";
 import * as alertasApi from "@/api/alertas";
 import { ErrorDeServidor } from "@/api/client";
+import { colores } from "@/theme/colores";
 
 beforeEach(() => {
   mockUseAuth.mockReturnValue({
@@ -266,4 +267,69 @@ test("si falla cargar las alertas activas, muestra un error en vez de 'Sin alert
   await render(<PantallaPanico />);
   await screen.findByText(/no se pudieron cargar las alertas/i);
   expect(screen.queryByText(/^sin alertas activas\.$/i)).toBeNull();
+});
+
+test("el orden de la pantalla es: mi depto, donación, botón de pánico, alertas activas, invitar", async () => {
+  await render(<PantallaPanico />);
+  await screen.findByText(/invitar vecinos/i);
+  const texto = JSON.stringify(screen.toJSON());
+  const posiciones = [
+    texto.indexOf("Mi departamento"),
+    texto.indexOf("Apoya el proyecto"),
+    texto.indexOf("Mantén presionado"),
+    texto.indexOf("Alertas activas"),
+    texto.indexOf("Invitar vecinos"),
+  ];
+  expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+});
+
+test("el selector de tipo y el botón de pánico quedan juntos, sin otra tarjeta en el medio", async () => {
+  await render(<PantallaPanico />);
+  await screen.findByText(/invitar vecinos/i);
+  const texto = JSON.stringify(screen.toJSON());
+  const posSelector = texto.indexOf("Tipo de emergencia");
+  const posBoton = texto.indexOf("Mantén presionado");
+  const posAlertas = texto.indexOf("Alertas activas");
+  expect(posSelector).toBeLessThan(posBoton);
+  expect(posBoton).toBeLessThan(posAlertas);
+});
+
+test("la tarjeta de mi depto usa el color de fondo informativo", async () => {
+  await render(<PantallaPanico />);
+  const tarjeta = await screen.findByTestId("tarjeta-depto");
+  expect(tarjeta.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })]));
+});
+
+test("la tarjeta de donación usa el color de fondo de apoyo", async () => {
+  await render(<PantallaPanico />);
+  const tarjeta = await screen.findByTestId("tarjeta-donacion");
+  expect(tarjeta.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoApoyo })]));
+});
+
+test("la tarjeta de invitar vecinos usa el color de apoyo y la de directorio el informativo", async () => {
+  mockUseAuth.mockReturnValue({
+    membresia: {
+      rol: "delegado",
+      condominio: { id: 1, nombre: "Empart", etiqueta_torre: "Block", etiqueta_unidad: "Departamento", genero_unidad: "m" },
+      unidad: null,
+      nombre: "Logan", telefono: "",
+    },
+  });
+  await render(<PantallaPanico />);
+  const tarjetaInvitar = await screen.findByTestId("tarjeta-invitar");
+  const tarjetaDirectorio = await screen.findByTestId("tarjeta-directorio");
+  expect(tarjetaInvitar.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoApoyo })]));
+  expect(tarjetaDirectorio.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoInfo })]));
+});
+
+test("sin alertas activas, la tarjeta usa el color positivo", async () => {
+  await render(<PantallaPanico />);
+  const tarjeta = await screen.findByTestId("tarjeta-alertas");
+  expect(tarjeta.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: colores.fondoPositivo })]));
+});
+
+test("el botón de pánico no se angosta a un tamaño chico al dejar de ser franja completa", async () => {
+  await render(<PantallaPanico />);
+  const boton = await screen.findByTestId("boton-panico");
+  expect(boton.props.style).not.toEqual(expect.objectContaining({ width: "100%" }));
 });
