@@ -47,13 +47,16 @@ test("muestra una etiqueta que deja claro qué es esta sección", async () => {
   await screen.findByText(/tipo de emergencia/i);
 });
 
-test("la grilla no scrollea por su cuenta -- vive dentro del scroll de la pantalla", async () => {
-  // Hallazgo real: una FlatList con scroll propio anidada dentro del
-  // ScrollView de la pantalla (ya no está detrás de un Modal aparte)
-  // generaba scroll trabado/doble. scrollEnabled={false} delega todo
-  // el scroll al ScrollView padre.
+test("la grilla es una vista que envuelve en wrap, no una lista virtualizada anidada en el scroll de la pantalla", async () => {
+  // Hallazgo real probando el build en el emulador: un FlatList
+  // virtualizado anidado dentro del ScrollView de la pantalla no
+  // medía bien su ancho -- quedaba encogido a una caja angosta y
+  // centrada en vez de ocupar el ancho completo, con el texto de
+  // cada opción cortado. Una grilla simple (View + flexWrap) se
+  // estira igual que cualquier otro elemento de la pantalla.
   const onCambiar = jest.fn();
   await render(<SelectorTipoAlerta valor="otro" onCambiar={onCambiar} />);
   const grilla = await screen.findByTestId("grilla-tipos-alerta");
-  expect(grilla.props.scrollEnabled).toBe(false);
+  const estilo = [grilla.props.style].flat();
+  expect(estilo).toEqual(expect.arrayContaining([expect.objectContaining({ flexWrap: "wrap" })]));
 });
