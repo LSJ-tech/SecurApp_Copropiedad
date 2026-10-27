@@ -159,6 +159,14 @@ STORAGES = {
 
 PLATFORM_NAME = os.environ.get('PLATFORM_NAME', 'Mi Barrio+')
 
+# Link de instalación del build Android más reciente (EAS) -- cambia cada
+# vez que se genera un build nativo nuevo (ver app_movil/, "eas build:list").
+# Queda como env var para no tener que tocar código cada vez.
+ANDROID_APP_URL = os.environ.get(
+    'ANDROID_APP_URL',
+    'https://expo.dev/accounts/backdraft/projects/app_movil/builds/cef3978b-fab1-4146-a672-507da666d8e8',
+)
+
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'

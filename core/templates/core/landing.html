@@ -55,7 +55,7 @@
         "mainEntity": [
             {"@type": "Question", "name": "¿Cuánto cuesta {{ PLATFORM_NAME }}?", "acceptedAnswer": {"@type": "Answer", "text": "Es gratis -- el botón de pánico y los avisos no tienen costo para nadie. Cualquier residente puede hacer una donación voluntaria para apoyar el desarrollo de la plataforma, completamente opcional."}},
             {"@type": "Question", "name": "¿Mis datos están separados de otros condominios?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Cada condominio es completamente independiente: nadie fuera del tuyo puede ver tus alertas ni avisos."}},
-            {"@type": "Question", "name": "¿Necesito instalar una aplicación?", "acceptedAnswer": {"@type": "Answer", "text": "No hace falta bajar nada de una tienda de apps: se usa desde el navegador del celular o computador. Sí recomendamos agregarla a la pantalla de inicio (toma unos segundos) para que quede como un ícono más y para que te lleguen las notificaciones del botón de pánico, especialmente en iPhone."}}
+            {"@type": "Question", "name": "¿Necesito instalar una aplicación?", "acceptedAnswer": {"@type": "Answer", "text": "Puedes usarla desde el navegador, sin instalar nada. Si tienes Android, también existe una app instalable (se descarga directo, todavía no está en Play Store). En iPhone no hay app nativa por ahora, pero funciona igual de bien desde el navegador."}}
         ]
     }
     </script>
@@ -349,14 +349,15 @@
     <header class="hero">
         <div class="container py-5 text-center">
             <span class="eyebrow mb-3"><i class="bi bi-shield-check"></i> Hecho en Chile, pensado primero para la seguridad de tu comunidad</span>
-            <h1 class="display-4 mb-3">Un barrio más conectado es un barrio mejor preparado</h1>
+            <h1 class="display-4 mb-3">El botón de pánico de tu comunidad, al alcance de todos</h1>
             <p class="fs-5 mb-4 mx-auto" style="max-width: 640px; opacity: 0.95;">
-                Un botón de pánico avisa a toda tu comunidad al instante, sin depender de que alguien vea el WhatsApp a tiempo. Y en el mismo panel, también avisos y directorio de vecinos -- gratis.
+                Un botón de pánico avisa a toda tu comunidad al instante, sin depender de que alguien vea el WhatsApp a tiempo. Avisos y directorio de vecinos en el mismo panel -- gratis, y ya disponible como <strong>app para Android</strong>.
             </p>
-            <div class="d-flex justify-content-center gap-3 flex-wrap mb-4">
+            <div class="d-flex justify-content-center gap-3 flex-wrap mb-3">
                 <a href="#solicitar" class="btn btn-light btn-lg px-4">Solicitar acceso</a>
                 <a href="#como-funciona" class="btn btn-outline-light btn-lg px-4">Ver cómo funciona</a>
             </div>
+            <p class="small mb-4" style="opacity: 0.85;">¿Solo quieres ver la app? <a href="{{ ANDROID_APP_URL }}" class="link-light">Instálala en Android →</a></p>
             <p class="small mb-5" style="opacity: 0.85;">Pensado para juntas de vecinos, condominios, pasajes y barrios en Chile. Gratis, sin letra chica.</p>
 
             <div class="row justify-content-center mx-auto" style="max-width: 760px;">
@@ -603,8 +604,8 @@
                     <div class="dato-real">
                         <i class="bi bi-phone text-rose"></i>
                         <div>
-                            <h3 class="h6 fw-semibold mb-1">Lista para la app de residentes</h3>
-                            <p class="text-muted mb-0">El mismo panel ya expone una API documentada, pensada para que los residentes usen todo esto también desde el celular.</p>
+                            <h3 class="h6 fw-semibold mb-1">Ya disponible como app para Android</h3>
+                            <p class="text-muted mb-0">Botón de pánico, avisos y directorio desde el bolsillo, sin pasar por el navegador. <a href="{{ ANDROID_APP_URL }}">Instálala acá</a> (próximamente en iPhone).</p>
                         </div>
                     </div>
                 </div>
@@ -686,7 +687,7 @@
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">¿Necesito instalar una aplicación?</button>
                     </h3>
                     <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#acordeonFaq">
-                        <div class="accordion-body text-muted">No hace falta bajar nada de una tienda de apps: se usa desde el navegador del celular o computador. Sí recomendamos agregarla a la pantalla de inicio (toma unos segundos) para que quede como un ícono más y para que te lleguen las notificaciones del botón de pánico, especialmente en iPhone. <a href="{% url 'como-instalar' %}">Ver cómo</a>.</div>
+                        <div class="accordion-body text-muted">Puedes usarla desde el navegador, sin instalar nada. Si tienes Android, también existe una <a href="{{ ANDROID_APP_URL }}">app instalable</a> (se descarga directo, todavía no está en Play Store) con botón de pánico, avisos y directorio. En iPhone no hay app nativa por ahora, pero funciona igual de bien desde el navegador -- te recomendamos agregarla a la pantalla de inicio. <a href="{% url 'como-instalar' %}">Ver cómo</a>.</div>
                     </div>
                 </div>
                 <div class="accordion-item">

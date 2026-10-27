@@ -1,6 +1,7 @@
 import re
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
@@ -2121,6 +2122,46 @@ class PaginasPublicasRenderizanTests(TestCase):
         trastornos vestibulares (WCAG 2.3.3)."""
         r = self.client.get(reverse("inicio"))
         self.assertContains(r, "prefers-reduced-motion: reduce")
+
+    def test_landing_el_hero_menciona_la_app_android(self):
+        # Hallazgo de la auditoría CRO (27-10-2026): alguien que llega desde
+        # un post que ya menciona "existe la app para Android" no lo veía
+        # confirmado en el hero -- quedaba enterrado varias secciones abajo.
+        r = self.client.get(reverse("inicio"))
+        contenido = r.content.decode()
+        inicio_hero = contenido.index('class="hero"')
+        fin_hero = contenido.index("</header>", inicio_hero)
+        self.assertIn("Android", contenido[inicio_hero:fin_hero])
+
+    def test_landing_el_hero_tiene_un_link_de_bajo_compromiso_a_la_app(self):
+        # Para tráfico frío (gente recién curioseando) que no está lista
+        # para el formulario de "Solicitar acceso" de 6 campos.
+        r = self.client.get(reverse("inicio"))
+        contenido = r.content.decode()
+        inicio_hero = contenido.index('class="hero"')
+        fin_hero = contenido.index("</header>", inicio_hero)
+        self.assertIn(settings.ANDROID_APP_URL, contenido[inicio_hero:fin_hero])
+
+    def test_landing_no_describe_la_app_como_algo_futuro(self):
+        # Hallazgo de la auditoría CRO (27-10-2026): la sección "Construido
+        # para la realidad..." tenía un bloque ("Lista para la app de
+        # residentes") que describía la app Android como algo habilitado
+        # por una API, "pensada para" usarse a futuro -- cuando ya existe y
+        # se está repartiendo a vecinos reales. Mismo tipo de bug que el ya
+        # corregido en el README/política de privacidad esta sesión.
+        r = self.client.get(reverse("inicio"))
+        self.assertNotContains(r, "pensada para que los residentes usen")
+
+    def test_landing_el_faq_de_instalar_menciona_la_app_android_real(self):
+        # El FAQ seguía con la respuesta antigua tipo PWA, sin mencionar
+        # que ya existe una app Android instalable de verdad.
+        r = self.client.get(reverse("inicio"))
+        contenido = r.content.decode()
+        inicio_faq = contenido.index('id="faq4"')
+        fin_faq = contenido.index("</div>", contenido.index("accordion-body", inicio_faq))
+        bloque = contenido[inicio_faq:fin_faq]
+        self.assertIn("Android", bloque)
+        self.assertIn(settings.ANDROID_APP_URL, bloque)
 
     def test_terminos_renderiza(self):
         r = self.client.get(reverse("terminos"))
