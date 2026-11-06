@@ -189,7 +189,12 @@ if os.environ.get('RESEND_API_KEY'):
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@mibarrioplus.local')
+# Con nombre visible ("Mi Barrio+ <no-reply@...>") en vez de solo la
+# dirección cruda -- es una señal de confianza más para filtros como el de
+# Hotmail/Outlook, que son particularmente agresivos mandando a spam correo
+# transaccional de dominios nuevos con poco volumen todavía.
+_email_from = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@mibarrioplus.local')
+DEFAULT_FROM_EMAIL = _email_from if '<' in _email_from else f'{PLATFORM_NAME} <{_email_from}>'
 
 
 # Cobro automático recurrente vía Mercado Pago (API Preapproval, no
