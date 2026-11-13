@@ -14,7 +14,7 @@ on:
 
 jobs:
   sincronizar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # fijo (no ubuntu-latest): ubuntu-latest saltó a 26.04 y ahí no hay build de Python 3.12.7
     steps:
       - uses: actions/checkout@v4
 
